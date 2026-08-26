@@ -1,7 +1,11 @@
 package com.smarttimetable.service;
 
 import com.smarttimetable.entity.FacultyAvailability;
+import com.smarttimetable.entity.Teacher;
+import com.smarttimetable.entity.TimeSlot;
 import com.smarttimetable.repository.FacultyAvailabilityRepository;
+import com.smarttimetable.repository.TeacherRepository;
+import com.smarttimetable.repository.TimeSlotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +17,12 @@ public class FacultyAvailabilityService {
 
     @Autowired
     private FacultyAvailabilityRepository facultyAvailabilityRepository;
+
+    @Autowired
+    private TeacherRepository teacherRepository;
+
+    @Autowired
+    private TimeSlotRepository timeSlotRepository;
 
     public List<FacultyAvailability> getAllAvailabilities() {
         return facultyAvailabilityRepository.findAll();
@@ -30,10 +40,12 @@ public class FacultyAvailabilityService {
             fa = opt.get();
             fa.setAvailable(available);
         } else {
-            fa = new FacultyAvailability();
-            // set defaults if creating new
-            fa.setAvailable(available);
-            fa.setDay(day);
+            Teacher teacher = teacherRepository.findById(teacherId)
+                    .orElseThrow(() -> new RuntimeException("Teacher not found"));
+            TimeSlot timeSlot = timeSlotRepository.findById(timeSlotId)
+                    .orElseThrow(() -> new RuntimeException("TimeSlot not found"));
+            
+            fa = new FacultyAvailability(teacher, day, timeSlot, available);
         }
         return facultyAvailabilityRepository.save(fa);
     }

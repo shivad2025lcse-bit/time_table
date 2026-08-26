@@ -74,6 +74,11 @@ public class DataInitializerService implements CommandLineRunner {
         User facultyUser4 = userRepository.save(new User("fharis012345", passwordEncoder.encode("haris012345"), Role.ROLE_FACULTY, "harikarthick@sece.ac.in", true));
         User facultyUser5 = userRepository.save(new User("fkartm012345", passwordEncoder.encode("kartm012345"), Role.ROLE_FACULTY, "karthickraja@sece.ac.in", true));
         User facultyUser6 = userRepository.save(new User("fsaran012345", passwordEncoder.encode("saran012345"), Role.ROLE_FACULTY, "n.saranya@sece.ac.in", true));
+        User facultyUser7 = userRepository.save(new User("fanant012345", passwordEncoder.encode("anant012345"), Role.ROLE_FACULTY, "s.ananthi@sece.ac.in", true));
+        User facultyUser8 = userRepository.save(new User("fparth012345", passwordEncoder.encode("parth012345"), Role.ROLE_FACULTY, "v.parthipan@sece.ac.in", true));
+        User facultyUser9 = userRepository.save(new User("fanand012345", passwordEncoder.encode("anand012345"), Role.ROLE_FACULTY, "a.anandaraj@sece.ac.in", true));
+        User facultyUser10 = userRepository.save(new User("fsarfa012345", passwordEncoder.encode("sarfa012345"), Role.ROLE_FACULTY, "a.sarfaraz@sece.ac.in", true));
+        User facultyUser11 = userRepository.save(new User("fsures012345", passwordEncoder.encode("sures012345"), Role.ROLE_FACULTY, "r.k.suresh@sece.ac.in", true));
         userRepository.save(new User("smithp012345", passwordEncoder.encode("mithp012345"), Role.ROLE_STUDENT, "student@sece.ac.in", true));
 
         // 2. Create Academic Year
@@ -91,6 +96,7 @@ public class DataInitializerService implements CommandLineRunner {
         Course itCourse = courseRepository.save(new Course("BTECH-IT", "B.Tech Information Technology", itDept));
         Course aidsCourse = courseRepository.save(new Course("BTECH-AIDS", "B.Tech AI & Data Science", aidsDept));
         Course aimlCourse = courseRepository.save(new Course("BTECH-AIML", "B.Tech AI & Machine Learning", aimlDept));
+        Course meCseCourse = courseRepository.save(new Course("ME-CSE", "M.E. Computer Science and Engineering", cseDept));
 
         // 5. Create Teachers
         Teacher t1 = teacherRepository.save(new Teacher("EMP_CSE_01", "Karthick", "R", "r.karthick.personal@gmail.com", "r.karthick@sece.ac.in", "9876543210", "", "Design and Analysis of Algorithms", cseDept, facultyUser1));
@@ -111,6 +117,22 @@ public class DataInitializerService implements CommandLineRunner {
         Teacher t6 = teacherRepository.save(new Teacher("EMP_CSE_05", "Saranya", "N", "n.saranya.personal@gmail.com", "n.saranya@sece.ac.in", "9876543215", "", "Artificial Intelligence", cseDept, facultyUser6));
         t6.setDisplayName("Dr.N.Saranya, AP/CSE");
         teacherRepository.save(t6);
+        Teacher t7 = teacherRepository.save(new Teacher("EMP_CSE_06", "Ananthi", "S", "s.ananthi.personal@gmail.com", "s.ananthi@sece.ac.in", "9876543216", "", "Project Work", cseDept, facultyUser7));
+        t7.setDisplayName("Dr.S.Ananthi, AP/CSE");
+        t7.setClassAdvisorFor("II M.E. CSE");
+        teacherRepository.save(t7);
+        Teacher t8 = teacherRepository.save(new Teacher("EMP_ECE_01", "Parthipan", "V", "v.parthipan.personal@gmail.com", "v.parthipan@sece.ac.in", "9876543217", "", "Internet of Things", eceDept, facultyUser8));
+        t8.setDisplayName("Mr.V.Parthipan, AP/ECE");
+        teacherRepository.save(t8);
+        Teacher t9 = teacherRepository.save(new Teacher("EMP_CSE_07", "Anandaraj", "A", "a.anandaraj.personal@gmail.com", "a.anandaraj@sece.ac.in", "9876543218", "", "Data Visualization Techniques", cseDept, facultyUser9));
+        t9.setDisplayName("Dr.A.Anandaraj, AP/CSE");
+        teacherRepository.save(t9);
+        Teacher t10 = teacherRepository.save(new Teacher("EMP_CSE_08", "Sarfaraz Ahmed", "A", "a.sarfaraz.personal@gmail.com", "a.sarfaraz@sece.ac.in", "9876543219", "", "Big Data Analytics", cseDept, facultyUser10));
+        t10.setDisplayName("Dr.A.Sarfaraz Ahmed, AP/CSE");
+        teacherRepository.save(t10);
+        Teacher t11 = teacherRepository.save(new Teacher("EMP_MECH_01", "Suresh", "R.K.", "r.k.suresh.personal@gmail.com", "r.k.suresh@sece.ac.in", "9876543220", "", "Total Quality Management", cseDept, facultyUser11));
+        t11.setDisplayName("Dr.R.K.Suresh, Prof/MECH");
+        teacherRepository.save(t11);
         Teacher tPlacement = teacherRepository.save(new Teacher("EMP_PLACE_01", "Placement", "Team", "placement@gmail.com", "placement@sece.ac.in", "9876543299", "", "Advanced Logical Thinking", cseDept, null));
         tPlacement.setDisplayName("Placement Team");
         teacherRepository.save(tPlacement);
@@ -129,6 +151,7 @@ public class DataInitializerService implements CommandLineRunner {
         Section sec2ItA = sectionRepository.save(new Section("II IT A", itCourse, 3, 60));
         Section sec2AidsA = sectionRepository.save(new Section("II AI&DS A", aidsCourse, 3, 60));
         Section sec2AimlA = sectionRepository.save(new Section("II AI&ML A", aimlCourse, 3, 60));
+        Section secMeCse = sectionRepository.save(new Section("II M.E. CSE", meCseCourse, 3, 30));
 
         // 8. No default students — roster starts empty; Admin/Faculty can add students from the UI.
 
@@ -154,18 +177,19 @@ public class DataInitializerService implements CommandLineRunner {
         Subject subTWM = subjectRepository.save(new Subject("TWM01", "Teamwork & Management (TWM)", cseDept, t2, 3, 0, 1, SubjectType.THEORY));
         Subject subJavaProj = subjectRepository.save(new Subject("JAVA-PROJ", "Java Project", cseDept, t5, 3, 1, 2, SubjectType.PROJECT));
         Subject subAimlProj = subjectRepository.save(new Subject("AIML-PROJ", "AIML Project", cseDept, t6, 3, 1, 2, SubjectType.PROJECT));
+        Subject subMEProject = subjectRepository.save(new Subject("P23CS602", "Project Work - Phase I (PW)", cseDept, t7, 3, 1, 14, SubjectType.PROJECT));
 
         // 10. Create Exact Time Slots (08:40 AM to 04:10 PM)
-        TimeSlot slot1 = timeSlotRepository.save(new TimeSlot(1, "08:40 AM", "09:35 AM"));
-        TimeSlot slot2 = timeSlotRepository.save(new TimeSlot(2, "09:35 AM", "10:25 AM"));
-        TimeSlot slot3 = timeSlotRepository.save(new TimeSlot(3, "10:25 AM", "11:15 AM"));
-        TimeSlot slot4 = timeSlotRepository.save(new TimeSlot(4, "11:35 AM", "12:25 PM"));
-        TimeSlot slot5 = timeSlotRepository.save(new TimeSlot(5, "12:25 PM", "01:15 PM"));
+        TimeSlot slot1 = timeSlotRepository.save(new TimeSlot(1, "08:40 AM", "09:40 AM"));
+        TimeSlot slot2 = timeSlotRepository.save(new TimeSlot(2, "09:40 AM", "10:40 AM"));
+        TimeSlot slot3 = timeSlotRepository.save(new TimeSlot(3, "11:00 AM", "12:00 PM"));
+        TimeSlot slot4 = timeSlotRepository.save(new TimeSlot(4, "12:00 PM", "01:00 PM"));
+        TimeSlot slot5 = timeSlotRepository.save(new TimeSlot(5, "01:40 PM", "02:30 PM"));
         TimeSlot slot6 = timeSlotRepository.save(new TimeSlot(6, "02:30 PM", "03:20 PM"));
         TimeSlot slot7 = timeSlotRepository.save(new TimeSlot(7, "03:20 PM", "04:10 PM"));
 
         // 11. Create Faculty Availability for 6 Working Days
-        List<Teacher> teachers = Arrays.asList(t1, t2, t3, t4, t5, t6, tPlacement);
+        List<Teacher> teachers = Arrays.asList(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, tPlacement);
         List<String> days = Arrays.asList("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday");
         List<TimeSlot> slots = Arrays.asList(slot1, slot2, slot3, slot4, slot5, slot6, slot7);
 
@@ -177,62 +201,235 @@ public class DataInitializerService implements CommandLineRunner {
             }
         }
 
-        // 12. Pre-populate Exact Timetable for II CSE C
+
+        // 12. Pre-populate Exact Timetable for II CSE A, B, C, D
         String yr = "2026-2027";
-        // Monday
-        timetableRepository.save(new TimetableEntry("Monday", slot1, subSE, t4, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Monday", slot2, subAIMLLab, t6, null, labIntelAI, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Monday", slot3, subAIMLLab, t6, null, labIntelAI, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Monday", slot4, subJAVA, t5, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Monday", slot5, subDAA, t1, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Monday", slot6, subDM, t3, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Monday", slot7, subSE, t4, sf04, null, sec2CseC, 3, yr));
+        timetableRepository.deleteAll();
 
-        // Tuesday
-        timetableRepository.save(new TimetableEntry("Tuesday", slot1, subJAVA, t5, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Tuesday", slot2, subDBMS, t2, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Tuesday", slot3, subAIML, t6, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Tuesday", slot4, subJAVALab, t5, null, labFullStack, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Tuesday", slot5, subJAVALab, t5, null, labFullStack, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Tuesday", slot6, subDM, t3, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Tuesday", slot7, subUHV, t2, sf04, null, sec2CseC, 3, yr));
+        // SECTION II CSE A
+        Section secA = sectionRepository.findBySectionName("II CSE A").orElseGet(() -> sectionRepository.save(new Section("II CSE A", cseCourse, 3, 60)));
+        addTT("Monday", 1, "DAA", secA, yr, cseDept);
+        addTT("Monday", 2, "AIML (Practical)", secA, yr, cseDept);
+        addTT("Monday", 3, "AIML (Practical)", secA, yr, cseDept);
+        addTT("Monday", 4, "DM", secA, yr, cseDept);
+        addTT("Monday", 5, "DBMS LAB", secA, yr, cseDept);
+        addTT("Monday", 6, "DBMS LAB", secA, yr, cseDept);
+        addTT("Monday", 7, "DBMS LAB", secA, yr, cseDept);
+        addTT("Tuesday", 1, "DM", secA, yr, cseDept);
+        addTT("Tuesday", 2, "JAVA (Practical)", secA, yr, cseDept);
+        addTT("Tuesday", 3, "JAVA (Practical)", secA, yr, cseDept);
+        addTT("Tuesday", 4, "DBMS", secA, yr, cseDept);
+        addTT("Tuesday", 5, "SS", secA, yr, cseDept);
+        addTT("Tuesday", 6, "DAA LAB", secA, yr, cseDept);
+        addTT("Tuesday", 7, "DAA LAB", secA, yr, cseDept);
+        addTT("Wednesday", 1, "ALT", secA, yr, cseDept);
+        addTT("Wednesday", 2, "ALT", secA, yr, cseDept);
+        addTT("Wednesday", 3, "DBMS", secA, yr, cseDept);
+        addTT("Wednesday", 4, "SE", secA, yr, cseDept);
+        addTT("Wednesday", 5, "DM", secA, yr, cseDept);
+        addTT("Wednesday", 6, "DAA", secA, yr, cseDept);
+        addTT("Wednesday", 7, "JAVA", secA, yr, cseDept);
+        addTT("Thursday", 1, "DBMS", secA, yr, cseDept);
+        addTT("Thursday", 2, "DM", secA, yr, cseDept);
+        addTT("Thursday", 3, "AIML", secA, yr, cseDept);
+        addTT("Thursday", 4, "DAA", secA, yr, cseDept);
+        addTT("Thursday", 5, "SE LAB", secA, yr, cseDept);
+        addTT("Thursday", 6, "SE LAB", secA, yr, cseDept);
+        addTT("Thursday", 7, "DBMS", secA, yr, cseDept);
+        addTT("Friday", 1, "DAA LAB", secA, yr, cseDept);
+        addTT("Friday", 2, "DAA LAB", secA, yr, cseDept);
+        addTT("Friday", 3, "JAVA", secA, yr, cseDept);
+        addTT("Friday", 4, "AIML", secA, yr, cseDept);
+        addTT("Friday", 5, "DM-T", secA, yr, cseDept);
+        addTT("Friday", 6, "LIB", secA, yr, cseDept);
+        addTT("Friday", 7, "JAVA", secA, yr, cseDept);
+        addTT("Saturday", 1, "UHV", secA, yr, cseDept);
+        addTT("Saturday", 2, "CoE", secA, yr, cseDept);
+        addTT("Saturday", 3, "CoE", secA, yr, cseDept);
+        addTT("Saturday", 4, "CoE", secA, yr, cseDept);
+        addTT("Saturday", 5, "AIML (Project)", secA, yr, cseDept);
+        addTT("Saturday", 6, "AIML (Project)", secA, yr, cseDept);
+        addTT("Saturday", 7, "TWM", secA, yr, cseDept);
 
-        // Wednesday (Period 4 & 5 ALT - Advanced Logical Thinking by Placement Team, SF 05)
-        timetableRepository.save(new TimetableEntry("Wednesday", slot1, subDAA, t1, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Wednesday", slot2, subSELab, t4, null, labIntelAI, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Wednesday", slot3, subSELab, t4, null, labIntelAI, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Wednesday", slot4, subALT, tPlacement, sf05, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Wednesday", slot5, subALT, tPlacement, sf05, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Wednesday", slot6, subCOE, t1, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Wednesday", slot7, subCOE, t1, sf04, null, sec2CseC, 3, yr));
+        // SECTION II CSE B
+        Section secB = sectionRepository.findBySectionName("II CSE B").orElseGet(() -> sectionRepository.save(new Section("II CSE B", cseCourse, 3, 60)));
+        addTT("Monday", 1, "SE LAB", secB, yr, cseDept);
+        addTT("Monday", 2, "SE LAB", secB, yr, cseDept);
+        addTT("Monday", 3, "DBMS", secB, yr, cseDept);
+        addTT("Monday", 4, "AIML", secB, yr, cseDept);
+        addTT("Monday", 5, "DAA LAB", secB, yr, cseDept);
+        addTT("Monday", 6, "DAA LAB", secB, yr, cseDept);
+        addTT("Monday", 7, "DM", secB, yr, cseDept);
+        addTT("Tuesday", 1, "DBMS", secB, yr, cseDept);
+        addTT("Tuesday", 2, "AIML (Project)", secB, yr, cseDept);
+        addTT("Tuesday", 3, "AIML (Project)", secB, yr, cseDept);
+        addTT("Tuesday", 4, "DAA", secB, yr, cseDept);
+        addTT("Tuesday", 5, "DM", secB, yr, cseDept);
+        addTT("Tuesday", 6, "SS", secB, yr, cseDept);
+        addTT("Tuesday", 7, "JAVA", secB, yr, cseDept);
+        addTT("Wednesday", 1, "DAA", secB, yr, cseDept);
+        addTT("Wednesday", 2, "DM", secB, yr, cseDept);
+        addTT("Wednesday", 3, "ALT", secB, yr, cseDept);
+        addTT("Wednesday", 4, "ALT", secB, yr, cseDept);
+        addTT("Wednesday", 5, "DBMS LAB", secB, yr, cseDept);
+        addTT("Wednesday", 6, "DBMS LAB", secB, yr, cseDept);
+        addTT("Wednesday", 7, "DBMS LAB", secB, yr, cseDept);
+        addTT("Thursday", 1, "JAVA", secB, yr, cseDept);
+        addTT("Thursday", 2, "AIML (Practical)", secB, yr, cseDept);
+        addTT("Thursday", 3, "AIML (Practical)", secB, yr, cseDept);
+        addTT("Thursday", 4, "SE", secB, yr, cseDept);
+        addTT("Thursday", 5, "DBMS", secB, yr, cseDept);
+        addTT("Thursday", 6, "DAA", secB, yr, cseDept);
+        addTT("Thursday", 7, "LIB", secB, yr, cseDept);
+        addTT("Friday", 1, "DM", secB, yr, cseDept);
+        addTT("Friday", 2, "JAVA (Practical)", secB, yr, cseDept);
+        addTT("Friday", 3, "JAVA (Practical)", secB, yr, cseDept);
+        addTT("Friday", 4, "DBMS", secB, yr, cseDept);
+        addTT("Friday", 5, "DAA LAB", secB, yr, cseDept);
+        addTT("Friday", 6, "DAA LAB", secB, yr, cseDept);
+        addTT("Friday", 7, "AIML", secB, yr, cseDept);
+        addTT("Saturday", 1, "UHV", secB, yr, cseDept);
+        addTT("Saturday", 2, "CoE", secB, yr, cseDept);
+        addTT("Saturday", 3, "CoE", secB, yr, cseDept);
+        addTT("Saturday", 4, "CoE", secB, yr, cseDept);
+        addTT("Saturday", 5, "DM-T", secB, yr, cseDept);
+        addTT("Saturday", 6, "JAVA", secB, yr, cseDept);
+        addTT("Saturday", 7, "TWM", secB, yr, cseDept);
 
-        // Thursday
-        timetableRepository.save(new TimetableEntry("Thursday", slot1, subAIML, t6, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Thursday", slot2, subDAALab, t1, null, labFullStack, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Thursday", slot3, subDAALab, t1, null, labFullStack, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Thursday", slot4, subDM, t3, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Thursday", slot5, subSS, t1, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Thursday", slot6, subDBMSLab, t2, null, labCloudDevOps, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Thursday", slot7, subDBMSLab, t2, null, labCloudDevOps, sec2CseC, 3, yr));
+        // SECTION II CSE C
+        Section secC = sectionRepository.findBySectionName("II CSE C").orElseGet(() -> sectionRepository.save(new Section("II CSE C", cseCourse, 3, 60)));
+        addTT("Monday", 1, "DAA LAB", secC, yr, cseDept);
+        addTT("Monday", 2, "DAA LAB", secC, yr, cseDept);
+        addTT("Monday", 3, "DBMS", secC, yr, cseDept);
+        addTT("Monday", 4, "DM", secC, yr, cseDept);
+        addTT("Monday", 5, "DAA", secC, yr, cseDept);
+        addTT("Monday", 6, "SE", secC, yr, cseDept);
+        addTT("Monday", 7, "DM-T", secC, yr, cseDept);
+        addTT("Tuesday", 1, "DM", secC, yr, cseDept);
+        addTT("Tuesday", 2, "DM", secC, yr, cseDept);
+        addTT("Tuesday", 3, "ALT", secC, yr, cseDept);
+        addTT("Tuesday", 4, "ALT", secC, yr, cseDept);
+        addTT("Tuesday", 5, "JAVA (Practical)", secC, yr, cseDept);
+        addTT("Tuesday", 6, "JAVA (Practical)", secC, yr, cseDept);
+        addTT("Tuesday", 7, "SS", secC, yr, cseDept);
+        addTT("Wednesday", 1, "SE LAB", secC, yr, cseDept);
+        addTT("Wednesday", 2, "SE LAB", secC, yr, cseDept);
+        addTT("Wednesday", 3, "DM", secC, yr, cseDept);
+        addTT("Wednesday", 4, "AIML", secC, yr, cseDept);
+        addTT("Wednesday", 5, "DAA LAB", secC, yr, cseDept);
+        addTT("Wednesday", 6, "DAA LAB", secC, yr, cseDept);
+        addTT("Wednesday", 7, "DBMS", secC, yr, cseDept);
+        addTT("Thursday", 1, "JAVA", secC, yr, cseDept);
+        addTT("Thursday", 2, "DBMS", secC, yr, cseDept);
+        addTT("Thursday", 3, "DAA", secC, yr, cseDept);
+        addTT("Thursday", 4, "AIML", secC, yr, cseDept);
+        addTT("Thursday", 5, "DBMS", secC, yr, cseDept);
+        addTT("Thursday", 6, "AIML (Project)", secC, yr, cseDept);
+        addTT("Thursday", 7, "AIML (Project)", secC, yr, cseDept);
+        addTT("Friday", 1, "JAVA", secC, yr, cseDept);
+        addTT("Friday", 2, "AIML (Practical)", secC, yr, cseDept);
+        addTT("Friday", 3, "AIML (Practical)", secC, yr, cseDept);
+        addTT("Friday", 4, "DAA", secC, yr, cseDept);
+        addTT("Friday", 5, "DBMS LAB", secC, yr, cseDept);
+        addTT("Friday", 6, "DBMS LAB", secC, yr, cseDept);
+        addTT("Friday", 7, "DBMS LAB", secC, yr, cseDept);
+        addTT("Saturday", 1, "UHV", secC, yr, cseDept);
+        addTT("Saturday", 2, "CoE", secC, yr, cseDept);
+        addTT("Saturday", 3, "CoE", secC, yr, cseDept);
+        addTT("Saturday", 4, "CoE", secC, yr, cseDept);
+        addTT("Saturday", 5, "TWM", secC, yr, cseDept);
+        addTT("Saturday", 6, "JAVA", secC, yr, cseDept);
+        addTT("Saturday", 7, "LIB", secC, yr, cseDept);
 
-        // Friday
-        timetableRepository.save(new TimetableEntry("Friday", slot1, subDM, t3, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Friday", slot2, subLIB, t1, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Friday", slot3, subJAVA, t5, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Friday", slot4, subDAALab, t1, null, labFullStack, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Friday", slot5, subDAALab, t1, null, labFullStack, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Friday", slot6, subDM, t3, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Friday", slot7, subDBMS, t2, sf04, null, sec2CseC, 3, yr));
+        // SECTION II CSE D
+        Section secD = sectionRepository.findBySectionName("II CSE D").orElseGet(() -> sectionRepository.save(new Section("II CSE D", cseCourse, 3, 60)));
+        addTT("Monday", 1, "DM", secD, yr, cseDept);
+        addTT("Monday", 2, "DBMS", secD, yr, cseDept);
+        addTT("Monday", 3, "SE LAB", secD, yr, cseDept);
+        addTT("Monday", 4, "SE LAB", secD, yr, cseDept);
+        addTT("Monday", 5, "DAA", secD, yr, cseDept);
+        addTT("Monday", 6, "DM", secD, yr, cseDept);
+        addTT("Monday", 7, "DBMS", secD, yr, cseDept);
+        addTT("Tuesday", 1, "DAA LAB", secD, yr, cseDept);
+        addTT("Tuesday", 2, "DAA LAB", secD, yr, cseDept);
+        addTT("Tuesday", 3, "DM", secD, yr, cseDept);
+        addTT("Tuesday", 4, "JAVA", secD, yr, cseDept);
+        addTT("Tuesday", 5, "SS", secD, yr, cseDept);
+        addTT("Tuesday", 6, "SE", secD, yr, cseDept);
+        addTT("Tuesday", 7, "DAA", secD, yr, cseDept);
+        addTT("Wednesday", 1, "JAVA", secD, yr, cseDept);
+        addTT("Wednesday", 2, "AIML", secD, yr, cseDept);
+        addTT("Wednesday", 3, "JAVA (Practical)", secD, yr, cseDept);
+        addTT("Wednesday", 4, "JAVA (Practical)", secD, yr, cseDept);
+        addTT("Wednesday", 5, "DM", secD, yr, cseDept);
+        addTT("Wednesday", 6, "AIML (Practical)", secD, yr, cseDept);
+        addTT("Wednesday", 7, "AIML (Practical)", secD, yr, cseDept);
+        addTT("Thursday", 1, "AIML", secD, yr, cseDept);
+        addTT("Thursday", 2, "DBMS LAB", secD, yr, cseDept);
+        addTT("Thursday", 3, "DBMS LAB", secD, yr, cseDept);
+        addTT("Thursday", 4, "DBMS LAB", secD, yr, cseDept);
+        addTT("Thursday", 5, "JAVA", secD, yr, cseDept);
+        addTT("Thursday", 6, "DAA LAB", secD, yr, cseDept);
+        addTT("Thursday", 7, "DAA LAB", secD, yr, cseDept);
+        addTT("Friday", 1, "DAA", secD, yr, cseDept);
+        addTT("Friday", 2, "DM", secD, yr, cseDept);
+        addTT("Friday", 3, "ALT", secD, yr, cseDept);
+        addTT("Friday", 4, "ALT", secD, yr, cseDept);
+        addTT("Friday", 5, "DBMS", secD, yr, cseDept);
+        addTT("Friday", 6, "AIML (Project)", secD, yr, cseDept);
+        addTT("Friday", 7, "AIML (Project)", secD, yr, cseDept);
+        addTT("Saturday", 1, "UHV", secD, yr, cseDept);
+        addTT("Saturday", 2, "CoE", secD, yr, cseDept);
+        addTT("Saturday", 3, "CoE", secD, yr, cseDept);
+        addTT("Saturday", 4, "CoE", secD, yr, cseDept);
+        addTT("Saturday", 5, "DBMS", secD, yr, cseDept);
+        addTT("Saturday", 6, "LIB", secD, yr, cseDept);
+        addTT("Saturday", 7, "TWM", secD, yr, cseDept);
 
-        // Saturday
-        timetableRepository.save(new TimetableEntry("Saturday", slot1, subDBMS, t2, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Saturday", slot2, subJavaProj, t5, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Saturday", slot3, subJavaProj, t5, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Saturday", slot4, subDAA, t1, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Saturday", slot5, subTWM, t2, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Saturday", slot6, subAimlProj, t6, sf04, null, sec2CseC, 3, yr));
-        timetableRepository.save(new TimetableEntry("Saturday", slot7, subAimlProj, t6, sf04, null, sec2CseC, 3, yr));
+        // SECTION II M.E. CSE
+        // PW Slots from the uploaded timetable
+        addTT("Monday", 4, "PW", secMeCse, yr, cseDept);
+        addTT("Monday", 7, "PW", secMeCse, yr, cseDept);
+        addTT("Tuesday", 2, "PW", secMeCse, yr, cseDept);
+        addTT("Tuesday", 7, "PW", secMeCse, yr, cseDept);
+        addTT("Wednesday", 2, "PW", secMeCse, yr, cseDept);
+        addTT("Wednesday", 7, "PW", secMeCse, yr, cseDept);
+        addTT("Thursday", 4, "PW", secMeCse, yr, cseDept);
+        addTT("Thursday", 6, "PW", secMeCse, yr, cseDept);
+        addTT("Friday", 4, "PW", secMeCse, yr, cseDept);
+        addTT("Friday", 6, "PW", secMeCse, yr, cseDept);
+        addTT("Friday", 7, "PW", secMeCse, yr, cseDept);
+        addTT("Saturday", 1, "PW", secMeCse, yr, cseDept);
+        addTT("Saturday", 3, "PW", secMeCse, yr, cseDept);
+        addTT("Saturday", 4, "PW", secMeCse, yr, cseDept);
+        addTT("Saturday", 7, "PW", secMeCse, yr, cseDept);
+
+        // Create Student Users
+        createTestStudent("studenta", "studentA", "A", "studenta@sece.ac.in", cseDept, cseCourse, secA);
+        createTestStudent("studentb", "studentB", "B", "studentb@sece.ac.in", cseDept, cseCourse, secB);
+        createTestStudent("studentc", "studentC", "C", "studentc@sece.ac.in", cseDept, cseCourse, secC);
+        createTestStudent("studentd", "studentD", "D", "studentd@sece.ac.in", cseDept, cseCourse, secD);
 
         System.out.println(">>> SRI ESHWAR COLLEGE TIME TABLE GENERATOR INITIALIZATION COMPLETED!");
+    }
+
+    private void addTT(String day, int slotIndex, String subjectName, Section section, String yr, Department dept) {
+        TimeSlot ts = timeSlotRepository.findById((long) slotIndex).orElseThrow();
+        Subject subject = subjectRepository.findAll().stream()
+                .filter(s -> s.getSubjectName().contains("(" + subjectName + ")") || s.getSubjectName().contains(subjectName))
+                .findFirst()
+                .orElseGet(() -> subjectRepository.save(new Subject("NEW_" + subjectName.replaceAll("\\s+",""), subjectName, dept, null, 3, 3, 3, SubjectType.THEORY)));
+        Teacher teacher = subject.getAssignedTeacher();
+        if (teacher == null) {
+            teacher = teacherRepository.findAll().get(0); // Fallback to first teacher to avoid DB constraint violation
+        }
+        timetableRepository.save(new TimetableEntry(day, ts, subject, teacher, null, null, section, 3, yr));
+    }
+
+    private void createTestStudent(String username, String firstName, String lastName, String email, Department dept, Course course, Section section) {
+        if (!userRepository.existsByUsername(username)) {
+            User u = userRepository.save(new User(username, passwordEncoder.encode("student123"), Role.ROLE_STUDENT, email, true));
+            studentRepository.save(new Student(username.toUpperCase(), firstName, lastName, email, email, dept, course, section, 3, u));
+        }
     }
 }

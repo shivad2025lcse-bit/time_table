@@ -87,15 +87,26 @@ public class StudentService {
             String last4 = phone.length() >= 4 ? phone.substring(phone.length() - 4) : "0000";
             String password = firstName + last4;
             
-            com.smarttimetable.entity.User newUser = new com.smarttimetable.entity.User(
-                username,
-                passwordEncoder.encode(password),
-                com.smarttimetable.entity.Role.ROLE_STUDENT,
-                student.getEmail(),
-                true
-            );
-            newUser = userRepository.save(newUser);
-            student.setUser(newUser);
+            // Check for orphaned user record from previous deletion before cascade was added
+            com.smarttimetable.entity.User user = userRepository.findByUsername(username).orElse(null);
+            
+            if (user == null) {
+                user = new com.smarttimetable.entity.User(
+                    username,
+                    passwordEncoder.encode(password),
+                    com.smarttimetable.entity.Role.ROLE_STUDENT,
+                    student.getEmail(),
+                    true
+                );
+            } else {
+                // Reuse orphaned user and reset password/email
+                user.setPassword(passwordEncoder.encode(password));
+                user.setEmail(student.getEmail());
+                user.setRole(com.smarttimetable.entity.Role.ROLE_STUDENT);
+                user.setActive(true);
+            }
+            user = userRepository.save(user);
+            student.setUser(user);
         }
         
         return studentRepository.save(student);

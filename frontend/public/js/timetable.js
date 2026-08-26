@@ -13,6 +13,7 @@ async function loadTimetableData() {
         const entriesRes = await apiFetch('/api/timetable');
         if (entriesRes.ok) {
             currentTimetableEntries = await entriesRes.json();
+            window.currentTimetableEntries = currentTimetableEntries; // Expose for frontend_app.js
             renderTimetableGrid(currentTimetableEntries);
             populateGridFilters();
         }

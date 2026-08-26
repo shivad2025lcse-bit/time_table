@@ -17,7 +17,13 @@ import com.smarttimetable.service.TimetableGeneratorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.smarttimetable.repository.UserRepository;
+import com.smarttimetable.repository.StudentRepository;
+import com.smarttimetable.entity.User;
+import com.smarttimetable.entity.Student;
+
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -45,8 +51,42 @@ public class TimetableController {
     @Autowired
     private ConflictService conflictService;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private StudentRepository studentRepository;
+
     @GetMapping
-    public ResponseEntity<List<TimetableEntryDto>> getAllTimetableEntries() {
+    public ResponseEntity<List<TimetableEntryDto>> getAllTimetableEntries(Authentication authentication) {
+        if (authentication != null && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))) {
+            String username = authentication.getName();
+            User user = userRepository.findByUsername(username).orElse(null);
+            if (user != null) {
+                Student student = studentRepository.findByUserId(user.getId()).orElse(null);
+                if (student != null && student.getSection() != null) {
+                    List<TimetableEntry> entries = timetableRepository.findBySectionId(student.getSection().getId());
+                    return ResponseEntity.ok(entries.stream()
+                            .map(timetableGeneratorService::convertToDto)
+                            .collect(Collectors.toList()));
+                }
+            }
+        }
+        
+        if (authentication != null && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_FACULTY"))) {
+            String username = authentication.getName();
+            User user = userRepository.findByUsername(username).orElse(null);
+            if (user != null) {
+                Teacher teacher = teacherRepository.findByUserId(user.getId()).orElse(null);
+                if (teacher != null) {
+                    List<TimetableEntry> entries = timetableRepository.findByTeacherId(teacher.getId());
+                    return ResponseEntity.ok(entries.stream()
+                            .map(timetableGeneratorService::convertToDto)
+                            .collect(Collectors.toList()));
+                }
+            }
+        }
+        
         List<TimetableEntry> entries = timetableRepository.findAll();
         return ResponseEntity.ok(entries.stream()
                 .map(timetableGeneratorService::convertToDto)
@@ -104,7 +144,10 @@ public class TimetableController {
     }
 
     @GetMapping("/teacher/{teacherId}")
-    public ResponseEntity<List<TimetableEntryDto>> getTeacherTimetable(@PathVariable Long teacherId) {
+    public ResponseEntity<List<TimetableEntryDto>> getTeacherTimetable(@PathVariable Long teacherId, Authentication authentication) {
+        if (authentication != null && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))) {
+            return ResponseEntity.status(403).build();
+        }
         List<TimetableEntry> entries = timetableRepository.findByTeacherId(teacherId);
         return ResponseEntity.ok(entries.stream()
                 .map(timetableGeneratorService::convertToDto)
@@ -112,7 +155,17 @@ public class TimetableController {
     }
 
     @GetMapping("/section/{sectionId}")
-    public ResponseEntity<List<TimetableEntryDto>> getSectionTimetable(@PathVariable Long sectionId) {
+    public ResponseEntity<List<TimetableEntryDto>> getSectionTimetable(@PathVariable Long sectionId, Authentication authentication) {
+        if (authentication != null && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))) {
+            String username = authentication.getName();
+            User user = userRepository.findByUsername(username).orElse(null);
+            if (user != null) {
+                Student student = studentRepository.findByUserId(user.getId()).orElse(null);
+                if (student == null || student.getSection() == null || !student.getSection().getId().equals(sectionId)) {
+                    return ResponseEntity.status(403).build();
+                }
+            }
+        }
         List<TimetableEntry> entries = timetableRepository.findBySectionId(sectionId);
         return ResponseEntity.ok(entries.stream()
                 .map(timetableGeneratorService::convertToDto)
@@ -120,7 +173,10 @@ public class TimetableController {
     }
 
     @GetMapping("/room/{classroomId}")
-    public ResponseEntity<List<TimetableEntryDto>> getClassroomTimetable(@PathVariable Long classroomId) {
+    public ResponseEntity<List<TimetableEntryDto>> getClassroomTimetable(@PathVariable Long classroomId, Authentication authentication) {
+        if (authentication != null && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))) {
+            return ResponseEntity.status(403).build();
+        }
         List<TimetableEntry> entries = timetableRepository.findByClassroomId(classroomId);
         return ResponseEntity.ok(entries.stream()
                 .map(timetableGeneratorService::convertToDto)
@@ -128,7 +184,10 @@ public class TimetableController {
     }
 
     @GetMapping("/lab/{laboratoryId}")
-    public ResponseEntity<List<TimetableEntryDto>> getLaboratoryTimetable(@PathVariable Long laboratoryId) {
+    public ResponseEntity<List<TimetableEntryDto>> getLaboratoryTimetable(@PathVariable Long laboratoryId, Authentication authentication) {
+        if (authentication != null && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))) {
+            return ResponseEntity.status(403).build();
+        }
         List<TimetableEntry> entries = timetableRepository.findByLaboratoryId(laboratoryId);
         return ResponseEntity.ok(entries.stream()
                 .map(timetableGeneratorService::convertToDto)

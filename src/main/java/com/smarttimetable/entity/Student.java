@@ -48,7 +48,7 @@ public class Student {
     @Column(name = "parent_phone_2")
     private String parentPhone2;
 
-    @OneToOne(fetch = FetchType.EAGER)
+    @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id")
     private User user;
 

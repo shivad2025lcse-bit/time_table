@@ -52,16 +52,25 @@ public class TeacherService {
             String baseUser = firstPart + lastPart + "012345";
             String username = "f" + baseUser;
             
-            com.smarttimetable.entity.User newUser = new com.smarttimetable.entity.User(
-                username, 
-                passwordEncoder.encode(baseUser), 
-                com.smarttimetable.entity.Role.ROLE_FACULTY, 
-                teacher.getCollegeEmail(), 
-                true
-            );
+            com.smarttimetable.entity.User user = userRepository.findByUsername(username).orElse(null);
             
-            newUser = userRepository.save(newUser);
-            teacher.setUser(newUser);
+            if (user == null) {
+                user = new com.smarttimetable.entity.User(
+                    username, 
+                    passwordEncoder.encode(baseUser), 
+                    com.smarttimetable.entity.Role.ROLE_FACULTY, 
+                    teacher.getCollegeEmail(), 
+                    true
+                );
+            } else {
+                user.setPassword(passwordEncoder.encode(baseUser));
+                user.setEmail(teacher.getCollegeEmail());
+                user.setRole(com.smarttimetable.entity.Role.ROLE_FACULTY);
+                user.setActive(true);
+            }
+            
+            user = userRepository.save(user);
+            teacher.setUser(user);
         }
         return teacherRepository.save(teacher);
     }
