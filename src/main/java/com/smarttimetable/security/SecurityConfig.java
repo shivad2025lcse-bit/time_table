@@ -57,6 +57,10 @@ public class SecurityConfig {
                     "/api/auth/login",
                     "/api/auth/reset-password",
                     "/api/notifications/**",
+                    "/api/operations/**",
+                    "/api/teachers/**",
+                    "/api/sections/**",
+                    "/api/timetable/**",
                     "/h2-console/**"
                 ).permitAll()
                 .anyRequest().authenticated()

@@ -202,7 +202,7 @@ export default function DashboardLayout() {
                                 <button id="studentDetailsOnlyBtn" className="btn btn-sm btn-outline-info d-none align-items-center gap-1" type="button" onClick={() => window.openStudentDetailsModal()} >
                                     <i className="fa-solid fa-clipboard-list"></i> Student Details
                                 </button>
-                                <button id="manageSectionsBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#manageSectionsModal">
+                                <button id="manageSectionsBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()}>
                                     <i className="fa-solid fa-folder-tree"></i> <span id="manageSectionsBtnText">Manage Sections</span>
                                 </button>
                                 <button id="manageRosterBtn" className="btn btn-sm btn-indigo d-flex align-items-center gap-1  style-btn" style={{ background: "var(--sece-indigo)" }} data-bs-toggle="modal" data-bs-target="#manageRosterModal">
@@ -229,6 +229,11 @@ export default function DashboardLayout() {
                                     <i className="fa-solid fa-people-arrows"></i> Staff Availability / Substitution
                                 </button>
 
+                                {(!isAdmin && !isStudent) && (
+                                    <button id="myTimetableBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => window.renderMyTimetable && window.renderMyTimetable()}>
+                                        <i className="fa-solid fa-calendar-user"></i> YOUR TIMETABLE
+                                    </button>
+                                )}
 
                                 <div className="dropdown">
                                     <button className="btn btn-sm btn-success dropdown-toggle fw-bold d-flex align-items-center gap-1" type="button" id="downloadDropdown" data-bs-toggle="dropdown">
@@ -253,45 +258,47 @@ export default function DashboardLayout() {
                     <div className="glass-panel p-3">
                         <div className="row g-3 align-items-center">
 
-                            <div className="col-md-3 col-sm-6" id="deptFilterWrapper">
-                                <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-building-columns text-primary me-1"></i> Department</label>
-                                <select id="deptSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.populateSectionSelects?.(); if (!isAdmin) window.onFilterChange?.(); }} >
-                                    <option value="">-- Select Department --</option>
-                                    <option value="CSE">CSE - Computer Science & Engg</option>
-                                    <option value="IT">IT - Information Technology</option>
-                                    <option value="AIDS">AI&DS - Artificial Intelligence & Data Science</option>
-                                    <option value="ECE">ECE - Electronics & Comm Engg</option>
-                                    <option value="EEE">EEE - Electrical & Electronics Engg</option>
-                                    <option value="MECH">MECH - Mechanical Engineering</option>
-                                    <option value="CIVIL">CIVIL - Civil Engineering</option>
-                                    <option value="CSD">CSD - Computer Science & Design</option>
-                                </select>
-                            </div>
+                            {(isAdmin || location.pathname === "/faculty") && (
+                                <>
+                                    <div className="col-md-3 col-sm-6" id="deptFilterWrapper">
+                                        <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-building-columns text-primary me-1"></i> Department</label>
+                                        <select id="deptSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.populateSectionSelects?.(); window.onFilterChange?.(); }} >
+                                            <option value="">-- Select Department --</option>
+                                            <option value="CSE">CSE - Computer Science & Engg</option>
+                                            <option value="IT">IT - Information Technology</option>
+                                            <option value="AIDS">AI&DS - Artificial Intelligence & Data Science</option>
+                                            <option value="ECE">ECE - Electronics & Comm Engg</option>
+                                            <option value="EEE">EEE - Electrical & Electronics Engg</option>
+                                            <option value="MECH">MECH - Mechanical Engineering</option>
+                                            <option value="CIVIL">CIVIL - Civil Engineering</option>
+                                            <option value="CSD">CSD - Computer Science & Design</option>
+                                        </select>
+                                    </div>
 
 
-                            <div className="col-md-2 col-sm-6" id="secFilterWrapper">
-                                <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-layer-group text-info me-1"></i> Section</label>
-                                <select id="sectionSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { if (!isAdmin) window.onFilterChange(); }} >
-                                    <option value="CSE_C">II CSE C [SF 04]</option>
-                                    <option value="CSE_A">II CSE A [SF 02]</option>
-                                    <option value="CSE_B">II CSE B [SF 03]</option>
-                                    <option value="IT_A">II IT A [IT 101]</option>
-                                    <option value="AIDS_A">II AI&DS A [AI 201]</option>
-                                    <option value="ECE_A">II ECE A [EC 301]</option>
-                                </select>
-                            </div>
-
-                            {isAdmin && (
-                                <div className="col-md-2 col-sm-6 d-flex align-items-end" id="adminSubmitFilterWrapper">
-                                    <button className="btn btn-sm btn-success w-100 fw-bold" onClick={() => window.onFilterChange()}><i className="fa-solid fa-check-circle me-1"></i> Submit</button>
-                                </div>
+                                    <div className="col-md-2 col-sm-6" id="secFilterWrapper">
+                                        <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-layer-group text-info me-1"></i> Section</label>
+                                        <select id="sectionSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.onFilterChange?.(); }} >
+                                            <option value="CSE_C">II CSE C [SF 04]</option>
+                                            <option value="CSE_A">II CSE A [SF 02]</option>
+                                            <option value="CSE_B">II CSE B [SF 03]</option>
+                                            <option value="IT_A">II IT A [IT 101]</option>
+                                            <option value="AIDS_A">II AI&DS A [AI 201]</option>
+                                            <option value="ECE_A">II ECE A [EC 301]</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div className="col-md-2 col-sm-6 d-flex align-items-end" id="adminSubmitFilterWrapper">
+                                        <button className="btn btn-sm btn-success w-100 fw-bold" onClick={() => { window.onFilterChange?.(); window.showTtPopup?.(); }}><i className="fa-solid fa-check-circle me-1"></i> Submit</button>
+                                    </div>
+                                </>
                             )}
 
                             {!isAdmin && (
                                 <div className="col-md-7 d-flex justify-content-md-end justify-content-start gap-4">
-                                    <div className="card shadow border-secondary bg-dark" style={{ minWidth: "250px", borderRadius: "8px" }}>
-                                        <div className="card-body p-3 text-light" style={{ fontSize: "0.9rem" }}>
-                                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <div id="batchInfoCard" className="card shadow border-secondary bg-dark" style={{ minWidth: "250px", borderRadius: "8px" }}>
+                                        <div id="batchInfoCardBody" className="card-body p-3 text-light" style={{ fontSize: "0.9rem" }}>
+                                            <div id="bannerBatchRow" className="d-flex justify-content-between align-items-center mb-2">
                                                 <div>
                                                     <strong className="text-muted"><i className="fa-solid fa-calendar-check text-info me-1"></i> Batch:</strong>
                                                 </div>
@@ -300,7 +307,7 @@ export default function DashboardLayout() {
                                                     <i id="batchEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Batch"></i>
                                                 </div>
                                             </div>
-                                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                            <div id="bannerSemRow" className="d-flex justify-content-between align-items-center mb-2">
                                                 <div>
                                                     <strong className="text-muted"><i className="fa-solid fa-book-open text-warning me-1"></i> Semester:</strong>
                                                 </div>
@@ -320,7 +327,7 @@ export default function DashboardLayout() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="d-flex flex-column justify-content-center gap-2 text-light p-3 card shadow border-secondary bg-dark" style={{ borderRadius: "8px", fontSize: "0.9rem" }}>
+                                    <div id="classInfoBlock" className="d-flex flex-column justify-content-center gap-2 text-light p-3 card shadow border-secondary bg-dark" style={{ borderRadius: "8px", fontSize: "0.9rem" }}>
                                         <div><strong className="text-muted"><i className="fa-solid fa-users text-primary me-1"></i> Class Strength:</strong> <span className="badge bg-success ms-1" id="classStrengthBadge">61 Students</span></div>
                                         <div><strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Class Advisor:</strong> <span className="text-warning ms-1">Ms.J.Keerthika, AP/CSE</span></div>
                                     </div>
@@ -333,7 +340,7 @@ export default function DashboardLayout() {
                     {!isAdmin && (
                         <>
                             <div id="roleBanner" className="alert alert-info py-2 px-3 border-0 rounded-3 d-flex align-items-center justify-content-between mb-3 shadow-sm">
-                                <div>
+                                <div id="roleBannerTextContainer">
                                     <i className="fa-solid fa-shield-halved me-2"></i>
                                     <span id="roleBannerText">Logged in as <strong>ADMIN</strong>. Click on any period cell in the grid to edit schedule, swap slots, or assign Placement ALT.</span>
                                 </div>
@@ -355,9 +362,11 @@ export default function DashboardLayout() {
                                 <strong>Please select a Department and Section from the dropdowns above to view and edit its timetable.</strong>
                             </div>
 
+                            <div id="ttPopupOverlayWrapper" className="tt-popup-wrapper">
+                                <button id="closeTtPopupBtn" className="btn btn-danger btn-sm d-none" style={{ position: 'fixed', top: '20px', right: '30px', zIndex: 10001, borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }} onClick={() => window.closeTtPopup?.()}><i className="fa-solid fa-xmark"></i></button>
 
-                            <div className="glass-panel" id="timetableCaptureArea">
-                                <div className="panel-header">
+                                <div className="glass-panel" id="timetableCaptureArea">
+                                    <div className="panel-header">
                                     <h2 className="panel-title d-flex align-items-center gap-2">
                                         <i className="fa-solid fa-calendar-days text-info"></i>
                                         <span id="ttTitleHeader" style={{ outline: "none", padding: "2px 5px", borderRadius: "4px", border: "1px dashed transparent" }}>Class Timetable - Academic Schedule (II CSE C - Classroom SF 04)</span>
@@ -414,6 +423,7 @@ export default function DashboardLayout() {
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
                             </div>
 
                         </>
@@ -474,6 +484,18 @@ export default function DashboardLayout() {
                                             <i className="fa-solid fa-calendar-days text-warning mb-3" style={{ fontSize: "2.5rem" }}></i>
                                             <h5 className="text-light fw-bold mb-2">Timetable Defaults</h5>
                                             <p className="text-muted small mb-0">Set global Batch, Semester and Academic Year defaults.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="row g-4 mt-1">
+                                <div className="col-md-4 col-sm-6">
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(230,100,50,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                            <i className="fa-solid fa-folder-tree text-danger mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                            <h5 className="text-light fw-bold mb-2">View Sections</h5>
+                                            <p className="text-muted small mb-0">View and manage all academic sections created.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -704,11 +726,11 @@ export default function DashboardLayout() {
                             <p id="sectionsAdminOnlyNote" className="small text-muted d-none mb-2"><i className="fa-solid fa-lock me-1"></i> Section management is restricted to Admin accounts.</p>
 
                             <div>
-                                  <div className="row g-2 mb-3 align-items-end">
-                                <div className="col-md-3">
+                            <div className="row g-2 mb-3 align-items-end">
+                                <div className="col-md-2">
                                     <label className="form-label small text-warning mb-1">Department</label>
                                     <select id="rosterFilterDept" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={(e) => window.onRosterFilterChange?.()}>
-                                        <option value="">All Departments</option>
+                                        <option value="">All</option>
                                         <option value="CSE">CSE</option>
                                         <option value="IT">IT</option>
                                         <option value="AIDS">AI&DS</option>
@@ -717,24 +739,28 @@ export default function DashboardLayout() {
                                         <option value="MECH">MECH</option>
                                     </select>
                                 </div>
-                                <div className="col-md-3">
+                                <div className="col-md-2">
                                     <label className="form-label small text-warning mb-1">Year</label>
                                     <select id="rosterFilterYear" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={(e) => window.onRosterFilterChange?.()}>
-                                        <option value="">All Years</option>
+                                        <option value="">All</option>
                                         <option value="I">I Year</option>
                                         <option value="II">II Year</option>
                                         <option value="III">III Year</option>
                                         <option value="IV">IV Year</option>
                                     </select>
                                 </div>
-                                <div className="col-md-3">
+                                <div className="col-md-2">
                                     <label className="form-label small text-warning mb-1">Section</label>
                                     <input type="text" id="rosterFilterSection" list="rosterFilterDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="All Sections" onChange={(e) => window.onRosterFilterChange?.()} autoComplete="off" />
                                     <datalist id="rosterFilterDatalist"></datalist>
                                 </div>
-                                <div className="col-md-3 text-end">
+                                <div className="col-md-6 d-flex gap-2 justify-content-end align-items-end">
+                                    <div className="input-group input-group-sm" style={{ maxWidth: '200px' }}>
+                                        <input type="text" id="rosterSearchRegNo" className="form-control bg-dark text-white border-secondary" placeholder="Reg No..." />
+                                        <button type="button" className="btn btn-outline-info" onClick={() => window.searchStudentInRoster()} title="Search Details"><i className="fa-solid fa-search"></i></button>
+                                    </div>
                                     {!isAdmin && (
-                                        <button id="addStudentBtn" className="btn btn-sm btn-success" onClick={() => window.toggleAddStudentForm()} ><i className="fa-solid fa-user-plus me-1"></i> Add New Student</button>
+                                        <button id="addStudentBtn" className="btn btn-sm btn-success" style={{ whiteSpace: 'nowrap' }} onClick={() => window.toggleAddStudentForm()} ><i className="fa-solid fa-user-plus me-1"></i> Add Student</button>
                                     )}
                                 </div>
                             </div>
@@ -749,47 +775,58 @@ export default function DashboardLayout() {
                                         <form id="addStudentForm" onSubmit={(event) => window.handleAddStudent(event)} >
                                             <div className="row g-2 mb-2">
                                                 <div className="col-md-4">
-                                                    <label className="form-label small mb-1">Roll No</label>
-                                                    <input type="text" id="stdRoll" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. 24CS062" required />
+                                                    <label className="form-label small">First Name <span className="text-danger">*</span></label>
+                                                    <input type="text" id="rsFirstName" className="form-control form-control-sm bg-dark text-white" required />
                                                 </div>
                                                 <div className="col-md-4">
-                                                    <label className="form-label small mb-1">Student Name</label>
-                                                    <input type="text" id="stdName" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Mithil Pranav" required />
+                                                    <label className="form-label small">Last Name <span className="text-danger">*</span></label>
+                                                    <input type="text" id="rsLastName" className="form-control form-control-sm bg-dark text-white" required />
                                                 </div>
                                                 <div className="col-md-4">
-                                                    <label className="form-label small mb-1">Section <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
-                                                    <input type="text" id="stdSection" list="stdSecList" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. II CSE C" required autoComplete="off" />
-                                                    <datalist id="stdSecList">
-                                                        <option value="II CSE C">II CSE C</option>
-                                                        <option value="II CSE A">II CSE A</option>
-                                                        <option value="II CSE B">II CSE B</option>
-                                                        <option value="II IT A">II IT A</option>
-                                                        <option value="II AI&DS A">II AI&DS A</option>
-                                                    </datalist>
+                                                    <label className="form-label small">Register Number <span className="text-danger">*</span></label>
+                                                    <input type="text" id="rsRegNo" className="form-control form-control-sm bg-dark text-white" required placeholder="e.g. 71812423001" />
+                                                </div>
+                                            </div>
+                                            <div className="row g-2 mb-2">
+                                                <div className="col-md-4">
+                                                    <label className="form-label small">Personal Email <span className="text-danger">*</span></label>
+                                                    <input type="email" id="rsEmail" className="form-control form-control-sm bg-dark text-white" required />
+                                                </div>
+                                                <div className="col-md-4">
+                                                    <label className="form-label small">College Email <span className="text-danger">*</span></label>
+                                                    <input type="email" id="rsCollegeEmail" className="form-control form-control-sm bg-dark text-white" required />
+                                                </div>
+                                                <div className="col-md-4">
+                                                    <label className="form-label small">Mobile Number <span className="text-danger">*</span></label>
+                                                    <input type="tel" id="rsPhone" className="form-control form-control-sm bg-dark text-white" required />
                                                 </div>
                                             </div>
                                             <div className="row g-2 mb-2">
                                                 <div className="col-md-6">
-                                                    <label className="form-label small mb-1">Personal Email Address</label>
-                                                    <input type="email" id="stdEmail" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="student@gmail.com" required />
+                                                    <label className="form-label small">Parent 1 Mobile <span className="text-danger">*</span></label>
+                                                    <input type="tel" id="rsParentPhone1" className="form-control form-control-sm bg-dark text-white" required />
                                                 </div>
                                                 <div className="col-md-6">
-                                                    <label className="form-label small mb-1">College Mail ID <span className="text-danger">*</span></label>
-                                                    <input type="email" id="stdCollegeEmail" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="student@sece.ac.in" required />
-                                                </div>
-                                                <div className="col-md-6">
-                                                    <label className="form-label small mb-1">Student Mobile Number</label>
-                                                    <input type="tel" id="stdPhone" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="9876543210" pattern="[0-9]{10}" required />
+                                                    <label className="form-label small">Parent 2 Mobile <span className="text-muted">(Optional)</span></label>
+                                                    <input type="tel" id="rsParentPhone2" className="form-control form-control-sm bg-dark text-white" />
                                                 </div>
                                             </div>
-                                            <div className="row g-2 mb-2">
-                                                <div className="col-md-6">
-                                                    <label className="form-label small mb-1">Parent Mobile 1 <span className="text-danger">*</span></label>
-                                                    <input type="tel" id="stdParentPhone1" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="9876543210" pattern="[0-9]{10}" required />
+                                            <div className="row g-2 mb-3">
+                                                <div className="col-md-3">
+                                                    <label className="form-label small">Department <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                                    <input type="text" id="rsDept" list="deptDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. CSE" autoComplete="off" />
                                                 </div>
-                                                <div className="col-md-6">
-                                                    <label className="form-label small mb-1">Parent Mobile 2 <span className="text-muted">(optional)</span></label>
-                                                    <input type="tel" id="stdParentPhone2" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="9876543210" pattern="[0-9]{10}" />
+                                                <div className="col-md-3">
+                                                    <label className="form-label small">Class <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                                    <input type="text" id="rsCourse" list="courseDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. BTECH-CSE" autoComplete="off" />
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <label className="form-label small">Section <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                                    <input type="text" id="rsSection" list="sectionDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. II CSE C" autoComplete="off" />
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <label className="form-label small">Semester <span className="text-danger">*</span></label>
+                                                    <input type="number" id="rsSemester" className="form-control form-control-sm bg-dark text-white" required min="1" max="8" defaultValue="3" />
                                                 </div>
                                             </div>
                                             <button type="submit" className="btn btn-sm btn-warning font-semibold"><i className="fa-solid fa-check me-1"></i> Save Student</button>
@@ -833,55 +870,73 @@ export default function DashboardLayout() {
                 </div>
             </div>
             <div className="modal-body">
-                
-                                    <div className="row g-3">
-                                        <div className="col-md-6">
-                                            <div className="card card-body bg-secondary  border-0">
-                                                <h6 className="fw-bold text-info"><i className="fa-solid fa-folder-plus me-1"></i> Add New Section</h6>
-                                                <form id="addSectionForm" onSubmit={(event) => window.handleAddSection(event)} >
-                                                    <div className="mb-2">
-                                                        <label className="form-label small">Department <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
-                                                        <input type="text" id="secDept" list="secDeptList" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. CSE" required autoComplete="off" />
-                                                        <datalist id="secDeptList">
-                                                            <option value="CSE">CSE - Computer Science & Engg</option>
-                                                            <option value="IT">IT - Information Technology</option>
-                                                            <option value="AIDS">AI&DS - Artificial Intelligence & DS</option>
-                                                            <option value="ECE">ECE - Electronics & Comm</option>
-                                                            <option value="EEE">EEE - Electrical & Electronics</option>
-                                                            <option value="MECH">MECH - Mechanical Engg</option>
-                                                        </datalist>
-                                                    </div>
-                                                    <div className="mb-2">
-                                                        <label className="form-label small">Section Name</label>
-                                                        <input type="text" id="secName" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. II CSE D" required />
-                                                    </div>
-                                                    <div className="mb-2">
-                                                        <label className="form-label small">Assigned Classroom</label>
-                                                        <input type="text" id="secClassroom" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. SF 05" required />
-                                                    </div>
-                                                    <div className="mb-2">
-                                                        <label className="form-label small">Max Capacity</label>
-                                                        <input type="number" id="secCapacity" min="0" max="80" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Max 80" defaultValue="60" required />
-                                                    </div>
-                                                    <button type="submit" className="btn btn-sm btn-info w-100 font-semibold"><i className="fa-solid fa-plus me-1"></i> Create Section</button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                        <div className="col-md-6">
-                                            <div className="card card-body bg-secondary  border-0">
-                                                <h6 className="fw-bold text-danger"><i className="fa-solid fa-folder-minus me-1"></i> Active Sections Roster</h6>
-                                                <ul className="list-group list-group-flush rounded bg-dark" id="sectionsList">
-
-                                                </ul>
-                                            
+                <div className="row g-3">
+                    <div className="col-md-6">
+                        <div className="card card-body bg-secondary border-0">
+                            <h6 className="fw-bold text-info"><i className="fa-solid fa-folder-plus me-1"></i> Add New Section</h6>
+                            <form id="addSectionForm" onSubmit={(event) => window.handleAddSection(event)} >
+                                <div className="mb-2">
+                                    <label className="form-label small">Department <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                    <input type="text" id="secDept" list="secDeptList" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. CSE" required autoComplete="off" />
+                                    <datalist id="secDeptList">
+                                        <option value="CSE">CSE - Computer Science & Engg</option>
+                                        <option value="IT">IT - Information Technology</option>
+                                        <option value="AIDS">AI&DS - Artificial Intelligence & DS</option>
+                                        <option value="ECE">ECE - Electronics & Comm</option>
+                                        <option value="EEE">EEE - Electrical & Electronics</option>
+                                        <option value="MECH">MECH - Mechanical Engg</option>
+                                    </datalist>
+                                </div>
+                                <div className="mb-2">
+                                    <label className="form-label small">Section Name</label>
+                                    <input type="text" id="secName" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. II CSE D" required />
+                                </div>
+                                <div className="mb-2">
+                                    <label className="form-label small">Assigned Classroom</label>
+                                    <input type="text" id="secClassroom" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. SF 05" required />
+                                </div>
+                                <div className="mb-2">
+                                    <label className="form-label small">Max Capacity</label>
+                                    <input type="number" id="secCapacity" min="0" max="80" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Max 80" defaultValue="60" required />
+                                </div>
+                                <button type="submit" className="btn btn-sm btn-info w-100 font-semibold"><i className="fa-solid fa-plus me-1"></i> Create Section</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div className="col-md-6">
+                        <div className="card card-body bg-secondary border-0">
+                            <ul className="list-group list-group-flush rounded bg-dark" id="sectionsList">
+                            </ul>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<div className="modal fade" id="viewSectionsModal" tabIndex="-1">
+    <div className="modal-dialog modal-lg modal-dialog-centered">
+        <div className="modal-content bg-dark text-white border-secondary">
+            <div className="modal-header border-secondary">
+                <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-folder-tree me-2"></i> View Sections</h5>
+                <div>
+                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div className="modal-body">
+                <div className="row g-3">
+                    <div className="col-12">
+                        <div className="card card-body bg-secondary border-0">
+                            <ul className="list-group list-group-flush rounded bg-dark" id="sectionsListOnly">
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
 
 
 
@@ -1069,10 +1124,6 @@ export default function DashboardLayout() {
                             </div>
                         </div>
                         <div className="modal-body">
-                            <div className="alert alert-warning py-2 small mb-3">
-                                <i className="fa-solid fa-lock me-1"></i>
-                                Only the Admin account can change global timetable defaults. These values apply across all views.
-                            </div>
                             <h6 className="text-warning fw-bold border-bottom border-secondary pb-2">Global Timetable Information</h6>
                             <form id="editBatchSemFormStandalone" onSubmit={(e) => { e.preventDefault(); window.saveBatchSemEdit(); }} className="row g-2 mb-3">
                                 <div className="col-md-4">
@@ -1609,6 +1660,57 @@ export default function DashboardLayout() {
                         </div>
                         <div className="modal-footer border-secondary">
                             <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="modal fade" id="editAyModal" tabIndex="-1">
+                <div className="modal-dialog modal-sm modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h6 className="modal-title text-info fw-bold"><i className="fa-solid fa-calendar-days me-2"></i> Edit Academic Year</h6>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body">
+                            <label className="form-label small text-muted">Start Year</label>
+                            <input type="number" id="ayStartYearInput" className="form-control bg-dark text-white border-secondary" min="2020" max="3000" defaultValue="2026" />
+                            <small className="text-muted mt-2 d-block">End year will be calculated automatically.</small>
+                        </div>
+                        <div className="modal-footer border-secondary">
+                            <button type="button" className="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" className="btn btn-sm btn-success" onClick={() => window.saveAcademicYear && window.saveAcademicYear()}>Save changes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="modal fade" id="myTimetableModal" tabIndex="-1">
+                <div className="modal-dialog modal-xl modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-calendar-user me-2"></i> Your Timetable</h5>
+                            <div>
+                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                        </div>
+                        <div className="modal-body p-0">
+                            <div className="table-responsive" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+                                <table className="table table-dark table-striped table-hover align-middle mb-0 text-center">
+                                    <thead className="sticky-top" style={{ backgroundColor: "#1e1e1e" }}>
+                                        <tr>
+                                            <th>Day</th>
+                                            <th>Time</th>
+                                            <th>Class / Section</th>
+                                            <th>Subject</th>
+                                            <th>Room</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="myTimetableBody">
+                                        <tr><td colSpan="5" className="text-center text-muted py-4">Loading timetable...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
