@@ -1557,8 +1557,8 @@ export default function DashboardLayout() {
             <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 
-            <script src="/js/frontend_app.js?v=4"></script>
-            <script src="/js/theme.js"></script>
+
+
 
             <div className="modal fade" id="studentDetailsOnlyModal" tabIndex="-1">
                 <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
