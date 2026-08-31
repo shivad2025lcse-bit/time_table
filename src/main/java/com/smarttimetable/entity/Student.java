@@ -48,6 +48,15 @@ public class Student {
     @Column(name = "parent_phone_2")
     private String parentPhone2;
 
+    @Column(name = "resident_type")
+    private String residentType;
+
+    @Column(name = "hostel_block")
+    private String hostelBlock;
+
+    @Column(name = "room_number")
+    private String roomNumber;
+
     @OneToOne(fetch = FetchType.EAGER, cascade = {CascadeType.MERGE, CascadeType.REFRESH})
     @JoinColumn(name = "user_id")
     private User user;
@@ -111,4 +120,13 @@ public class Student {
 
     public String getParentPhone2() { return parentPhone2; }
     public void setParentPhone2(String parentPhone2) { this.parentPhone2 = parentPhone2; }
+
+    public String getResidentType() { return residentType; }
+    public void setResidentType(String residentType) { this.residentType = residentType; }
+
+    public String getHostelBlock() { return hostelBlock; }
+    public void setHostelBlock(String hostelBlock) { this.hostelBlock = hostelBlock; }
+
+    public String getRoomNumber() { return roomNumber; }
+    public void setRoomNumber(String roomNumber) { this.roomNumber = roomNumber; }
 }

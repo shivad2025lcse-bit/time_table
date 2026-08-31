@@ -229,9 +229,6 @@ export default function DashboardLayout() {
                                     <i className="fa-solid fa-id-card"></i> My Student Details
                                 </button>
 
-                                <button id="studentDetailsOnlyBtn" className="btn btn-sm btn-outline-info d-none align-items-center gap-1" type="button" onClick={() => window.openStudentDetailsModal()} >
-                                    <i className="fa-solid fa-clipboard-list"></i> Student Details
-                                </button>
                                 <button id="manageSectionsBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()}>
                                     <i className="fa-solid fa-folder-tree"></i> <span id="manageSectionsBtnText">Manage Sections</span>
                                 </button>
@@ -331,51 +328,38 @@ export default function DashboardLayout() {
                                     </>
                                 )}
 
-                                <div className="col-md-7 d-flex justify-content-md-end justify-content-start gap-4">
-                                    <div id="batchInfoCard" className="card shadow border-secondary bg-dark" style={{ minWidth: "250px", borderRadius: "8px" }}>
-                                        <div id="batchInfoCardBody" className="card-body p-3 text-light" style={{ fontSize: "0.9rem" }}>
-                                            <div id="bannerBatchRow" className="d-flex justify-content-between align-items-center mb-2">
-                                                <div>
-                                                    <strong className="text-muted"><i className="fa-solid fa-calendar-check text-info me-1"></i> Batch:</strong>
-                                                </div>
-                                                <div>
-                                                    <span id="batchTextHeader" className="badge bg-primary">2024 - 2028</span>
-                                                    <i id="batchEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Batch"></i>
-                                                </div>
-                                            </div>
-                                            <div id="bannerSemRow" className="d-flex justify-content-between align-items-center mb-2">
-                                                <div>
-                                                    <strong className="text-muted"><i className="fa-solid fa-book-open text-warning me-1"></i> Semester:</strong>
-                                                </div>
-                                                <div>
-                                                    <span id="semTextHeader" className="badge bg-secondary">II Year / III Semester</span>
-                                                    <i id="semEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Semester"></i>
-                                                </div>
-                                            </div>
-                                            <div className="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <strong className="text-muted"><i className="fa-solid fa-calendar-days text-success me-1"></i> Academic Year:</strong>
-                                                </div>
-                                                <div>
-                                                    <span id="ayTextHeader" className="fw-bold">2026 - 2027</span>
-                                                    <i id="ayEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Academic Year"></i>
-                                                </div>
-                                            </div>
-                                            <div id="studentAdvisorBannerRow" className="d-none align-items-center">
-                                                <div>
-                                                    <strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Advisor:</strong>
-                                                </div>
-                                                <div className="ms-2">
-                                                    <span id="studentAdvisorNameBanner" className="fw-bold text-warning"></span>
-                                                    <span id="studentAdvisorPhoneBanner" className="ms-2 badge bg-dark border border-secondary text-light"></span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                <div className="col-md-7 d-flex justify-content-md-end justify-content-start flex-wrap align-items-center gap-4 text-light" style={{ fontSize: "1rem" }}>
+                                    <div id="bannerBatchRow" className="d-flex align-items-center gap-2">
+                                        <strong className="text-muted"><i className="fa-solid fa-calendar-check text-info me-1"></i> Batch:</strong>
+                                        <span id="batchTextHeader" className="badge bg-primary">2024 - 2028</span>
+                                        <i id="batchEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Batch"></i>
                                     </div>
-                                    <div id="classInfoBlock" className="d-flex flex-column justify-content-center gap-2 text-light p-3 card shadow border-secondary bg-dark" style={{ borderRadius: "8px", fontSize: "0.9rem" }}>
-                                        <div><strong className="text-muted"><i className="fa-solid fa-users text-primary me-1"></i> Class Strength:</strong> <span className="badge bg-success ms-1" id="classStrengthBadge">61 Students</span></div>
-                                        <div><strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Class Advisor:</strong> <span className="text-warning ms-1" id="classAdvisorLabel">Ms.J.Keerthika, AP/CSE</span></div>
-                                        <div id="classTutorsRow" className="d-none"><strong className="text-muted"><i className="fa-solid fa-chalkboard-user text-info me-1"></i> Class Tutors:</strong> <span className="text-light ms-1" id="classTutorsLabel"></span></div>
+                                    <div id="bannerSemRow" className="d-flex align-items-center gap-2">
+                                        <strong className="text-muted"><i className="fa-solid fa-book-open text-warning me-1"></i> Semester:</strong>
+                                        <span id="semTextHeader" className="badge bg-secondary">II Year / III Semester</span>
+                                        <i id="semEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Semester"></i>
+                                    </div>
+                                    <div className="d-flex align-items-center gap-2" id="bannerAyRow">
+                                        <strong className="text-muted"><i className="fa-solid fa-calendar-days text-success me-1"></i> Academic Year:</strong>
+                                        <span id="ayTextHeader" className="fw-bold">2026 - 2027</span>
+                                        <i id="ayEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Academic Year"></i>
+                                    </div>
+                                    <div id="studentAdvisorBannerRow" className="d-none align-items-center gap-2">
+                                        <strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Advisor:</strong>
+                                        <span id="studentAdvisorNameBanner" className="fw-bold text-warning"></span>
+                                        <span id="studentAdvisorPhoneBanner" className="badge bg-dark border border-secondary text-light"></span>
+                                    </div>
+                                    <div className="d-flex align-items-center gap-2">
+                                        <strong className="text-muted"><i className="fa-solid fa-users text-primary me-1"></i> Class Strength:</strong>
+                                        <span className="badge bg-success" id="classStrengthBadge">61 Students</span>
+                                    </div>
+                                    <div className="d-flex align-items-center gap-2">
+                                        <strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Class Advisor:</strong>
+                                        <span className="text-warning fw-bold" id="classAdvisorLabel">Ms.J.Keerthika, AP/CSE</span>
+                                    </div>
+                                    <div id="classTutorsRow" className="d-none align-items-center gap-2">
+                                        <strong className="text-muted"><i className="fa-solid fa-chalkboard-user text-info me-1"></i> Class Tutors:</strong>
+                                        <span className="text-light" id="classTutorsLabel"></span>
                                     </div>
                                 </div>
                             </div>
@@ -468,7 +452,7 @@ export default function DashboardLayout() {
 
                             <div className="glass-panel mt-3" id="studentFacultyAvailabilityArea">
                                     <div className="panel-header">
-                                        <h3 className="panel-title"><i className="fa-solid fa-people-arrows text-warning"></i> All Faculty Availability (Today)</h3>
+                                        <h3 className="panel-title"><i className="fa-solid fa-people-arrows text-warning"></i> Faculty Availability (Today)</h3>
                                     </div>
                                     <div className="table-responsive p-2">
                                         <table className="ref-table">
@@ -526,7 +510,7 @@ export default function DashboardLayout() {
                                     </div>
                                 </div>
                                 <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,100,200,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onClick={() => window.initAdminViewEditTimetableModal && window.initAdminViewEditTimetableModal()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,100,200,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
                                             <i className="fa-solid fa-table-list text-pink mb-3" style={{ fontSize: "2.5rem", color: "var(--bs-pink, #d63384)" }}></i>
                                             <h5 className="text-light fw-bold mb-2">View / Edit Timetable</h5>
@@ -841,13 +825,34 @@ export default function DashboardLayout() {
                                                 </div>
                                             </div>
                                             <div className="row g-2 mb-2">
-                                                <div className="col-md-6">
+                                                <div className="col-md-4">
                                                     <label className="form-label small">Parent 1 Mobile <span className="text-danger">*</span></label>
                                                     <input type="tel" id="rsParentPhone1" className="form-control form-control-sm bg-dark text-white" required />
                                                 </div>
-                                                <div className="col-md-6">
+                                                <div className="col-md-4">
                                                     <label className="form-label small">Parent 2 Mobile <span className="text-muted">(Optional)</span></label>
                                                     <input type="tel" id="rsParentPhone2" className="form-control form-control-sm bg-dark text-white" />
+                                                </div>
+                                                <div className="col-md-4">
+                                                    <label className="form-label small">Resident Type <span className="text-danger">*</span></label>
+                                                    <select id="rsResidentType" className="form-select form-select-sm bg-dark text-white border-secondary" required onChange={(e) => {
+                                                        const el = document.getElementById('rsHostelFields');
+                                                        if (el) el.classList.toggle('d-none', e.target.value !== 'Hosteller');
+                                                    }}>
+                                                        <option value="">Select...</option>
+                                                        <option value="Hosteller">Hosteller</option>
+                                                        <option value="Day Scholar">Day Scholar</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div id="rsHostelFields" className="row g-2 mb-2 d-none">
+                                                <div className="col-md-6">
+                                                    <label className="form-label small">Hostel Block</label>
+                                                    <input type="text" id="rsHostelBlock" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. A Block" />
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <label className="form-label small">Room Number</label>
+                                                    <input type="text" id="rsRoomNumber" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. 204" />
                                                 </div>
                                             </div>
                                             <div className="row g-2 mb-3">
@@ -881,8 +886,6 @@ export default function DashboardLayout() {
                                                     <th>Department & Sec</th>
                                                     <th>Email</th>
                                                     <th>Phone (SMS)</th>
-                                                    <th>Username</th>
-                                                    <th>Password</th>
                                                     <th className="text-center">Action</th>
                                                 </tr>
                                             </thead>
@@ -1093,6 +1096,7 @@ export default function DashboardLayout() {
                                             <th>Department & Sec</th>
                                             <th>Email</th>
                                             <th>Phone (SMS)</th>
+                                            <th>Resident Type</th>
                                             <th className="text-center">Action</th>
                                         </tr>
                                     </thead>
@@ -1224,7 +1228,11 @@ export default function DashboardLayout() {
                                             <label className="form-label small mb-1">Venue</label>
                                             <input id="newSubjectVenue" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Venue" />
                                         </div>
-                                        <div className="col-md-12 mt-2 text-end">
+                                        <div className="col-md-12 mt-2 d-flex justify-content-end gap-2">
+                                            <input type="file" id="importAdminSubjectExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importAdminSubjectExcel && window.importAdminSubjectExcel(e)} />
+                                            <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importAdminSubjectExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
+                                                <i className="fa-solid fa-file-excel me-1"></i> Import Excel
+                                            </button>
                                             <button className="btn btn-sm btn-info" type="submit"><i className="fa-solid fa-plus me-1"></i>Add Subject</button>
                                         </div>
                                     </form>
@@ -1315,7 +1323,11 @@ export default function DashboardLayout() {
                                     <label className="form-label small mb-1">Capacity</label>
                                     <input id="newVenueCapacity" type="number" min="1" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Cap." />
                                 </div>
-                                <div className="col-md-12 mt-2 text-end">
+                                <div className="col-md-12 mt-2 d-flex justify-content-end gap-2">
+                                    <input type="file" id="importAdminVenueExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importAdminVenueExcel && window.importAdminVenueExcel(e)} />
+                                    <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importAdminVenueExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
+                                        <i className="fa-solid fa-file-excel me-1"></i> Import Excel
+                                    </button>
                                     <button className="btn btn-sm btn-success" type="submit"><i className="fa-solid fa-plus me-1"></i>Add Venue</button>
                                 </div>
                             </form>
@@ -1621,17 +1633,38 @@ export default function DashboardLayout() {
                                     </div>
                                 </div>
                                 <div className="row g-2 mb-2">
-                                    <div className="col-md-4">
+                                    <div className="col-md-3">
                                         <label className="form-label small">Student Phone</label>
                                         <input type="tel" id="esPhone" className="form-control form-control-sm bg-dark text-white" />
                                     </div>
-                                    <div className="col-md-4">
+                                    <div className="col-md-3">
                                         <label className="form-label small">Parent Phone 1 <span className="text-danger">*</span></label>
                                         <input type="tel" id="esParentPhone1" className="form-control form-control-sm bg-dark text-white" required />
                                     </div>
-                                    <div className="col-md-4">
+                                    <div className="col-md-3">
                                         <label className="form-label small">Parent Phone 2</label>
                                         <input type="tel" id="esParentPhone2" className="form-control form-control-sm bg-dark text-white" />
+                                    </div>
+                                    <div className="col-md-3">
+                                        <label className="form-label small">Resident Type <span className="text-danger">*</span></label>
+                                        <select id="esResidentType" className="form-select form-select-sm bg-dark text-white border-secondary" required onChange={(e) => {
+                                            const el = document.getElementById('esHostelFields');
+                                            if (el) el.classList.toggle('d-none', e.target.value !== 'Hosteller');
+                                        }}>
+                                            <option value="">Select...</option>
+                                            <option value="Hosteller">Hosteller</option>
+                                            <option value="Day Scholar">Day Scholar</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div id="esHostelFields" className="row g-2 mb-2 d-none">
+                                    <div className="col-md-6">
+                                        <label className="form-label small">Hostel Block</label>
+                                        <input type="text" id="esHostelBlock" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. A Block" />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label small">Room Number</label>
+                                        <input type="text" id="esRoomNumber" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. 204" />
                                     </div>
                                 </div>
                                 <div className="row g-2 mb-3">
@@ -1704,13 +1737,21 @@ export default function DashboardLayout() {
                                     </div>
                                 </div>
                                 <div className="row g-2 mb-2">
-                                    <div className="col-md-6">
+                                    <div className="col-md-4">
                                         <label className="form-label small">Parent 1 Mobile <span className="text-danger">*</span></label>
                                         <input type="tel" id="msParentPhone1" className="form-control form-control-sm bg-dark text-white" required />
                                     </div>
-                                    <div className="col-md-6">
+                                    <div className="col-md-4">
                                         <label className="form-label small">Parent 2 Mobile <span className="text-muted">(Optional)</span></label>
                                         <input type="tel" id="msParentPhone2" className="form-control form-control-sm bg-dark text-white" />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label className="form-label small">Resident Type <span className="text-danger">*</span></label>
+                                        <select id="msResidentType" className="form-select form-select-sm bg-dark text-white border-secondary" required>
+                                            <option value="">Select...</option>
+                                            <option value="Hosteller">Hosteller</option>
+                                            <option value="Day Scholar">Day Scholar</option>
+                                        </select>
                                     </div>
                                 </div>
                                 <div className="row g-2 mb-3">
@@ -1899,28 +1940,22 @@ export default function DashboardLayout() {
                                         <input type="text" id="ttBuildTutors" className="form-control bg-dark text-white border-secondary" placeholder="e.g. Ms.B.Gomathi, Mr.K.Sabarigirivason" />
                                     </div>
                                 </div>
-                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Period Timings</h6>
-                                <div className="row g-2 mb-4">
-                                    <div className="col"><input type="text" id="ttBuildP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P1 Timing" defaultValue="08.40 - 09.40" /></div>
-                                    <div className="col"><input type="text" id="ttBuildP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P2 Timing" defaultValue="09.40 - 10.40" /></div>
-                                    <div className="col"><input type="text" id="ttBuildP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P3 Timing" defaultValue="11.00 - 12.00" /></div>
-                                    <div className="col"><input type="text" id="ttBuildTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Tea Break" defaultValue="12.00 - 12.15" /></div>
-                                    <div className="col"><input type="text" id="ttBuildP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P4 Timing" defaultValue="12.15 - 01.15" /></div>
-                                    <div className="col"><input type="text" id="ttBuildP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P5 Timing" defaultValue="01.15 - 02.00" /></div>
-                                    <div className="col"><input type="text" id="ttBuildLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Lunch Break" defaultValue="02.00 - 02.40" /></div>
-                                    <div className="col"><input type="text" id="ttBuildAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Activity Timing" defaultValue="02.40 - 03.30" /></div>
-                                    <div className="col"><input type="text" id="ttBuildP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P6 Timing" defaultValue="03.30 - 04.20" /></div>
-                                    <div className="col"><input type="text" id="ttBuildP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P7 Timing" defaultValue="04.20 - 05.10" /></div>
-                                </div>
-
-                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Timetable Entries</h6>
                                 <p className="small text-muted mb-2">Enter Subject / Staff / Venue. Format: <code>Subject, Staff, Venue</code> or just type it in. Leave blank for FREE.</p>
                                 <div className="table-responsive">
-                                    <table className="table table-dark table-bordered border-secondary table-sm text-center" style={{ tableLayout: "fixed" }}>
+                                    <table className="table table-dark table-bordered border-secondary table-sm text-center align-middle" style={{ tableLayout: "fixed" }}>
                                         <thead>
                                             <tr>
-                                                <th style={{ width: "100px" }}>Day</th>
-                                                <th>Period 1</th><th>Period 2</th><th>Period 3</th><th className="text-warning">Tea Break</th><th>Period 4</th><th>Period 5</th><th className="text-warning">Lunch Break</th><th className="text-warning">Activity Hour</th><th>Period 6</th><th>Period 7</th>
+                                                <th style={{ width: "90px" }}>Day</th>
+                                                <th>Period 1<input type="text" id="ttBuildP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="08.40 - 09.40" /></th>
+                                                <th>Period 2<input type="text" id="ttBuildP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="09.40 - 10.40" /></th>
+                                                <th>Period 3<input type="text" id="ttBuildP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="11.00 - 12.00" /></th>
+                                                <th className="text-warning">Tea Break<input type="text" id="ttBuildTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="12.00 - 12.15" /></th>
+                                                <th>Period 4<input type="text" id="ttBuildP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="12.15 - 01.15" /></th>
+                                                <th>Period 5<input type="text" id="ttBuildP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="01.15 - 02.00" /></th>
+                                                <th className="text-warning">Lunch Break<input type="text" id="ttBuildLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="02.00 - 02.40" /></th>
+                                                <th className="text-warning">Activity<input type="text" id="ttBuildAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="02.40 - 03.30" /></th>
+                                                <th>Period 6<input type="text" id="ttBuildP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="03.30 - 04.20" /></th>
+                                                <th>Period 7<input type="text" id="ttBuildP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="04.20 - 05.10" /></th>
                                             </tr>
                                         </thead>
                                         <tbody id="ttBuilderGrid">
@@ -2034,28 +2069,22 @@ export default function DashboardLayout() {
                         </div>
                         <div className="modal-body p-3">
                             <form id="myTimetableForm" onSubmit={(e) => { e.preventDefault(); if (window.saveMyTimetable) window.saveMyTimetable(); }}>
-                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Period Timings</h6>
-                                <div className="row g-2 mb-4">
-                                    <div className="col"><input type="text" id="myTtP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P1 Timing" defaultValue="08.40 - 09.40" /></div>
-                                    <div className="col"><input type="text" id="myTtP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P2 Timing" defaultValue="09.40 - 10.40" /></div>
-                                    <div className="col"><input type="text" id="myTtP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P3 Timing" defaultValue="11.00 - 12.00" /></div>
-                                    <div className="col"><input type="text" id="myTtTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Tea Break" defaultValue="12.00 - 12.15" /></div>
-                                    <div className="col"><input type="text" id="myTtP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P4 Timing" defaultValue="12.15 - 01.15" /></div>
-                                    <div className="col"><input type="text" id="myTtP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P5 Timing" defaultValue="01.15 - 02.00" /></div>
-                                    <div className="col"><input type="text" id="myTtLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Lunch Break" defaultValue="02.00 - 02.40" /></div>
-                                    <div className="col"><input type="text" id="myTtAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Activity Timing" defaultValue="02.40 - 03.30" /></div>
-                                    <div className="col"><input type="text" id="myTtP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P6 Timing" defaultValue="03.30 - 04.20" /></div>
-                                    <div className="col"><input type="text" id="myTtP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P7 Timing" defaultValue="04.20 - 05.10" /></div>
-                                </div>
-
-                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Timetable Entries</h6>
                                 <p className="small text-muted mb-2">Enter Subject / Class / Venue. Format: <code>Subject, Class, Venue</code> or just type it in. Leave blank for FREE.</p>
                                 <div className="table-responsive">
-                                    <table className="table table-dark table-bordered border-secondary table-sm text-center" style={{ tableLayout: "fixed" }}>
+                                    <table className="table table-dark table-bordered border-secondary table-sm text-center align-middle" style={{ tableLayout: "fixed" }}>
                                         <thead>
                                             <tr>
-                                                <th style={{ width: "100px" }}>Day</th>
-                                                <th>Period 1</th><th>Period 2</th><th>Period 3</th><th className="text-warning">Tea Break</th><th>Period 4</th><th>Period 5</th><th className="text-warning">Lunch Break</th><th className="text-warning">Activity Hour</th><th>Period 6</th><th>Period 7</th>
+                                                <th style={{ width: "90px" }}>Day</th>
+                                                <th>Period 1<input type="text" id="myTtP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="08.40 - 09.40" /></th>
+                                                <th>Period 2<input type="text" id="myTtP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="09.40 - 10.40" /></th>
+                                                <th>Period 3<input type="text" id="myTtP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="11.00 - 12.00" /></th>
+                                                <th className="text-warning">Tea Break<input type="text" id="myTtTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="12.00 - 12.15" /></th>
+                                                <th>Period 4<input type="text" id="myTtP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="12.15 - 01.15" /></th>
+                                                <th>Period 5<input type="text" id="myTtP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="01.15 - 02.00" /></th>
+                                                <th className="text-warning">Lunch Break<input type="text" id="myTtLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="02.00 - 02.40" /></th>
+                                                <th className="text-warning">Activity<input type="text" id="myTtAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="02.40 - 03.30" /></th>
+                                                <th>Period 6<input type="text" id="myTtP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="03.30 - 04.20" /></th>
+                                                <th>Period 7<input type="text" id="myTtP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="04.20 - 05.10" /></th>
                                             </tr>
                                         </thead>
                                         <tbody id="myTimetableBody">

@@ -69,6 +69,9 @@ public class StudentController {
                     existing.setPhone(studentDetails.getPhone());
                     existing.setParentPhone1(studentDetails.getParentPhone1());
                     existing.setParentPhone2(studentDetails.getParentPhone2());
+                    existing.setResidentType(studentDetails.getResidentType());
+                    existing.setHostelBlock(studentDetails.getHostelBlock());
+                    existing.setRoomNumber(studentDetails.getRoomNumber());
                     // Students shouldn't change their semester, only Admin/Faculty
                     if (!isStudent) {
                         existing.setSemester(studentDetails.getSemester());

@@ -483,7 +483,7 @@
         }
     .tt-fullscreen-modal {
         position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
-        background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px) !important; z-index: 10000 !important;
+        background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px) !important; z-index: 1040 !important;
         overflow-y: auto !important; padding: 40px 5% !important;
     }
  

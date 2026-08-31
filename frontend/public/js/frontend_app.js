@@ -517,9 +517,35 @@ const DEFAULT_TIMETABLE_DATA = {
 const TIMETABLE_STORAGE_KEY = 'sece_timetable_edits_v1';
 
 function loadSavedTimetable() {
-    // Start from the built-in default schedule, then layer any saved edits on top.
-    // Sections/days/periods that were never edited keep their original default data.
     const merged = JSON.parse(JSON.stringify(DEFAULT_TIMETABLE_DATA));
+    
+    // 1. Inject custom built timetables
+    activeSections.forEach(sec => {
+        const builtSaved = localStorage.getItem(`sece_tt_built_${sec.name}`);
+        if (builtSaved) {
+            try {
+                const built = JSON.parse(builtSaved);
+                if (built && built.grid) {
+                    merged[sec.name] = {};
+                    Object.keys(built.grid).forEach(day => {
+                        merged[sec.name][day] = [];
+                        for(let i=1; i<=7; i++) {
+                             const pData = built.grid[day][`P${i}`] || '';
+                             const parts = pData.split(',').map(s => s.trim());
+                             merged[sec.name][day].push({
+                                 sub: parts[0] || '',
+                                 faculty: parts[1] || '',
+                                 venue: parts[2] || '',
+                                 cat: 'cat-theory'
+                             });
+                        }
+                    });
+                }
+            } catch (e) { console.error('Error parsing built timetable:', e); }
+        }
+    });
+
+    // 2. Layer on top period-level edits
     try {
         const saved = localStorage.getItem(TIMETABLE_STORAGE_KEY);
         if (!saved) return merged;
@@ -1670,6 +1696,15 @@ function switchRole(role, silent = false) {
         }
     }
 
+    const roleBanner = document.getElementById('roleBanner');
+    if (roleBanner) {
+        if (role === 'ADMIN') {
+            roleBanner.classList.add('d-none');
+        } else {
+            roleBanner.classList.remove('d-none');
+        }
+    }
+
     const roleBannerTextContainer = document.getElementById('roleBannerTextContainer');
     if (roleBannerTextContainer) {
         if (role === 'STUDENT') {
@@ -1719,18 +1754,6 @@ function switchRole(role, silent = false) {
         } else {
             profileBtn.classList.add('d-none');
             profileBtn.classList.remove('d-flex');
-        }
-    }
-
-    // Additional: Student Details Only button â€” removed from FACULTY per request
-    const studentDetailsOnlyBtn = document.getElementById('studentDetailsOnlyBtn');
-    if (studentDetailsOnlyBtn) {
-        if (role === 'ADMIN') {
-            studentDetailsOnlyBtn.classList.remove('d-none');
-            studentDetailsOnlyBtn.classList.add('d-flex');
-        } else {
-            studentDetailsOnlyBtn.classList.add('d-none');
-            studentDetailsOnlyBtn.classList.remove('d-flex');
         }
     }
 
@@ -2456,6 +2479,9 @@ function handleAddStudent(e) {
     const phone = safetyNormalizePhone(document.getElementById('rsPhone').value);
     const parentPhone1 = safetyNormalizePhone(document.getElementById('rsParentPhone1').value);
     const parentPhone2 = safetyNormalizePhone(document.getElementById('rsParentPhone2').value);
+    const residentType = document.getElementById('rsResidentType').value;
+    const hostelBlock = residentType === 'Hosteller' ? document.getElementById('rsHostelBlock').value.trim() : null;
+    const roomNumber = residentType === 'Hosteller' ? document.getElementById('rsRoomNumber').value.trim() : null;
     const deptId = document.getElementById('rsDept').value.trim();
     const courseId = document.getElementById('rsCourse').value.trim();
     const secId = document.getElementById('rsSection').value.trim();
@@ -2471,6 +2497,10 @@ function handleAddStudent(e) {
     }
     if (parentPhone2 && !/^\d{10}$/.test(parentPhone2)) {
         alert('Parent Mobile 2 must contain exactly 10 digits when provided.');
+        return;
+    }
+    if (residentType === 'Hosteller' && (!hostelBlock || !roomNumber)) {
+        alert('Hostel Block and Room Number are required for Hostellers.');
         return;
     }
     if (studentsRoster.some(s => String(s.roll || s.registerNumber || '').toLowerCase() === regNo.toLowerCase())) {
@@ -2501,6 +2531,9 @@ function handleAddStudent(e) {
         phone: phone,
         parentPhone1: parentPhone1,
         parentPhone2: parentPhone2 || null,
+        residentType: residentType,
+        hostelBlock: hostelBlock,
+        roomNumber: roomNumber,
         semester: parseInt(semester),
         department: { name: deptId },
         course: { name: actualCourseId },
@@ -2513,7 +2546,7 @@ function handleAddStudent(e) {
     }).then(async res => {
         if (res.ok) {
             const username = regNo;
-            const newStudent = { roll: regNo, name: firstName + ' ' + lastName, sec: fullSectionName, email, collegeEmail, phone, parentPhone1, parentPhone2, username, registerNumber: regNo };
+            const newStudent = { roll: regNo, name: firstName + ' ' + lastName, sec: fullSectionName, email, collegeEmail, phone, parentPhone1, parentPhone2, residentType, hostelBlock, roomNumber, username, registerNumber: regNo };
             studentsRoster.push(newStudent);
             saveStudents();
             if (typeof loadRecentStudents === 'function') loadRecentStudents();
@@ -2682,7 +2715,7 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
     const subtitle = document.getElementById('classAdvisorViewSubtitle');
     if (!body || !subtitle) return;
 
-    subtitle.innerText = `${faculty.displayName || faculty.name} â€” Class Advisor for ${section}`;
+    subtitle.innerText = `${faculty.displayName || faculty.name} — Class Advisor for ${section}`;
     body.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-info" role="status"></div></div>';
 
     try {
@@ -3212,13 +3245,13 @@ function renderAdminResourcesUI() {
     }
     if (venueList) {
         venueList.innerHTML = adminResources.venues.length ? adminResources.venues.map((v, i) =>
-            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? 'â€” Block ' + v.block : ''}${v.capacity ? ' â€” Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
+            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? '— Block ' + v.block : ''}${v.capacity ? ' — Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
         ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No custom venues.</div>';
     }
     if (classList) {
         classList.innerHTML = activeSections.length ? activeSections.map((s, i) =>
             `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
-                <span><strong>${s.name}</strong> <small class="text-muted">(${s.dept}) â€” ${s.classroom}${s.block ? ' â€” Block ' + s.block : ''}</small></span>
+                <span><strong>${s.name}</strong> <small class="text-muted">(${s.dept}) — ${s.classroom}${s.block ? ' — Block ' + s.block : ''}</small></span>
                 <button class="btn btn-sm btn-outline-danger" onclick="removeSection(${i})">Remove</button>
             </div>`
         ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No classes.</div>';
@@ -3251,6 +3284,64 @@ function handleAddSubject(e) {
     populateEditSubjectSelect();
     document.getElementById('addSubjectForm').reset();
     showToast('Subject Added', `${short} - ${title} is now available in Edit Period.`);
+}
+
+function importAdminSubjectExcel(event) {
+    if (!adminOnly()) return;
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = e.target.result;
+            const workbook = XLSX.read(data, { type: 'binary' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+            if (rows.length < 2) {
+                alert('The imported file is empty or missing headers.');
+                return;
+            }
+            
+            let addedCount = 0;
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length === 0) continue;
+                
+                const code = String(row[0] || '').trim().toUpperCase();
+                const title = String(row[1] || '').trim();
+                const faculty = String(row[2] || '').trim();
+                const venue = String(row[3] || '').trim();
+                
+                if (!code || !title) continue;
+                
+                const short = code;
+                if (!adminResources.subjects.some(s => s.code === code) && 
+                    !courseReferenceList.some(s => s.code === code || s.short === short)) {
+                    adminResources.subjects.push({ short, code, title, faculty, category: 'cat-theory', venue });
+                    addedCount++;
+                }
+            }
+            
+            if (addedCount > 0) {
+                saveAdminResources();
+                mergeCustomSubjectsIntoCourseList();
+                renderAdminResourcesUI();
+                renderCourseRefTable();
+                populateEditSubjectSelect();
+                showToast('Import Successful', `Successfully imported ${addedCount} subjects.`);
+            } else {
+                alert('No new subjects were imported. Ensure codes are unique and headers are correct.');
+            }
+        } catch (error) {
+            console.error('Error parsing Excel:', error);
+            alert('Error parsing the Excel file. Please ensure it is a valid .xlsx or .csv format.');
+        }
+    };
+    reader.readAsBinaryString(file);
+    event.target.value = '';
 }
 
 function removeAdminSubject(idx) {
@@ -3288,18 +3379,78 @@ function handleAdminAddClass(e) {
 function handleAddVenue(e) {
     e.preventDefault();
     if (!adminOnly()) return;
-    const venue = document.getElementById('newVenueName').value.trim();
-    if (!venue) return;
-    if (adminResources.venues.some(v => v.toLowerCase() === venue.toLowerCase())) {
+    const venueName = document.getElementById('newVenueName').value.trim();
+    const type = document.getElementById('newVenueType') ? document.getElementById('newVenueType').value.trim() : '';
+    const block = document.getElementById('newVenueBlock') ? document.getElementById('newVenueBlock').value.trim() : '';
+    const capacity = document.getElementById('newVenueCapacity') ? document.getElementById('newVenueCapacity').value.trim() : '';
+    
+    if (!venueName) return;
+    if (adminResources.venues.some(v => (typeof v === 'string' ? v.toLowerCase() : v.name.toLowerCase()) === venueName.toLowerCase())) {
         alert('That venue already exists.');
         return;
     }
-    adminResources.venues.push(venue);
+    
+    const venueObj = { name: venueName, type: type, block: block, capacity: capacity };
+    adminResources.venues.push(venueObj);
     saveAdminResources();
     renderAdminResourcesUI();
     populateEditVenueSelect();
     document.getElementById('adminVenueForm').reset();
-    showToast('Venue Added', `${venue} is now available in Edit Period.`);
+    showToast('Venue Added', `${venueName} is now available in Edit Period.`);
+}
+
+function importAdminVenueExcel(event) {
+    if (!adminOnly()) return;
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = e.target.result;
+            const workbook = XLSX.read(data, { type: 'binary' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+            if (rows.length < 2) {
+                alert('The imported file is empty or missing headers.');
+                return;
+            }
+            
+            let addedCount = 0;
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length === 0) continue;
+                
+                const venueName = String(row[0] || '').trim();
+                const type = String(row[1] || '').trim();
+                const block = String(row[2] || '').trim();
+                const capacity = String(row[3] || '').trim();
+                
+                if (!venueName) continue;
+                
+                if (!adminResources.venues.some(v => (typeof v === 'string' ? v.toLowerCase() : (v.name || '').toLowerCase()) === venueName.toLowerCase())) {
+                    adminResources.venues.push({ name: venueName, type: type, block: block, capacity: capacity });
+                    addedCount++;
+                }
+            }
+            
+            if (addedCount > 0) {
+                saveAdminResources();
+                renderAdminResourcesUI();
+                populateEditVenueSelect();
+                showToast('Import Successful', `Successfully imported ${addedCount} venues.`);
+            } else {
+                alert('No new venues were imported. Ensure venue names are unique.');
+            }
+        } catch (error) {
+            console.error('Error parsing Excel:', error);
+            alert('Error parsing the Excel file. Please ensure it is a valid .xlsx or .csv format.');
+        }
+    };
+    reader.readAsBinaryString(file);
+    event.target.value = '';
 }
 
 function removeAdminVenue(idx) {
@@ -3424,7 +3575,7 @@ function handleNotificationRegister(e) {
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
 
-    showToast('Registration Saved!', `${name} will get alerts at ${email} & ${phone}. Saved â€” visible next time you log in.`);
+    showToast('Registration Saved!', `${name} will get alerts at ${email} & ${phone}. Saved — visible next time you log in.`);
 }
 
 // Render the "My Notifications" status panel + bell button label
@@ -3448,7 +3599,7 @@ function renderNotificationStatus() {
         if (record.prefs?.wednesdayALT) activePrefs.push('Wednesday ALT reminder');
         panel.className = 'alert alert-success py-2 px-3 border-0 rounded-3 mb-3 shadow-sm small';
         panel.innerHTML = `<i class="fa-solid fa-bell-on me-2"></i>
-            <strong>Notifications ON</strong> for ${record.name} â€” ${record.email} / ${record.phone}.
+            <strong>Notifications ON</strong> for ${record.name} — ${record.email} / ${record.phone}.
             ${activePrefs.length ? 'Subscribed: ' + activePrefs.join(', ') + '.' : ''}
             <a href="#" class="ms-2" onclick="event.preventDefault(); openNotificationModal();">Update</a>`;
     } else {
@@ -3579,7 +3730,7 @@ function exportTimetableCSV() {
 }
 
 // =============================================
-// PERIOD NOTIFICATIONS â€” Backend API Storage
+// PERIOD NOTIFICATIONS — Backend API Storage
 // Data is persisted to the database so ALL
 // users (students, faculty, admin) see updates.
 // =============================================
@@ -3999,6 +4150,9 @@ async function loadRecentStudents() {
                     phone: s.phone,
                     parentPhone1: s.parentPhone1,
                     parentPhone2: s.parentPhone2,
+                    residentType: s.residentType,
+                    hostelBlock: s.hostelBlock,
+                    roomNumber: s.roomNumber,
                     username: s.user ? s.user.username : ''
                 }));
                 window.studentsRoster = studentsRoster;
@@ -4334,9 +4488,11 @@ window.saveAdminResources = saveAdminResources;
 window.mergeCustomSubjectsIntoCourseList = mergeCustomSubjectsIntoCourseList;
 window.renderAdminResourcesUI = renderAdminResourcesUI;
 window.handleAddSubject = handleAddSubject;
+window.importAdminSubjectExcel = importAdminSubjectExcel;
 window.removeAdminSubject = removeAdminSubject;
 window.handleAdminAddClass = handleAdminAddClass;
 window.handleAddVenue = handleAddVenue;
+window.importAdminVenueExcel = importAdminVenueExcel;
 window.removeAdminVenue = removeAdminVenue;
 window.populateEditSubjectSelect = populateEditSubjectSelect;
 window.populateEditVenueSelect = populateEditVenueSelect;
@@ -4804,6 +4960,15 @@ window.editPersistentStudent = function(id) {
     document.getElementById('esCourse').value = course;
     document.getElementById('esSection').value = sec;
     document.getElementById('esSemester').value = student.semester || student.sem || '';
+    document.getElementById('esResidentType').value = student.residentType || '';
+    document.getElementById('esHostelBlock').value = student.hostelBlock || '';
+    document.getElementById('esRoomNumber').value = student.roomNumber || '';
+    
+    const esHostelFields = document.getElementById('esHostelFields');
+    if (esHostelFields) {
+        if (student.residentType === 'Hosteller') esHostelFields.classList.remove('d-none');
+        else esHostelFields.classList.add('d-none');
+    }
     
     const alertBox = document.getElementById('editStudentAlert');
     if (alertBox) alertBox.classList.add('d-none');
@@ -4825,6 +4990,9 @@ window.submitEditStudentForm = async function(e) {
     const phone = document.getElementById('esPhone').value;
     const parentPhone1 = document.getElementById('esParentPhone1').value;
     const parentPhone2 = document.getElementById('esParentPhone2').value;
+    const residentType = document.getElementById('esResidentType').value;
+    const hostelBlock = residentType === 'Hosteller' ? document.getElementById('esHostelBlock').value.trim() : null;
+    const roomNumber = residentType === 'Hosteller' ? document.getElementById('esRoomNumber').value.trim() : null;
     const deptId = document.getElementById('esDept').value;
     const courseId = document.getElementById('esCourse').value;
     const secId = document.getElementById('esSection').value;
@@ -4832,6 +5000,12 @@ window.submitEditStudentForm = async function(e) {
 
     const alertBox = document.getElementById('editStudentAlert');
     alertBox.classList.remove('d-none', 'alert-success', 'alert-danger');
+
+    if (residentType === 'Hosteller' && (!hostelBlock || !roomNumber)) {
+        alertBox.classList.add('alert-danger');
+        alertBox.innerText = 'Hostel Block and Room Number are required for Hostellers.';
+        return;
+    }
 
     const nameParts = fName.trim().split(/\s+/);
     const firstName = nameParts[0] || fName;
@@ -4844,7 +5018,8 @@ window.submitEditStudentForm = async function(e) {
     const payload = {
         firstName: firstName, lastName: lastName, registerNumber: regNo,
         email: email || collegeEmail, collegeEmail: collegeEmail, phone: phone,
-        parentPhone1: parentPhone1, parentPhone2: parentPhone2 || null, semester: parseInt(semester),
+        parentPhone1: parentPhone1, parentPhone2: parentPhone2 || null, residentType: residentType, 
+        hostelBlock: hostelBlock, roomNumber: roomNumber, semester: parseInt(semester),
         department: { name: deptId }, course: { name: actualCourseId }, section: { sectionName: fullSectionName }
     };
 
@@ -4871,48 +5046,97 @@ window.submitEditStudentForm = async function(e) {
     }
 };
 
-window.initAdminViewEditTimetableModal = async function() {
+window.initAdminViewEditTimetableModal = function() {
     const deptSelect = document.getElementById('avtDeptSelect');
     if (!deptSelect) return;
-    deptSelect.innerHTML = '<option value="">Select Department...</option>';
+    
+    // Extract unique departments from activeSections, filtering out junk values
+    const depts = [...new Set(activeSections.map(s => s.dept))]
+        .filter(d => d && d !== 'Select Department...' && d.trim() !== '')
+        .sort();
+        
+    deptSelect.innerHTML = '<option value="">Select Department...</option>' + 
+        depts.map(d => `<option value="${d}">${d}</option>`).join('');
+    
     document.getElementById('avtSectionSelect').innerHTML = '<option value="">Select Department First...</option>';
-    try {
-        const res = await apiFetch('/api/departments');
-        if (res.ok) {
-            const depts = await res.json();
-            depts.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d.name; opt.innerText = d.name;
-                deptSelect.appendChild(opt);
-            });
-        }
-    } catch (err) { console.error('Failed to load departments', err); }
 };
 
-window.avtDeptChanged = async function(deptName) {
+window.avtDeptChanged = function(deptName) {
     const sectionSelect = document.getElementById('avtSectionSelect');
     if (!sectionSelect) return;
-    sectionSelect.innerHTML = '<option value="">Select Section...</option>';
-    if (!deptName) {
+    
+    if (!deptName || deptName === 'Select Department...') {
         sectionSelect.innerHTML = '<option value="">Select Department First...</option>';
         return;
     }
-    try {
-        const res = await apiFetch('/api/sections');
-        if (res.ok) {
-            const sections = await res.json();
-            const filteredSections = sections.filter(s => {
-                if (s.course && s.course.department && s.course.department.name === deptName) return true;
-                if (s.sectionName && s.sectionName.includes(deptName)) return true;
-                return false;
-            });
-            filteredSections.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s.sectionName; opt.innerText = s.sectionName;
-                sectionSelect.appendChild(opt);
-            });
+    
+    const sections = activeSections.filter(s => s.dept === deptName).sort((a, b) => a.name.localeCompare(b.name));
+    sectionSelect.innerHTML = '<option value="">Select Section...</option>' + 
+        sections.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+};
+
+window.renderTimetableBuilderGrid = function(section) {
+    const tbody = document.getElementById('ttBuilderGrid');
+    if (!tbody) return;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    const savedDataStr = localStorage.getItem(`sece_tt_built_${section}`);
+    let savedData = null;
+    if (savedDataStr) {
+        try { savedData = JSON.parse(savedDataStr); } catch (e) {}
+    }
+    
+    document.getElementById('ttBuildAdvisor').value = (savedData && savedData.advisor) ? savedData.advisor : '';
+    document.getElementById('ttBuildTutors').value = (savedData && savedData.tutors) ? savedData.tutors : '';
+
+    let html = '';
+    days.forEach(day => {
+        html += `<tr><td class="align-middle text-white fw-bold">${day}</td>`;
+        for (let p = 1; p <= 7; p++) {
+            if (p === 4) html += `<td class="align-middle text-muted small text-center">TEA</td>`;
+            if (p === 6) {
+                html += `<td class="align-middle text-muted small text-center">LUNCH</td>`;
+                const actVal = (savedData && savedData.grid && savedData.grid[day] && savedData.grid[day].act) ? savedData.grid[day].act : '';
+                html += `<td><input type="text" id="ttb_${day}_act" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${actVal.replace(/"/g, '&quot;')}" /></td>`;
+            }
+            
+            const val = (savedData && savedData.grid && savedData.grid[day] && savedData.grid[day][`P${p}`]) ? savedData.grid[day][`P${p}`] : '';
+            html += `<td><input type="text" id="ttb_${day}_P${p}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${val.replace(/"/g, '&quot;')}" /></td>`;
         }
-    } catch (err) { console.error('Failed to load sections', err); }
+        html += `</tr>`;
+    });
+    tbody.innerHTML = html;
+};
+
+window.saveTimetableBuilder = function() {
+    const section = window.currentTimetableSection;
+    if (!section) return;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const data = {
+        advisor: document.getElementById('ttBuildAdvisor').value.trim(),
+        tutors: document.getElementById('ttBuildTutors').value.trim(),
+        grid: {}
+    };
+    days.forEach(day => {
+        data.grid[day] = {};
+        for (let p = 1; p <= 7; p++) {
+            const val = document.getElementById(`ttb_${day}_P${p}`).value.trim();
+            data.grid[day][`P${p}`] = val;
+        }
+        const actVal = document.getElementById(`ttb_${day}_act`).value.trim();
+        data.grid[day].act = actVal;
+    });
+    
+    localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
+    showToast('Success', `Timetable for ${section} saved!`);
+    
+    const modalEl = bootstrap.Modal.getInstance(document.getElementById('timetableBuilderModal'));
+    if (modalEl) modalEl.hide();
+    
+    timetableData = loadSavedTimetable();
+    if (currentSection === section) {
+        renderTimetableGrid();
+    }
 };
 
 window.submitAdminViewEditTimetable = function() {
@@ -4931,7 +5155,7 @@ window.submitAdminViewEditTimetable = function() {
     window.currentTimetableYear = year;
     window.currentTimetableSemester = semester;
     
-    if (window.renderTimetableBuilderGrid) window.renderTimetableBuilderGrid(section);
+    window.renderTimetableBuilderGrid(section);
     const selectionModalEl = bootstrap.Modal.getInstance(document.getElementById('adminViewEditTimetableModal'));
     if (selectionModalEl) selectionModalEl.hide();
     const builderModalEl = new bootstrap.Modal(document.getElementById('timetableBuilderModal'));
