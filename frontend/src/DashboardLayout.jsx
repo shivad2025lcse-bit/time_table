@@ -7,6 +7,7 @@ export default function DashboardLayout() {
     const isLoginPage = location.pathname === "/login" || location.pathname === "/";
     const isAdmin = location.pathname === "/admin";
     const isStudent = location.pathname === "/student";
+    const isFaculty = location.pathname === "/faculty";
     useEffect(() => {
         // Guard against double-injection: React 19 StrictMode double-fires
         // effects in dev, and every route ("/login", "/admin", "/faculty",
@@ -28,6 +29,25 @@ export default function DashboardLayout() {
         });
     }, []);
 
+    useEffect(() => {
+        // When the React route changes, wait for DOM update and then trigger legacy rendering scripts
+        const timer = setTimeout(() => {
+            if (window.renderStaffAvailability) window.renderStaffAvailability();
+            if (window.renderEnrolledStudentsRoster) window.renderEnrolledStudentsRoster();
+
+            // For student route: re-apply login session so timetable loads for the correct section
+            if (location.pathname === '/student') {
+                if (typeof window.restoreLoginSession === 'function') {
+                    window.restoreLoginSession();
+                } else if (typeof window.switchRole === 'function') {
+                    const role = localStorage.getItem('sece_logged_in_role') || 'STUDENT';
+                    window.switchRole(role, true);
+                }
+            }
+        }, 600);
+        return () => clearTimeout(timer);
+    }, [location.pathname]);
+
     return (
         <>
 
@@ -36,7 +56,7 @@ export default function DashboardLayout() {
             <section id="loginScreen" style={{ display: isLoginPage ? "flex" : "none" }}>
                 <div className="login-shell">
                     <div className="login-brand">
-                        <div className="sece-logo-badge">SECE</div>
+                        <img src="/images/sece-logo.png" alt="SECE Logo" style={{ width: "45px", height: "45px", objectFit: "contain" }} />
                         <h1 className="h3 fw-bold text-white mb-2">SRI ESHWAR COLLEGE OF ENGINEERING</h1>
                         <p className="text-muted mb-0">Smart Class & Timetable Scheduler</p>
                     </div>
@@ -67,6 +87,11 @@ export default function DashboardLayout() {
                                 <button className="btn btn-danger w-100">Continue as Admin</button>
                             </div>
                         </div>
+                        <div className="text-center mt-4">
+                            <button type="button" className="btn btn-outline-info rounded-pill px-4" onClick={() => window.openShareAppModal && window.openShareAppModal()}>
+                                <i className="fa-solid fa-share-nodes me-2"></i> Share App
+                            </button>
+                        </div>
                     </div>
 
 
@@ -86,7 +111,7 @@ export default function DashboardLayout() {
                             <p id="loginHint" className="small text-muted mb-0">Username = role letter + first 4 letters of first name + last-name initial + 012345</p>
                         </div>
 
-                        <form id="roleLoginForm" onSubmit={(event) => window.handleLogin(event)} >
+                        <form id="roleLoginForm" onSubmit={(event) => window.handleRoleLogin && window.handleRoleLogin(event)} >
                             <input type="hidden" id="selectedLoginRole" defaultValue="STUDENT" />
 
                             <div className="mb-3">
@@ -111,10 +136,10 @@ export default function DashboardLayout() {
                                         <i className="fa-solid fa-eye" id="loginPasswordEye"></i>
                                     </button>
                                 </div>
-                                <div className="form-text text-muted">Initial password = first 4 letters of first name + last-name initial + 012345 (without the role prefix).</div>
+                                <div className="form-text text-muted">Enter your password. For new accounts use your Register Number as username and <code>student123</code> as password.</div>
                             </div>
 
-                            <button type="submit" className="btn btn-primary w-100 fw-bold">
+                            <button type="submit" id="roleLoginBtn" className="btn btn-primary w-100 fw-bold">
                                 <i className="fa-solid fa-right-to-bracket me-1"></i> Login
                             </button>
 
@@ -134,7 +159,7 @@ export default function DashboardLayout() {
                     <div className="container-fluid px-4">
                         <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
                             <div className="d-flex align-items-center gap-3">
-                                <div className="sece-logo-badge">SECE</div>
+                                <img src="/images/sece-logo.png" alt="SECE Logo" style={{ width: "45px", height: "45px", objectFit: "contain" }} />
                                 <div>
                                     <h1 className="h5 mb-0 fw-bold text-white tracking-tight">SRI ESHWAR COLLEGE OF ENGINEERING</h1>
                                     <div className="d-flex align-items-center gap-2 mt-1 flex-wrap">
@@ -190,6 +215,11 @@ export default function DashboardLayout() {
                                     <i className="fa-solid fa-chalkboard-user"></i> Add Faculty
                                 </button>
 
+                                <button id="manageAnnouncementsBtn" className="btn btn-sm btn-outline-success d-flex align-items-center gap-1 d-none"
+                                    type="button" data-bs-toggle="modal" data-bs-target="#manageAnnouncementsModal" onClick={() => window.renderManageAnnouncementsList && window.renderManageAnnouncementsList()}>
+                                    <i className="fa-solid fa-bullhorn"></i> Manage Announcements
+                                </button>
+
                                 <button id="adminViewFacultyBtn" className="btn btn-sm btn-outline-info align-items-center gap-1 d-none" type="button" data-bs-toggle="modal" data-bs-target="#adminViewFacultyModal">
                                     <i className="fa-solid fa-address-card"></i> View Full Faculty Details
                                 </button>
@@ -225,9 +255,11 @@ export default function DashboardLayout() {
                                 <button id="studentDayNotificationBtn" className="btn btn-sm btn-outline-info align-items-center gap-1 d-none" type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
 
 
-                                <button id="substitutionBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#substitutionModal">
-                                    <i className="fa-solid fa-people-arrows"></i> Staff Availability / Substitution
-                                </button>
+                                {(!isAdmin && !isStudent) && (
+                                    <button id="substitutionBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#substitutionModal">
+                                        <i className="fa-solid fa-people-arrows"></i> Staff Availability / Substitution
+                                    </button>
+                                )}
 
                                 {(!isAdmin && !isStudent) && (
                                     <button id="myTimetableBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => window.renderMyTimetable && window.renderMyTimetable()}>
@@ -251,50 +283,54 @@ export default function DashboardLayout() {
                     </div>
                 </header>
 
+                <div id="announcementTickerContainer" className="w-100 bg-success text-white py-1 marquee-l2r-container" style={{ borderBottom: "2px solid #198754" }}>
+                    <div id="announcementMarquee" className="marquee-l2r-content mb-0 fw-bold fs-6" style={{ letterSpacing: "0.5px" }}></div>
+                </div>
+
 
                 <main className="container-fluid px-4 py-3">
 
 
-                    <div className="glass-panel p-3">
-                        <div className="row g-3 align-items-center">
+                    {!isAdmin && (
+                        <div className="glass-panel p-3 mb-3">
+                            <div className="row g-3 align-items-center">
 
-                            {(isAdmin || location.pathname === "/faculty") && (
-                                <>
-                                    <div className="col-md-3 col-sm-6" id="deptFilterWrapper">
-                                        <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-building-columns text-primary me-1"></i> Department</label>
-                                        <select id="deptSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.populateSectionSelects?.(); window.onFilterChange?.(); }} >
-                                            <option value="">-- Select Department --</option>
-                                            <option value="CSE">CSE - Computer Science & Engg</option>
-                                            <option value="IT">IT - Information Technology</option>
-                                            <option value="AIDS">AI&DS - Artificial Intelligence & Data Science</option>
-                                            <option value="ECE">ECE - Electronics & Comm Engg</option>
-                                            <option value="EEE">EEE - Electrical & Electronics Engg</option>
-                                            <option value="MECH">MECH - Mechanical Engineering</option>
-                                            <option value="CIVIL">CIVIL - Civil Engineering</option>
-                                            <option value="CSD">CSD - Computer Science & Design</option>
-                                        </select>
-                                    </div>
+                                {location.pathname === "/faculty" && (
+                                    <>
+                                        <div className="col-md-3 col-sm-6" id="deptFilterWrapper">
+                                            <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-building-columns text-primary me-1"></i> Department</label>
+                                            <select id="deptSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.populateSectionSelects?.(); window.onFilterChange?.(); }} >
+                                                <option value="">-- Select Department --</option>
+                                                <option value="CSE">CSE - Computer Science & Engg</option>
+                                                <option value="IT">IT - Information Technology</option>
+                                                <option value="AIDS">AI&DS - Artificial Intelligence & Data Science</option>
+                                                <option value="ECE">ECE - Electronics & Comm Engg</option>
+                                                <option value="EEE">EEE - Electrical & Electronics Engg</option>
+                                                <option value="MECH">MECH - Mechanical Engineering</option>
+                                                <option value="CIVIL">CIVIL - Civil Engineering</option>
+                                                <option value="CSD">CSD - Computer Science & Design</option>
+                                            </select>
+                                        </div>
 
 
-                                    <div className="col-md-2 col-sm-6" id="secFilterWrapper">
-                                        <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-layer-group text-info me-1"></i> Section</label>
-                                        <select id="sectionSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.onFilterChange?.(); }} >
-                                            <option value="CSE_C">II CSE C [SF 04]</option>
-                                            <option value="CSE_A">II CSE A [SF 02]</option>
-                                            <option value="CSE_B">II CSE B [SF 03]</option>
-                                            <option value="IT_A">II IT A [IT 101]</option>
-                                            <option value="AIDS_A">II AI&DS A [AI 201]</option>
-                                            <option value="ECE_A">II ECE A [EC 301]</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <div className="col-md-2 col-sm-6 d-flex align-items-end" id="adminSubmitFilterWrapper">
-                                        <button className="btn btn-sm btn-success w-100 fw-bold" onClick={() => { window.onFilterChange?.(); window.showTtPopup?.(); }}><i className="fa-solid fa-check-circle me-1"></i> Submit</button>
-                                    </div>
-                                </>
-                            )}
+                                        <div className="col-md-2 col-sm-6" id="secFilterWrapper">
+                                            <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-layer-group text-info me-1"></i> Section</label>
+                                            <select id="sectionSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.onFilterChange?.(); }} >
+                                                <option value="CSE_C">II CSE C [SF 04]</option>
+                                                <option value="CSE_A">II CSE A [SF 02]</option>
+                                                <option value="CSE_B">II CSE B [SF 03]</option>
+                                                <option value="IT_A">II IT A [IT 101]</option>
+                                                <option value="AIDS_A">II AI&DS A [AI 201]</option>
+                                                <option value="ECE_A">II ECE A [EC 301]</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div className="col-md-2 col-sm-6 d-flex align-items-end" id="adminSubmitFilterWrapper">
+                                            <button className="btn btn-sm btn-success w-100 fw-bold" onClick={() => { window.onFilterChange?.(); window.showTtPopup?.(); }}><i className="fa-solid fa-check-circle me-1"></i> Submit</button>
+                                        </div>
+                                    </>
+                                )}
 
-                            {!isAdmin && (
                                 <div className="col-md-7 d-flex justify-content-md-end justify-content-start gap-4">
                                     <div id="batchInfoCard" className="card shadow border-secondary bg-dark" style={{ minWidth: "250px", borderRadius: "8px" }}>
                                         <div id="batchInfoCardBody" className="card-body p-3 text-light" style={{ fontSize: "0.9rem" }}>
@@ -325,37 +361,42 @@ export default function DashboardLayout() {
                                                     <i id="ayEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Academic Year"></i>
                                                 </div>
                                             </div>
+                                            <div id="studentAdvisorBannerRow" className="d-none align-items-center">
+                                                <div>
+                                                    <strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Advisor:</strong>
+                                                </div>
+                                                <div className="ms-2">
+                                                    <span id="studentAdvisorNameBanner" className="fw-bold text-warning"></span>
+                                                    <span id="studentAdvisorPhoneBanner" className="ms-2 badge bg-dark border border-secondary text-light"></span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div id="classInfoBlock" className="d-flex flex-column justify-content-center gap-2 text-light p-3 card shadow border-secondary bg-dark" style={{ borderRadius: "8px", fontSize: "0.9rem" }}>
                                         <div><strong className="text-muted"><i className="fa-solid fa-users text-primary me-1"></i> Class Strength:</strong> <span className="badge bg-success ms-1" id="classStrengthBadge">61 Students</span></div>
-                                        <div><strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Class Advisor:</strong> <span className="text-warning ms-1">Ms.J.Keerthika, AP/CSE</span></div>
+                                        <div><strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Class Advisor:</strong> <span className="text-warning ms-1" id="classAdvisorLabel">Ms.J.Keerthika, AP/CSE</span></div>
+                                        <div id="classTutorsRow" className="d-none"><strong className="text-muted"><i className="fa-solid fa-chalkboard-user text-info me-1"></i> Class Tutors:</strong> <span className="text-light ms-1" id="classTutorsLabel"></span></div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
 
-                    {!isAdmin && (
-                        <>
                             <div id="roleBanner" className="alert alert-info py-2 px-3 border-0 rounded-3 d-flex align-items-center justify-content-between mb-3 shadow-sm">
                                 <div id="roleBannerTextContainer">
                                     <i className="fa-solid fa-shield-halved me-2"></i>
                                     <span id="roleBannerText">Logged in as <strong>ADMIN</strong>. Click on any period cell in the grid to edit schedule, swap slots, or assign Placement ALT.</span>
                                 </div>
                                 <div className="d-flex align-items-center gap-2">
-                                    <button className="btn btn-sm btn-outline-dark  py-0 border-0" onClick={() => window.quickAssignWednesdayALT()} ><i className="fa-solid fa-bolt text-warning me-1"></i> Quick Preset: Wed 4,5 ALT</button>
-                                    <button id="resetTimetableBtn" className="btn btn-sm btn-outline-danger py-0 d-none" onClick={() => window.resetTimetableEdits()} ><i className="fa-solid fa-rotate-left me-1"></i> Reset Edits to Default</button>
-                                    <button className="btn btn-sm btn-success py-0" onClick={() => window.downloadTimetablePNG()} ><i className="fa-solid fa-download me-1"></i> Download PNG</button>
+                                    <button id="quickAssignBtn" className="btn btn-sm btn-outline-dark py-0 border-0 d-none" onClick={() => window.quickAssignWednesdayALT()}><i className="fa-solid fa-bolt text-warning me-1"></i> Quick Preset: Wed 4,5 ALT</button>
+                                    <button id="resetTimetableBtn" className="btn btn-sm btn-outline-danger py-0 d-none" onClick={() => window.resetTimetableEdits()}><i className="fa-solid fa-rotate-left me-1"></i> Reset Edits to Default</button>
+                                    <button className="btn btn-sm btn-success py-0" onClick={() => window.downloadTimetablePNG()}><i className="fa-solid fa-download me-1"></i> Download PNG</button>
                                 </div>
                             </div>
 
-
                             <div id="notifStatusPanel" className="alert alert-secondary py-2 px-3 border-0 rounded-3 mb-3 shadow-sm small">
-
                             </div>
-
 
                             <div id="adminTTPlaceholder" className="alert alert-warning py-3 px-4 border-0 rounded-3 mb-4 shadow-sm text-center d-none">
                                 <i className="fa-solid fa-circle-info me-2 fs-5 mb-2 d-block"></i>
@@ -381,15 +422,16 @@ export default function DashboardLayout() {
                                         <thead>
                                             <tr>
                                                 <th style={{ width: "100px" }}>Day Order</th>
-                                                <th>1<br /><small className="text-dim">08.40 - 09.40</small></th>
-                                                <th>2<br /><small className="text-dim">09.40 - 10.40</small></th>
-                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }}>10.40-11.00</th>
-                                                <th>3<br /><small className="text-dim">11.00 - 12.00</small></th>
-                                                <th>4<br /><small className="text-dim">12.00 - 01.00</small></th>
-                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }}>01.00-01.40</th>
-                                                <th>5<br /><small className="text-dim">01.40 - 02.30</small></th>
-                                                <th>6<br /><small className="text-dim">02.30 - 03.20</small></th>
-                                                <th>7<br /><small className="text-dim">03.20 - 04.10</small></th>
+                                                <th>1<br /><small className="text-dim" id="ttHeaderP1">08.40 - 09.40</small></th>
+                                                <th>2<br /><small className="text-dim" id="ttHeaderP2">09.40 - 10.40</small></th>
+                                                <th>3<br /><small className="text-dim" id="ttHeaderP3">11.00 - 12.00</small></th>
+                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }} id="ttHeaderTea">12.00-12.15</th>
+                                                <th>4<br /><small className="text-dim" id="ttHeaderP4">12.00 - 01.00</small></th>
+                                                <th>5<br /><small className="text-dim" id="ttHeaderP5">01.40 - 02.30</small></th>
+                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }} id="ttHeaderLunch">02.30-03.15</th>
+                                                <th>ACT<br /><small className="text-dim" id="ttHeaderAct">Activity</small></th>
+                                                <th>6<br /><small className="text-dim" id="ttHeaderP6">02.30 - 03.20</small></th>
+                                                <th>7<br /><small className="text-dim" id="ttHeaderP7">03.20 - 04.10</small></th>
                                             </tr>
                                         </thead>
                                         <tbody id="ttGridBody">
@@ -419,18 +461,32 @@ export default function DashboardLayout() {
                                             </tr>
                                         </thead>
                                         <tbody id="courseRefBody">
-
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
-                            </div>
 
-                        </>
-                    )}
+                            <div className="glass-panel mt-3" id="studentFacultyAvailabilityArea">
+                                    <div className="panel-header">
+                                        <h3 className="panel-title"><i className="fa-solid fa-people-arrows text-warning"></i> All Faculty Availability (Today)</h3>
+                                    </div>
+                                    <div className="table-responsive p-2">
+                                        <table className="ref-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Staff Name</th>
+                                                    <th>Department</th>
+                                                    <th>Status (Today)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="studentFacultyAvailabilityBody">
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                        </div>
 
-                    {isAdmin && (
-                        <div className="mt-4 px-2">
+                        <div className="mt-4 px-2" id="adminControlPanelContainer">
                             <h4 className="text-info fw-bold mb-4"><i className="fa-solid fa-shield-halved me-2"></i> Admin Control Panel</h4>
                             <div className="row g-4">
                                 <div className="col-md-4 col-sm-6">
@@ -460,16 +516,25 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-md-4 col-sm-6">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageFacultyModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                <div className="col-lg-4 col-md-6 col-sm-12">
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminFacultyDetailsModal" onClick={() => window.renderAdminFacultyDetails && window.renderAdminFacultyDetails()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-chalkboard-user text-warning mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Manage Faculty</h5>
-                                            <p className="text-muted small mb-0">Add new faculty accounts and manage assignments.</p>
+                                            <i className="fa-solid fa-address-card text-warning mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                            <h5 className="text-light fw-bold mb-2">Faculty Details</h5>
+                                            <p className="text-muted small mb-0">View complete details of enrolled faculty members.</p>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-md-4 col-sm-6">
+                                <div className="col-lg-4 col-md-6 col-sm-12">
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,100,200,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                            <i className="fa-solid fa-table-list text-pink mb-3" style={{ fontSize: "2.5rem", color: "var(--bs-pink, #d63384)" }}></i>
+                                            <h5 className="text-light fw-bold mb-2">View / Edit Timetable</h5>
+                                            <p className="text-muted small mb-0">Select batch, dept, year, and section to edit timetable.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-lg-4 col-md-6 col-sm-12">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageStudentsModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(13,110,253,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
                                             <i className="fa-solid fa-users text-primary mb-3" style={{ fontSize: "2.5rem" }}></i>
@@ -478,19 +543,8 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-md-4 col-sm-6">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#timetableDefaultsModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-calendar-days text-warning mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Timetable Defaults</h5>
-                                            <p className="text-muted small mb-0">Set global Batch, Semester and Academic Year defaults.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="row g-4 mt-1">
-                                <div className="col-md-4 col-sm-6">
+
+                                <div className="col-lg-4 col-md-6 col-sm-12">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(230,100,50,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
                                             <i className="fa-solid fa-folder-tree text-danger mb-3" style={{ fontSize: "2.5rem" }}></i>
@@ -499,9 +553,17 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
+                                <div className="col-lg-4 col-md-6 col-sm-12">
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewCredentialsModal" onClick={() => window.renderCredentialsList && window.renderCredentialsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,255,150,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                            <i className="fa-solid fa-key text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                            <h5 className="text-light fw-bold mb-2">View Usernames / Passwords</h5>
+                                            <p className="text-muted small mb-0">View all Enrolled Student and Faculty Credentials.</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    )}
 
                 </main>
             </div>
@@ -727,34 +789,7 @@ export default function DashboardLayout() {
 
                             <div>
                             <div className="row g-2 mb-3 align-items-end">
-                                <div className="col-md-2">
-                                    <label className="form-label small text-warning mb-1">Department</label>
-                                    <select id="rosterFilterDept" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={(e) => window.onRosterFilterChange?.()}>
-                                        <option value="">All</option>
-                                        <option value="CSE">CSE</option>
-                                        <option value="IT">IT</option>
-                                        <option value="AIDS">AI&DS</option>
-                                        <option value="ECE">ECE</option>
-                                        <option value="EEE">EEE</option>
-                                        <option value="MECH">MECH</option>
-                                    </select>
-                                </div>
-                                <div className="col-md-2">
-                                    <label className="form-label small text-warning mb-1">Year</label>
-                                    <select id="rosterFilterYear" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={(e) => window.onRosterFilterChange?.()}>
-                                        <option value="">All</option>
-                                        <option value="I">I Year</option>
-                                        <option value="II">II Year</option>
-                                        <option value="III">III Year</option>
-                                        <option value="IV">IV Year</option>
-                                    </select>
-                                </div>
-                                <div className="col-md-2">
-                                    <label className="form-label small text-warning mb-1">Section</label>
-                                    <input type="text" id="rosterFilterSection" list="rosterFilterDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="All Sections" onChange={(e) => window.onRosterFilterChange?.()} autoComplete="off" />
-                                    <datalist id="rosterFilterDatalist"></datalist>
-                                </div>
-                                <div className="col-md-6 d-flex gap-2 justify-content-end align-items-end">
+                                <div className="col-md-12 d-flex gap-2 justify-content-end align-items-end">
                                     <div className="input-group input-group-sm" style={{ maxWidth: '200px' }}>
                                         <input type="text" id="rosterSearchRegNo" className="form-control bg-dark text-white border-secondary" placeholder="Reg No..." />
                                         <button type="button" className="btn btn-outline-info" onClick={() => window.searchStudentInRoster()} title="Search Details"><i className="fa-solid fa-search"></i></button>
@@ -762,6 +797,10 @@ export default function DashboardLayout() {
                                     {!isAdmin && (
                                         <button id="addStudentBtn" className="btn btn-sm btn-success" style={{ whiteSpace: 'nowrap' }} onClick={() => window.toggleAddStudentForm()} ><i className="fa-solid fa-user-plus me-1"></i> Add Student</button>
                                     )}
+                                    <input type="file" id="importStudentExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importStudentExcel && window.importStudentExcel(e)} />
+                                    <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importStudentExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
+                                        <i className="fa-solid fa-file-excel me-1"></i> Import Excel
+                                    </button>
                                 </div>
                             </div>
                             <div className="d-flex align-items-center justify-content-between mb-2">
@@ -842,6 +881,8 @@ export default function DashboardLayout() {
                                                     <th>Department & Sec</th>
                                                     <th>Email</th>
                                                     <th>Phone (SMS)</th>
+                                                    <th>Username</th>
+                                                    <th>Password</th>
                                                     <th className="text-center">Action</th>
                                                 </tr>
                                             </thead>
@@ -930,6 +971,88 @@ export default function DashboardLayout() {
                         <div className="card card-body bg-secondary border-0">
                             <ul className="list-group list-group-flush rounded bg-dark" id="sectionsListOnly">
                             </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div className="modal fade" id="viewCredentialsModal" tabIndex="-1">
+    <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div className="modal-content bg-dark text-white border-secondary">
+            <div className="modal-header border-secondary">
+                <h5 className="modal-title text-success fw-bold"><i className="fa-solid fa-key me-2"></i> User Credentials</h5>
+                <div>
+                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div className="modal-body p-0">
+                <div className="card card-body bg-dark border-0">
+                    <div className="d-flex mb-3 gap-2">
+                        <div className="input-group">
+                            <span className="input-group-text bg-dark text-secondary border-secondary"><i className="fa-solid fa-magnifying-glass"></i></span>
+                            <input type="text" className="form-control bg-dark text-white border-secondary" id="credentialSearchInput" placeholder="Enter exact username (e.g., 25cs316) to search..." onKeyDown={(e) => { if (e.key === 'Enter') window.searchUserCredentials?.(); }} />
+                            <button className="btn btn-primary" type="button" onClick={() => window.searchUserCredentials?.()}>Search</button>
+                        </div>
+                    </div>
+                    <ul className="nav nav-tabs nav-tabs-dark mb-3" role="tablist">
+                        <li className="nav-item" role="presentation">
+                            <button className="nav-link active" data-bs-toggle="tab" data-bs-target="#credStudentsTab" type="button" role="tab">Students</button>
+                        </li>
+                        <li className="nav-item" role="presentation">
+                            <button className="nav-link" data-bs-toggle="tab" data-bs-target="#credFacultyTab" type="button" role="tab">Faculty</button>
+                        </li>
+                        <li className="nav-item" role="presentation">
+                            <button className="nav-link" data-bs-toggle="tab" data-bs-target="#credAdvisorTab" type="button" role="tab">Advisor</button>
+                        </li>
+                    </ul>
+                    <div className="tab-content">
+                        <div className="tab-pane fade show active" id="credStudentsTab" role="tabpanel">
+                            <div className="table-responsive">
+                                <table className="table table-dark table-hover align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Register No / Username</th>
+                                            <th>Name</th>
+                                            <th>Section</th>
+                                            <th>Password</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="credStudentsList"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className="tab-pane fade" id="credFacultyTab" role="tabpanel">
+                            <div className="table-responsive">
+                                <table className="table table-dark table-hover align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Faculty Name</th>
+                                            <th>Department</th>
+                                            <th>Username</th>
+                                            <th>Password</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="credFacultyList"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className="tab-pane fade" id="credAdvisorTab" role="tabpanel">
+                            <div className="table-responsive">
+                                <table className="table table-dark table-hover align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Advisor Name</th>
+                                            <th>Assigned Section</th>
+                                            <th>Username</th>
+                                            <th>Password</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="credAdvisorList"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1422,7 +1545,7 @@ export default function DashboardLayout() {
             <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 
-            <script src="/js/frontend_app.js"></script>
+            <script src="/js/frontend_app.js?v=4"></script>
             <script src="/js/theme.js"></script>
 
             <div className="modal fade" id="studentDetailsOnlyModal" tabIndex="-1">
@@ -1461,17 +1584,97 @@ export default function DashboardLayout() {
                 </div>
             </div>
 
+                        {/* Edit Student Modal */}
+            <div className="modal fade" id="editStudentModal" tabIndex="-1">
+                <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary d-flex justify-content-between align-items-center">
+                            <h5 className="modal-title text-warning fw-bold mb-0"><i className="fa-solid fa-user-pen me-2"></i> Edit Student</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body">
+                            <div id="editStudentAlert" className="alert d-none small py-2"></div>
+                            <form id="editStudentForm" onSubmit={(e) => { e.preventDefault(); try { window.submitEditStudentForm(e); } catch(err) { alert("Error submitting form: " + err.message); } }}>
+                                <input type="hidden" id="esId" />
+                                <div className="row g-2 mb-2">
+                                    <div className="col-md-4">
+                                        <label className="form-label small">First Name <span className="text-danger">*</span></label>
+                                        <input type="text" id="esFirstName" className="form-control form-control-sm bg-dark text-white" required />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label className="form-label small">Last Name <span className="text-danger">*</span></label>
+                                        <input type="text" id="esLastName" className="form-control form-control-sm bg-dark text-white" required />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label className="form-label small">Register No <span className="text-danger">*</span></label>
+                                        <input type="text" id="esRegNo" className="form-control form-control-sm bg-dark text-white" required />
+                                    </div>
+                                </div>
+                                <div className="row g-2 mb-2">
+                                    <div className="col-md-6">
+                                        <label className="form-label small">Personal Email</label>
+                                        <input type="email" id="esEmail" className="form-control form-control-sm bg-dark text-white" />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label small">College Email <span className="text-danger">*</span></label>
+                                        <input type="email" id="esCollegeEmail" className="form-control form-control-sm bg-dark text-white" required />
+                                    </div>
+                                </div>
+                                <div className="row g-2 mb-2">
+                                    <div className="col-md-4">
+                                        <label className="form-label small">Student Phone</label>
+                                        <input type="tel" id="esPhone" className="form-control form-control-sm bg-dark text-white" />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label className="form-label small">Parent Phone 1 <span className="text-danger">*</span></label>
+                                        <input type="tel" id="esParentPhone1" className="form-control form-control-sm bg-dark text-white" required />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label className="form-label small">Parent Phone 2</label>
+                                        <input type="tel" id="esParentPhone2" className="form-control form-control-sm bg-dark text-white" />
+                                    </div>
+                                </div>
+                                <div className="row g-2 mb-3">
+                                    <div className="col-md-3">
+                                        <label className="form-label small">Department <span className="text-danger">*</span></label>
+                                        <input type="text" id="esDept" list="deptDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required autoComplete="off" />
+                                    </div>
+                                    <div className="col-md-3">
+                                        <label className="form-label small">Course <span className="text-danger">*</span></label>
+                                        <input type="text" id="esCourse" list="courseDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required autoComplete="off" />
+                                    </div>
+                                    <div className="col-md-3">
+                                        <label className="form-label small">Section <span className="text-danger">*</span></label>
+                                        <input type="text" id="esSection" list="sectionDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required autoComplete="off" />
+                                    </div>
+                                    <div className="col-md-3">
+                                        <label className="form-label small">Semester <span className="text-danger">*</span></label>
+                                        <input type="number" id="esSemester" className="form-control form-control-sm bg-dark text-white" required min="1" max="8" />
+                                    </div>
+                                </div>
+                                <button type="submit" className="btn btn-warning w-100 fw-bold"><i className="fa-solid fa-save me-1"></i> Update Student</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
             {/* Manage Students Modal */}
             <div className="modal fade" id="manageStudentsModal" tabIndex="-1">
                 <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
                     <div className="modal-content bg-dark text-white border-secondary">
-                        <div className="modal-header border-secondary">
-                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-users me-2"></i> Manage Students</h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        <div className="modal-header border-secondary d-flex justify-content-between align-items-center">
+                            <h5 className="modal-title text-info fw-bold mb-0"><i className="fa-solid fa-users me-2"></i> Manage Students</h5>
+                            <div className="d-flex align-items-center gap-2">
+                                <input type="file" id="importAdminStudentExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importStudentExcel && window.importStudentExcel(e, true)} />
+                                <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importAdminStudentExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
+                                    <i className="fa-solid fa-file-excel me-1"></i> Import Excel
+                                </button>
+                                <button type="button" className="btn-close btn-close-white ms-2" data-bs-dismiss="modal"></button>
+                            </div>
                         </div>
                         <div className="modal-body">
                             <div id="manageStudentsAlert" className="alert d-none small py-2"></div>
-                            <form id="manageStudentsForm" onSubmit={(e) => { e.preventDefault(); window.submitManageStudentForm(e); }}>
+                            <form id="manageStudentsForm" onSubmit={(e) => { e.preventDefault(); try { window.submitManageStudentForm(e); } catch(err) { alert("Error submitting form: " + err.message); } }}>
                                 <div className="row g-2 mb-2">
                                     <div className="col-md-4">
                                         <label className="form-label small">First Name <span className="text-danger">*</span></label>
@@ -1605,9 +1808,15 @@ export default function DashboardLayout() {
             <div className="modal fade" id="manageFacultyModal" tabIndex="-1">
                 <div className="modal-dialog modal-lg modal-dialog-centered">
                     <div className="modal-content bg-dark text-white border-secondary">
-                        <div className="modal-header border-secondary">
-                            <h5 className="modal-title text-warning fw-bold"><i className="fa-solid fa-chalkboard-user me-2"></i> Add Faculty</h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        <div className="modal-header border-secondary d-flex justify-content-between align-items-center">
+                            <h5 className="modal-title text-warning fw-bold mb-0"><i className="fa-solid fa-chalkboard-user me-2"></i> Add Faculty</h5>
+                            <div className="d-flex align-items-center gap-2">
+                                <input type="file" id="importFacultyExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importFacultyExcel && window.importFacultyExcel(e)} />
+                                <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importFacultyExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
+                                    <i className="fa-solid fa-file-excel me-1"></i> Import Excel
+                                </button>
+                                <button type="button" className="btn-close btn-close-white ms-2" data-bs-dismiss="modal"></button>
+                            </div>
                         </div>
                         <div className="modal-body">
                             <p className="small text-muted mb-3">Add new faculty members. A backend User account will be automatically provisioned for them.</p>
@@ -1665,6 +1874,131 @@ export default function DashboardLayout() {
                 </div>
             </div>
 
+            <div className="modal fade" id="timetableBuilderModal" tabIndex="-1">
+                <div className="modal-dialog modal-xl modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
+                            <h5 className="modal-title text-primary fw-bold"><i className="fa-solid fa-table me-2"></i> Timetable Builder</h5>
+                            <div>
+                                <input type="file" id="importExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importTimetableExcel && window.importTimetableExcel(e)} />
+                                <button type="button" className="btn btn-sm btn-outline-success me-3" onClick={() => document.getElementById('importExcelInput').click()}>
+                                    <i className="fa-solid fa-file-excel me-1"></i> Import Excel
+                                </button>
+                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                        </div>
+                        <div className="modal-body">
+                            <form id="timetableBuilderForm" onSubmit={(e) => { e.preventDefault(); if (window.saveTimetableBuilder) window.saveTimetableBuilder(); }}>
+                                <div className="row g-3 mb-4">
+                                    <div className="col-md-6">
+                                        <label className="form-label small text-muted">Class Advisor</label>
+                                        <input type="text" id="ttBuildAdvisor" className="form-control bg-dark text-white border-secondary" placeholder="e.g. Ms.J.Keerthika, AP/CSE" />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label small text-muted">Class Tutors</label>
+                                        <input type="text" id="ttBuildTutors" className="form-control bg-dark text-white border-secondary" placeholder="e.g. Ms.B.Gomathi, Mr.K.Sabarigirivason" />
+                                    </div>
+                                </div>
+                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Period Timings</h6>
+                                <div className="row g-2 mb-4">
+                                    <div className="col"><input type="text" id="ttBuildP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P1 Timing" defaultValue="08.40 - 09.40" /></div>
+                                    <div className="col"><input type="text" id="ttBuildP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P2 Timing" defaultValue="09.40 - 10.40" /></div>
+                                    <div className="col"><input type="text" id="ttBuildP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P3 Timing" defaultValue="11.00 - 12.00" /></div>
+                                    <div className="col"><input type="text" id="ttBuildTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Tea Break" defaultValue="12.00 - 12.15" /></div>
+                                    <div className="col"><input type="text" id="ttBuildP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P4 Timing" defaultValue="12.15 - 01.15" /></div>
+                                    <div className="col"><input type="text" id="ttBuildP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P5 Timing" defaultValue="01.15 - 02.00" /></div>
+                                    <div className="col"><input type="text" id="ttBuildLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Lunch Break" defaultValue="02.00 - 02.40" /></div>
+                                    <div className="col"><input type="text" id="ttBuildAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Activity Timing" defaultValue="02.40 - 03.30" /></div>
+                                    <div className="col"><input type="text" id="ttBuildP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P6 Timing" defaultValue="03.30 - 04.20" /></div>
+                                    <div className="col"><input type="text" id="ttBuildP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P7 Timing" defaultValue="04.20 - 05.10" /></div>
+                                </div>
+
+                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Timetable Entries</h6>
+                                <p className="small text-muted mb-2">Enter Subject / Staff / Venue. Format: <code>Subject, Staff, Venue</code> or just type it in. Leave blank for FREE.</p>
+                                <div className="table-responsive">
+                                    <table className="table table-dark table-bordered border-secondary table-sm text-center" style={{ tableLayout: "fixed" }}>
+                                        <thead>
+                                            <tr>
+                                                <th style={{ width: "100px" }}>Day</th>
+                                                <th>Period 1</th><th>Period 2</th><th>Period 3</th><th className="text-warning">Tea Break</th><th>Period 4</th><th>Period 5</th><th className="text-warning">Lunch Break</th><th className="text-warning">Activity Hour</th><th>Period 6</th><th>Period 7</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ttBuilderGrid">
+                                            {/* Generated by JS */}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className="d-flex justify-content-end gap-2 mt-3">
+                                    <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" className="btn btn-success"><i className="fa-solid fa-floppy-disk me-1"></i> Save Built Timetable</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="modal fade" id="adminViewEditTimetableModal" tabIndex="-1">
+                <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-pink fw-bold"><i className="fa-solid fa-table-list me-2"></i> View / Edit Timetable</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body">
+                            <form id="adminViewEditTimetableForm" onSubmit={(e) => { e.preventDefault(); if (window.submitAdminViewEditTimetable) window.submitAdminViewEditTimetable(); }}>
+                                <div className="mb-3">
+                                    <label className="form-label small text-muted">Batch Start Year <span className="text-danger">*</span></label>
+                                    <input type="number" id="avtBatchInput" className="form-control bg-dark text-white border-secondary" min="2020" max="3000" defaultValue="2023" required />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label small text-muted">Department <span className="text-danger">*</span></label>
+                                    <select id="avtDeptSelect" className="form-select bg-dark text-white border-secondary" required onChange={(e) => window.avtDeptChanged && window.avtDeptChanged(e.target.value)}>
+                                        <option value="">Select Department...</option>
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label small text-muted">Section <span className="text-danger">*</span></label>
+                                    <select id="avtSectionSelect" className="form-select bg-dark text-white border-secondary" required>
+                                        <option value="">Select Department First...</option>
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label small text-muted">Year <span className="text-danger">*</span></label>
+                                    <select id="avtYearSelect" className="form-select bg-dark text-white border-secondary" required onChange={(e) => {
+                                        const y = parseInt(e.target.value);
+                                        const semSelect = document.getElementById('avtSemesterSelect');
+                                        if (semSelect && !isNaN(y)) {
+                                            semSelect.value = (y * 2 - 1).toString(); // e.g. Year 1 -> Sem 1
+                                        }
+                                    }}>
+                                        <option value="1">1st Year</option>
+                                        <option value="2">2nd Year</option>
+                                        <option value="3">3rd Year</option>
+                                        <option value="4">4th Year</option>
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label small text-muted">Semester <span className="text-danger">*</span></label>
+                                    <select id="avtSemesterSelect" className="form-select bg-dark text-white border-secondary" required>
+                                        <option value="1">I Semester</option>
+                                        <option value="2">II Semester</option>
+                                        <option value="3">III Semester</option>
+                                        <option value="4">IV Semester</option>
+                                        <option value="5">V Semester</option>
+                                        <option value="6">VI Semester</option>
+                                        <option value="7">VII Semester</option>
+                                        <option value="8">VIII Semester</option>
+                                    </select>
+                                </div>
+                                <button type="submit" className="btn btn-pink w-100 mt-2 text-white" style={{ backgroundColor: 'var(--bs-pink, #d63384)' }}>View Timetable</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="modal fade" id="editAyModal" tabIndex="-1">
                 <div className="modal-dialog modal-sm modal-dialog-centered">
                     <div className="modal-content bg-dark text-white border-secondary">
@@ -1688,28 +2022,169 @@ export default function DashboardLayout() {
             <div className="modal fade" id="myTimetableModal" tabIndex="-1">
                 <div className="modal-dialog modal-xl modal-dialog-centered">
                     <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
+                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-calendar-user me-2"></i> Feed Your Timetable</h5>
+                            <div>
+                                <input type="file" id="importExcelInputFaculty" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importFacultyTimetableExcel && window.importFacultyTimetableExcel(e)} />
+                                <button type="button" className="btn btn-sm btn-outline-success me-3" onClick={() => document.getElementById('importExcelInputFaculty').click()}>
+                                    <i className="fa-solid fa-file-excel me-1"></i> Import Excel
+                                </button>
+                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                        </div>
+                        <div className="modal-body p-3">
+                            <form id="myTimetableForm" onSubmit={(e) => { e.preventDefault(); if (window.saveMyTimetable) window.saveMyTimetable(); }}>
+                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Period Timings</h6>
+                                <div className="row g-2 mb-4">
+                                    <div className="col"><input type="text" id="myTtP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P1 Timing" defaultValue="08.40 - 09.40" /></div>
+                                    <div className="col"><input type="text" id="myTtP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P2 Timing" defaultValue="09.40 - 10.40" /></div>
+                                    <div className="col"><input type="text" id="myTtP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P3 Timing" defaultValue="11.00 - 12.00" /></div>
+                                    <div className="col"><input type="text" id="myTtTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Tea Break" defaultValue="12.00 - 12.15" /></div>
+                                    <div className="col"><input type="text" id="myTtP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P4 Timing" defaultValue="12.15 - 01.15" /></div>
+                                    <div className="col"><input type="text" id="myTtP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P5 Timing" defaultValue="01.15 - 02.00" /></div>
+                                    <div className="col"><input type="text" id="myTtLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Lunch Break" defaultValue="02.00 - 02.40" /></div>
+                                    <div className="col"><input type="text" id="myTtAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Activity Timing" defaultValue="02.40 - 03.30" /></div>
+                                    <div className="col"><input type="text" id="myTtP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P6 Timing" defaultValue="03.30 - 04.20" /></div>
+                                    <div className="col"><input type="text" id="myTtP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P7 Timing" defaultValue="04.20 - 05.10" /></div>
+                                </div>
+
+                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Timetable Entries</h6>
+                                <p className="small text-muted mb-2">Enter Subject / Class / Venue. Format: <code>Subject, Class, Venue</code> or just type it in. Leave blank for FREE.</p>
+                                <div className="table-responsive">
+                                    <table className="table table-dark table-bordered border-secondary table-sm text-center" style={{ tableLayout: "fixed" }}>
+                                        <thead>
+                                            <tr>
+                                                <th style={{ width: "100px" }}>Day</th>
+                                                <th>Period 1</th><th>Period 2</th><th>Period 3</th><th className="text-warning">Tea Break</th><th>Period 4</th><th>Period 5</th><th className="text-warning">Lunch Break</th><th className="text-warning">Activity Hour</th><th>Period 6</th><th>Period 7</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="myTimetableBody">
+                                            {/* Generated by JS */}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className="d-flex justify-content-end gap-2 mt-3">
+                                    <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" className="btn btn-success"><i className="fa-solid fa-floppy-disk me-1"></i> Save Timetable</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div className="modal fade" id="adminFacultyDetailsModal" tabIndex="-1">
+                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                    <div className="modal-content bg-dark text-white border-secondary">
                         <div className="modal-header border-secondary">
-                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-calendar-user me-2"></i> Your Timetable</h5>
+                            <h5 className="modal-title text-warning fw-bold"><i className="fa-solid fa-address-card me-2"></i> Enrolled Faculty Details</h5>
                             <div>
                                 <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                         </div>
                         <div className="modal-body p-0">
-                            <div className="table-responsive" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+                            <div className="d-flex mb-3 gap-2 px-3 pt-3">
+                                <div className="input-group">
+                                    <span className="input-group-text bg-dark text-secondary border-secondary"><i className="fa-solid fa-magnifying-glass"></i></span>
+                                    <input type="text" className="form-control bg-dark text-white border-secondary" id="adminFacultySearchInput" placeholder="Enter faculty username (e.g., fkeerj012345) to search..." onKeyDown={(e) => { if (e.key === 'Enter') window.searchAdminFacultyDetails?.(); }} />
+                                    <button className="btn btn-primary" type="button" onClick={() => window.searchAdminFacultyDetails?.()}>Search</button>
+                                </div>
+                            </div>
+                            <div className="table-responsive">
                                 <table className="table table-dark table-striped table-hover align-middle mb-0 text-center">
                                     <thead className="sticky-top" style={{ backgroundColor: "#1e1e1e" }}>
                                         <tr>
-                                            <th>Day</th>
-                                            <th>Time</th>
-                                            <th>Class / Section</th>
-                                            <th>Subject</th>
-                                            <th>Room</th>
+                                            <th>Name</th>
+                                            <th>Department</th>
+                                            <th>Subject Handling</th>
+                                            <th>Personal Email</th>
+                                            <th>College Email</th>
+                                            <th>Mobile 1</th>
+                                            <th>Mobile 2</th>
+                                            <th>Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="myTimetableBody">
-                                        <tr><td colSpan="5" className="text-center text-muted py-4">Loading timetable...</td></tr>
+                                    <tbody id="adminFacultyDetailsBody">
+                                        <tr><td colSpan="7" className="text-center text-muted py-4">No faculty enrolled yet.</td></tr>
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="modal fade" id="manageAnnouncementsModal" tabIndex="-1">
+                <div className="modal-dialog modal-lg modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-success fw-bold"><i className="fa-solid fa-bullhorn me-2"></i> Manage Announcements</h5>
+                            <div>
+                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                        </div>
+                        <div className="modal-body">
+                            <div className="mb-4">
+                                <label className="form-label text-warning small">Post New Announcement</label>
+                                <div className="input-group">
+                                    <input type="text" id="newAnnouncementInput" className="form-control bg-dark text-white border-secondary" placeholder="e.g., Tomorrow is a holiday due to the festival..." />
+                                    <button className="btn btn-success" type="button" onClick={() => window.addAnnouncement && window.addAnnouncement()}>Post</button>
+                                </div>
+                            </div>
+                            <h6 className="text-light fw-bold border-bottom border-secondary pb-2 mb-3">Active Announcements</h6>
+                            <div className="table-responsive">
+                                <table className="table table-dark table-striped table-hover align-middle mb-0 text-center">
+                                    <thead className="sticky-top" style={{ backgroundColor: "#1e1e1e" }}>
+                                        <tr>
+                                            <th style={{ width: "80%" }}>Announcement Text</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="manageAnnouncementsBody">
+                                        <tr><td colSpan="2" className="text-center text-muted py-4">Loading announcements...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="modal fade" id="shareAppModal" tabIndex="-1">
+                <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title fw-bold text-info"><i className="fa-solid fa-share-nodes me-2"></i> Share App</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body text-center">
+                            <p className="text-muted small mb-3">Scan this QR Code to directly open the login page on your mobile device:</p>
+                            <div className="bg-white p-2 d-inline-block rounded mb-3 shadow" id="qrCodeContainer">
+                                <img src="" id="loginQrCodeImage" alt="Login QR Code" style={{ width: "160px", height: "160px", objectFit: "contain" }} />
+                            </div>
+                            
+                            <div className="input-group input-group-sm mb-4 mx-auto" style={{maxWidth: "300px"}}>
+                                <input type="text" id="shareAppLinkInput" className="form-control bg-dark text-white border-secondary" readOnly />
+                                <button className="btn btn-outline-secondary" type="button" onClick={() => {
+                                    const link = document.getElementById('shareAppLinkInput').value;
+                                    navigator.clipboard.writeText(link);
+                                    alert('Link copied!');
+                                }}>
+                                    <i className="fa-solid fa-copy"></i>
+                                </button>
+                            </div>
+
+                            <p className="text-muted small mb-3">Or share via link:</p>
+                            <div className="d-flex justify-content-center gap-3">
+                                <button className="btn btn-outline-success rounded-circle" style={{width: "50px", height: "50px"}} onClick={() => window.shareViaWhatsApp && window.shareViaWhatsApp()} title="WhatsApp">
+                                    <i className="fa-brands fa-whatsapp fs-4"></i>
+                                </button>
+                                <button className="btn btn-outline-primary rounded-circle" style={{width: "50px", height: "50px"}} onClick={() => window.shareViaMessage && window.shareViaMessage()} title="Message (SMS)">
+                                    <i className="fa-solid fa-comment-sms fs-4"></i>
+                                </button>
+                                <button className="btn btn-outline-light rounded-circle" style={{width: "50px", height: "50px"}} onClick={() => window.shareViaWebAPI && window.shareViaWebAPI()} title="More Options / Copy Link">
+                                    <i className="fa-solid fa-share fs-4"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1719,3 +2194,5 @@ export default function DashboardLayout() {
         </>
     );
 }
+
+

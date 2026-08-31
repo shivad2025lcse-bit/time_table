@@ -38,9 +38,13 @@ public class StudentService {
     public Optional<Student> getStudentById(Long id) {
         return studentRepository.findById(id);
     }
-
     @org.springframework.transaction.annotation.Transactional
     public Student saveStudent(Student student) {
+        if (student.getId() == null && student.getRegisterNumber() != null) {
+            if (studentRepository.findByRegisterNumber(student.getRegisterNumber()).isPresent()) {
+                throw new IllegalArgumentException("A student with Register Number " + student.getRegisterNumber() + " already exists!");
+            }
+        }
         if (student.getDepartment() != null && student.getDepartment().getId() == null && student.getDepartment().getName() != null) {
             student.setDepartment(departmentRepository.findByCode(student.getDepartment().getName())
                     .orElseGet(() -> departmentRepository.findByName(student.getDepartment().getName())
@@ -94,6 +98,7 @@ public class StudentService {
                 user = new com.smarttimetable.entity.User(
                     username,
                     passwordEncoder.encode(password),
+                    password,
                     com.smarttimetable.entity.Role.ROLE_STUDENT,
                     student.getEmail(),
                     true
@@ -101,6 +106,7 @@ public class StudentService {
             } else {
                 // Reuse orphaned user and reset password/email
                 user.setPassword(passwordEncoder.encode(password));
+                user.setRawPassword(password);
                 user.setEmail(student.getEmail());
                 user.setRole(com.smarttimetable.entity.Role.ROLE_STUDENT);
                 user.setActive(true);

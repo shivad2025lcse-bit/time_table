@@ -44,7 +44,7 @@ public class Teacher {
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
 
-    @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @OneToOne(fetch = FetchType.EAGER, cascade = {CascadeType.MERGE, CascadeType.REFRESH})
     @JoinColumn(name = "user_id")
     private User user;
 

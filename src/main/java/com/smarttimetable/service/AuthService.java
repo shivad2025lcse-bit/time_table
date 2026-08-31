@@ -78,6 +78,7 @@ public class AuthService {
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setRawPassword(newPassword);
         userRepository.save(user);
 
         Map<String, Object> response = new HashMap<>();
@@ -94,6 +95,7 @@ public class AuthService {
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setRawPassword(newPassword);
         userRepository.save(user);
 
         Map<String, Object> response = new HashMap<>();

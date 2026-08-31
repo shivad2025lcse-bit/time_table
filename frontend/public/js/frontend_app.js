@@ -127,11 +127,69 @@ function toggleLoginPassword() {
     icon.className = input.type === 'password' ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
 }
 
-function handleRoleLogin(e) {
+async function handleRoleLogin(e) {
     e.preventDefault();
     const role = document.getElementById('selectedLoginRole').value;
     const username = document.getElementById('loginUsername').value.trim().toLowerCase();
     const password = document.getElementById('loginPassword').value;
+    const loginBtn = document.getElementById('roleLoginBtn');
+
+    if (!username || !password) {
+        alert('Please enter your username and password.');
+        return;
+    }
+
+    // Show loading state
+    if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Logging in...'; }
+
+    // Step 1: Try backend API authentication first (works for all backend users)
+    try {
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            // Backend login success — store token and user info
+            localStorage.setItem('jwt_token', data.token);
+            localStorage.setItem('user_info', JSON.stringify(data));
+            localStorage.setItem('sece_logged_in_user', username);
+            localStorage.setItem('sece_logged_in_role', role);
+            currentUserRole = role;
+
+            // Fetch student's section from backend before redirecting
+            if (role === 'STUDENT') {
+                try {
+                    const stuRes = await fetch('/api/students', { headers: { 'Authorization': 'Bearer ' + data.token } });
+                    if (stuRes.ok) {
+                        const students = await stuRes.json();
+                        const me = students.find(s => s.user && s.user.username === username);
+                        if (me && me.section) {
+                            const secName = me.section.sectionName || me.section.name || '';
+                            if (secName) {
+                                currentSection = secName;
+                                localStorage.setItem('sece_last_viewed_section', secName);
+                            }
+                        }
+                    }
+                } catch(err) { console.warn('Could not fetch student section', err); }
+                window.location.href = '/student';
+            } else if (role === 'ADMIN') {
+                window.location.href = '/admin';
+            } else {
+                window.location.href = '/faculty';
+            }
+            return;
+        }
+        // Backend returned 401/403 — fall through to local validation below
+    } catch (networkErr) {
+        console.warn('Backend unreachable, falling back to local auth', networkErr);
+    }
+
+    // Step 2: Fallback to local validation (for hardcoded admin / offline mode)
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket me-2"></i>Login'; }
 
     if (!isLowercaseAlnum(username) || !/^[a-zA-Z0-9]+$/.test(password)) {
         alert('Username must be lowercase letters and numbers. Password can contain both uppercase and lowercase letters and numbers.');
@@ -143,7 +201,7 @@ function handleRoleLogin(e) {
     }
     const expectedPassword = getStoredPassword(username);
     if (!expectedPassword || password !== expectedPassword) {
-        alert('Invalid password. Use Forgot Password or Account Settings to set a new password.');
+        alert('Invalid username or password.');
         return;
     }
 
@@ -155,20 +213,13 @@ function handleRoleLogin(e) {
         const stu = typeof studentsRoster !== 'undefined' ? studentsRoster.find(s => (s.username || String(s.roll || '').toLowerCase()) === username) : null;
         if (stu) {
             const sec = stu.sec || (stu.section ? (stu.section.sectionName || stu.section.name || stu.section) : null);
-            if (sec) {
-                currentSection = sec;
-                localStorage.setItem('sece_last_viewed_section', currentSection);
-            }
+            if (sec) { currentSection = sec; localStorage.setItem('sece_last_viewed_section', currentSection); }
         }
     }
 
-    if (role === 'ADMIN') {
-        window.location.href = '/admin';
-    } else if (role === 'FACULTY') {
-        window.location.href = '/faculty';
-    } else {
-        window.location.href = '/student';
-    }
+    if (role === 'ADMIN') { window.location.href = '/admin'; }
+    else if (role === 'FACULTY') { window.location.href = '/faculty'; }
+    else { window.location.href = '/student'; }
 }
 
 function logoutUser() {
@@ -246,7 +297,48 @@ function restoreLoginSession() {
             const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
             if (userInfo && userInfo.role) {
                 const shortRole = userInfo.role.replace('ROLE_', '');
-                switchRole(shortRole, true);
+                currentUserRole = shortRole;
+                // For backend students, store their username so currentStudentRecord() can find them
+                if (shortRole === 'STUDENT' && userInfo.username) {
+                    localStorage.setItem('sece_logged_in_user', userInfo.username);
+                    // Load student's section from backend
+                    apiFetch('/api/students').then(res => {
+                        if (res && res.ok) {
+                            res.json().then(students => {
+                                const me = students.find(s => s.user && s.user.username === userInfo.username);
+                                if (me) {
+                                    const secObj = me.section || me.sec;
+                                    let secName = typeof secObj === 'string' ? secObj : (secObj ? (secObj.sectionName || secObj.name || '') : '');
+                                    if (secName) {
+                                        currentSection = secName;
+                                        localStorage.setItem('sece_last_viewed_section', secName);
+                                    }
+                                    // Add to studentsRoster if not present
+                                    const alreadyInRoster = studentsRoster.find(s => s.username === userInfo.username);
+                                    if (!alreadyInRoster) {
+                                        studentsRoster.push({
+                                            id: me.id,
+                                            roll: me.registerNumber || me.roll || userInfo.username,
+                                            firstName: me.firstName || '',
+                                            name: me.name || (me.firstName + ' ' + (me.lastName || '')).trim(),
+                                            email: me.email || '-',
+                                            collegeEmail: me.collegeEmail || '-',
+                                            phone: me.phone || '0000000000',
+                                            username: userInfo.username,
+                                            sec: secName || 'II CSE A',
+                                            section: secObj
+                                        });
+                                    }
+                                }
+                                switchRole(shortRole, true);
+                            });
+                        } else {
+                            switchRole(shortRole, true);
+                        }
+                    }).catch(() => switchRole(shortRole, true));
+                } else {
+                    switchRole(shortRole, true);
+                }
             }
         } catch (e) {
             console.error('Error restoring backend session roles in UI', e);
@@ -485,7 +577,7 @@ const courseReferenceList = [
     { short: 'DVT', code: 'P23CS513 Data Visualization Techniques', faculty: 'Dr.A.Anandaraj, AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
     { short: 'BDA', code: 'P23CS521 Big Data Analytics', faculty: 'Dr.A.Sarfaraz Ahmed,AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
     { short: 'TQM', code: 'P23CS507 Total Quality Management', faculty: 'Dr.R.K.Suresh, Prof/MECH', venue: '1CloudHub', cat: 'OE', credits: 3, hrs: '3' },
-    { short: 'PW', code: 'P23CS602 Project Work – Phase I', faculty: 'Dr.S.Ananthi, AP/CSE', venue: '1CloudHub', cat: 'PW', credits: 6, hrs: '14+7*' },
+    { short: 'PW', code: 'P23CS602 Project Work â€“ Phase I', faculty: 'Dr.S.Ananthi, AP/CSE', venue: '1CloudHub', cat: 'PW', credits: 6, hrs: '14+7*' },
     { short: 'LIB', code: 'Library Hour', faculty: '-', venue: 'Library', cat: '-', credits: '-', hrs: '1*' },
     { short: 'TWM', code: 'Tutor Ward Meeting', faculty: 'Dr.S.Ananthi, AP/CSE', venue: '1CloudHub', cat: '-', credits: '-', hrs: '1' }
 ];
@@ -665,7 +757,7 @@ function substitutionKey(dateStr, section, day, pIdx) {
 }
 
 // Only returns a substitution if "day" is today's actual weekday AND the stored
-// date is today's exact date — so it naturally stops applying tomorrow, and next
+// date is today's exact date â€” so it naturally stops applying tomorrow, and next
 // week's occurrence of the same weekday is unaffected.
 function getSubstitutionFor(section, day, pIdx) {
     if (day !== getTodayDayName()) return null;
@@ -761,7 +853,7 @@ function populateSubPeriodOptions() {
     dayData.forEach((p, idx) => {
         const opt = document.createElement('option');
         opt.value = idx;
-        opt.text = `Period ${idx + 1} — ${p.sub} (${p.faculty})`;
+        opt.text = `Period ${idx + 1} â€” ${p.sub} (${p.faculty})`;
         select.appendChild(opt);
     });
     onSubPeriodChange();
@@ -793,7 +885,7 @@ async function handleArrangeSubstitution(e) {
     }
     const todayName = getTodayDayName();
     if (todayName === 'Sunday') {
-        alert('No classes scheduled on Sunday — nothing to substitute.');
+        alert('No classes scheduled on Sunday â€” nothing to substitute.');
         return;
     }
     const pIdx = parseInt(document.getElementById('subPeriodSelect').value);
@@ -872,7 +964,7 @@ function renderTodaysSubstitutions() {
 
     list.innerHTML = relevant.map(([key, s]) => `
         <li class="list-group-item bg-dark text-white d-flex justify-content-between align-items-center small">
-            <span>Period ${s.pIdx + 1}: <strong>${s.substituteFaculty}</strong> covering for ${s.originalFaculty}${s.reason ? ' — ' + s.reason : ''}</span>
+            <span>Period ${s.pIdx + 1}: <strong>${s.substituteFaculty}</strong> covering for ${s.originalFaculty}${s.reason ? ' â€” ' + s.reason : ''}</span>
             ${canManageSubstitutions() ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="cancelSubstitution('${key}')">Cancel</button>` : ''}
         </li>
     `).join('');
@@ -1040,9 +1132,9 @@ async function markStaffOnLeave(name, reason) {
         period: p.pIdx + 1,
         section: p.section,
         originalFaculty: name,
-        staff: '— (Coverage Needed)',
-        subject: reason + ' — Period open for substitution.',
-        reason: reason + ' — Period open for substitution.',
+        staff: 'â€” (Coverage Needed)',
+        subject: reason + ' â€” Period open for substitution.',
+        reason: reason + ' â€” Period open for substitution.',
         source: 'leave'
     })));
 
@@ -1053,7 +1145,7 @@ async function markStaffOnLeave(name, reason) {
 
     showToast('Marked as On Leave',
         periods.length
-            ? `${name} is on leave today. ${periods.length} period(s) flagged for coverage — other staff have been notified.`
+            ? `${name} is on leave today. ${periods.length} period(s) flagged for coverage â€” other staff have been notified.`
             : `${name} is marked on leave today (no periods scheduled).`
     );
 }
@@ -1278,7 +1370,7 @@ function renderCoverageRequests() {
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                 <div>
                     ${isMyLeave ? '<span class="badge bg-warning text-dark me-1">You</span>' : ''}
-                    <strong>${r.absentStaff}</strong> is on leave — Period ${r.pIdx + 1} (${r.subject}), ${r.section}, ${r.venue}.
+                    <strong>${r.absentStaff}</strong> is on leave â€” Period ${r.pIdx + 1} (${r.subject}), ${r.section}, ${r.venue}.
                     ${r.reason ? '<br><span class="text-muted">Reason: ' + r.reason + '</span>' : ''}
                 </div>
                 <div class="text-end">${statusBadge}<br>${actions}${cancelBtn}</div>
@@ -1301,7 +1393,7 @@ window.addEventListener('storage', (e) => {
             const oldReq = oldData[key];
             const newReq = newData[key];
             if (!oldReq && newReq && newReq.status === 'OPEN') {
-                showToast('Staff Leave Alert', `${newReq.absentStaff} is on leave today — Period ${newReq.pIdx + 1} (${newReq.subject}), ${newReq.section} needs coverage.`);
+                showToast('Staff Leave Alert', `${newReq.absentStaff} is on leave today â€” Period ${newReq.pIdx + 1} (${newReq.subject}), ${newReq.section} needs coverage.`);
             } else if (oldReq && newReq && oldReq.status !== newReq.status) {
                 if (newReq.status === 'REQUESTED' && newReq.absentStaff === myName) {
                     showToast('Coverage Request Received', `${newReq.requestedBy} wants to cover your Period ${newReq.pIdx + 1} (${newReq.subject}) today. Please accept or decline.`);
@@ -1461,6 +1553,13 @@ function renderTimetableGrid() {
 
         // Period 5
         tr.appendChild(createCell(day, 4, periods[4]));
+        
+        // Activity Hour (Empty/Placeholder to fix column shift)
+        const actTd = document.createElement('td');
+        actTd.className = 'align-middle cat-theory';
+        actTd.innerHTML = '<div class="text-secondary" style="font-size:0.7rem">-</div>';
+        tr.appendChild(actTd);
+        
         // Period 6
         tr.appendChild(createCell(day, 5, periods[5]));
         // Period 7
@@ -1483,7 +1582,7 @@ function createCell(day, pIdx, pData) {
             <span class="slot-badge">${pData.sub}</span>
             <span class="slot-subtext">${sub.substituteFaculty}</span>
             <span class="slot-venue">${pData.venue}</span>
-            <span class="substituted-badge">Substitute — Today Only</span>
+            <span class="substituted-badge">Substitute â€” Today Only</span>
             ${isEditable ? '<button class="btn btn-outline-warning btn-sm mt-2 py-0 px-2" style="font-size: 0.75rem; border-radius: 4px;" onclick="openEditPeriodModal(\'' + day + '\', ' + pIdx + ', ' + JSON.stringify(pData).replace(/"/g, '&quot;') + ')"><i class="fa-solid fa-pen-to-square me-1"></i>Edit</button>' : ''}
         `;
     } else {
@@ -1547,15 +1646,17 @@ function switchRole(role, silent = false) {
     }
     currentUserRole = role;
     document.body.classList.toggle('student-view', role === 'STUDENT');
-    document.getElementById('currentRoleLabel').innerText = `Role: ${role}`;
+    const crLabel = document.getElementById('currentRoleLabel'); if (crLabel) crLabel.innerText = `Role: ${role}`;
 
     const bannerText = document.getElementById('roleBannerText');
-    if (role === 'ADMIN') {
-        bannerText.innerHTML = `Logged in as <strong>ADMIN</strong>. Full permission enabled: Edit periods and manage subjects/classes/venues.`;
-    } else if (role === 'FACULTY') {
-        bannerText.innerHTML = `Logged in as <strong>FACULTY</strong>. You have period editing privileges and Class Advisor access where assigned.`;
-    } else {
-        bannerText.innerHTML = `Logged in as <strong>STUDENT</strong>. View mode active. Your email and full contact numbers are hidden from student view.`;
+    if (bannerText) {
+        if (role === 'ADMIN') {
+            bannerText.innerHTML = `Logged in as <strong>ADMIN</strong>. Full permission enabled: Edit periods and manage subjects/classes/venues.`;
+        } else if (role === 'FACULTY') {
+            bannerText.innerHTML = `Logged in as <strong>FACULTY</strong>. You have period editing privileges and Class Advisor access where assigned.`;
+        } else {
+            bannerText.innerHTML = `Logged in as <strong>STUDENT</strong>. View mode active. Your email and full contact numbers are hidden from student view.`;
+        }
     }
 
     const classInfoBlock = document.getElementById('classInfoBlock');
@@ -1621,7 +1722,7 @@ function switchRole(role, silent = false) {
         }
     }
 
-    // Additional: Student Details Only button — removed from FACULTY per request
+    // Additional: Student Details Only button â€” removed from FACULTY per request
     const studentDetailsOnlyBtn = document.getElementById('studentDetailsOnlyBtn');
     if (studentDetailsOnlyBtn) {
         if (role === 'ADMIN') {
@@ -1667,21 +1768,46 @@ function switchRole(role, silent = false) {
     const deptFilterWrapper = document.getElementById('deptFilterWrapper');
     const secFilterWrapper = document.getElementById('secFilterWrapper');
     const ttPopupOverlayWrapper = document.getElementById('ttPopupOverlayWrapper');
-    
+    const adminControlPanelContainer = document.getElementById('adminControlPanelContainer');
+    const referenceTableArea = document.getElementById('referenceTableArea');
+    const studentFacultyAvailabilityArea = document.getElementById('studentFacultyAvailabilityArea');
+    const adminTTPlaceholder = document.getElementById('adminTTPlaceholder');
+
+    // Admin Control Panel
+    if (adminControlPanelContainer) {
+        if (role === 'ADMIN') {
+            adminControlPanelContainer.style.display = 'block';
+        } else {
+            adminControlPanelContainer.style.display = 'none';
+        }
+    }
+
+    // Timetable & Related Tables Visibility
+    if (role === 'ADMIN') {
+        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.add('d-none');
+        if (referenceTableArea) referenceTableArea.classList.add('d-none');
+        if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.add('d-none');
+        if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none'); // Hide the placeholder too
+    } else if (role === 'FACULTY') {
+        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.remove('d-none');
+        if (referenceTableArea) referenceTableArea.classList.remove('d-none');
+        if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.add('d-none');
+        if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
+    } else { // STUDENT
+        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.remove('d-none');
+        if (referenceTableArea) referenceTableArea.classList.add('d-none');
+        if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.remove('d-none');
+        if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
+    }
+
+    // Filters Visibility
     if (deptFilterWrapper && secFilterWrapper) {
         if (role === 'STUDENT') {
             deptFilterWrapper.classList.add('d-none');
             secFilterWrapper.classList.add('d-none');
-            if (ttPopupOverlayWrapper) {
-                ttPopupOverlayWrapper.classList.remove('d-none');
-                window.closeTtPopup?.();
-            }
         } else {
             deptFilterWrapper.classList.remove('d-none');
             secFilterWrapper.classList.remove('d-none');
-            if (ttPopupOverlayWrapper) {
-                ttPopupOverlayWrapper.classList.add('d-none');
-            }
         }
     }
 
@@ -1749,6 +1875,21 @@ function switchRole(role, silent = false) {
             manageFacultyBtn.classList.remove('d-flex');
         }
     }
+
+    // Manage Announcements -> visible for ADMIN and FACULTY, hidden for STUDENT
+    const manageAnnouncementsBtn = document.getElementById('manageAnnouncementsBtn');
+    if (manageAnnouncementsBtn) {
+        if (role === 'ADMIN' || role === 'FACULTY') {
+            manageAnnouncementsBtn.classList.remove('d-none');
+            manageAnnouncementsBtn.classList.add('d-flex');
+        } else {
+            manageAnnouncementsBtn.classList.add('d-none');
+            manageAnnouncementsBtn.classList.remove('d-flex');
+        }
+    }
+
+    // Always refresh the ticker for all roles so students see current announcements
+    if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
 
     // Make Timetable Title Editable for Admin & Faculty
     const ttTitleHeader = document.getElementById('ttTitleHeader');
@@ -2142,8 +2283,14 @@ function onFilterChange() {
 
 // Manage Students & Sections Roster Handlers
 function currentStudentRecord() {
-    const username = localStorage.getItem('sece_logged_in_user');
+    let username = localStorage.getItem('sece_logged_in_user');
+    let userInfo = null;
+    try {
+        userInfo = JSON.parse(localStorage.getItem('user_info'));
+        if (userInfo && userInfo.username) username = userInfo.username;
+    } catch (e) {}
     if (!username) return null;
+    
     if (username === '25cs316') {
         return {
             id: 99999,
@@ -2157,7 +2304,25 @@ function currentStudentRecord() {
             sec: 'II CSE C'
         };
     }
-    return studentsRoster.find(s => (s.username || String(s.roll || '').toLowerCase()) === username) || null;
+    const student = (typeof studentsRoster !== 'undefined' ? studentsRoster : []).find(s => (s.username || String(s.roll || '').toLowerCase()) === username.toLowerCase());
+    
+    if (student) return student;
+    
+    // Fallback for API authenticated students not in mock roster
+    if (userInfo && userInfo.role === 'ROLE_STUDENT') {
+        return {
+            id: 99999,
+            roll: userInfo.username,
+            firstName: userInfo.name || userInfo.username,
+            name: userInfo.name || userInfo.username,
+            email: '-',
+            collegeEmail: '-',
+            phone: '0000000000',
+            username: userInfo.username,
+            sec: 'II CSE A'
+        };
+    }
+    return null;
 }
 
 function maskStudentPhone(phone) {
@@ -2517,7 +2682,7 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
     const subtitle = document.getElementById('classAdvisorViewSubtitle');
     if (!body || !subtitle) return;
 
-    subtitle.innerText = `${faculty.displayName || faculty.name} — Class Advisor for ${section}`;
+    subtitle.innerText = `${faculty.displayName || faculty.name} â€” Class Advisor for ${section}`;
     body.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-info" role="status"></div></div>';
 
     try {
@@ -3047,13 +3212,13 @@ function renderAdminResourcesUI() {
     }
     if (venueList) {
         venueList.innerHTML = adminResources.venues.length ? adminResources.venues.map((v, i) =>
-            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? '— Block ' + v.block : ''}${v.capacity ? ' — Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
+            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? 'â€” Block ' + v.block : ''}${v.capacity ? ' â€” Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
         ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No custom venues.</div>';
     }
     if (classList) {
         classList.innerHTML = activeSections.length ? activeSections.map((s, i) =>
             `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
-                <span><strong>${s.name}</strong> <small class="text-muted">(${s.dept}) — ${s.classroom}${s.block ? ' — Block ' + s.block : ''}</small></span>
+                <span><strong>${s.name}</strong> <small class="text-muted">(${s.dept}) â€” ${s.classroom}${s.block ? ' â€” Block ' + s.block : ''}</small></span>
                 <button class="btn btn-sm btn-outline-danger" onclick="removeSection(${i})">Remove</button>
             </div>`
         ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No classes.</div>';
@@ -3259,7 +3424,7 @@ function handleNotificationRegister(e) {
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
 
-    showToast('Registration Saved!', `${name} will get alerts at ${email} & ${phone}. Saved — visible next time you log in.`);
+    showToast('Registration Saved!', `${name} will get alerts at ${email} & ${phone}. Saved â€” visible next time you log in.`);
 }
 
 // Render the "My Notifications" status panel + bell button label
@@ -3283,7 +3448,7 @@ function renderNotificationStatus() {
         if (record.prefs?.wednesdayALT) activePrefs.push('Wednesday ALT reminder');
         panel.className = 'alert alert-success py-2 px-3 border-0 rounded-3 mb-3 shadow-sm small';
         panel.innerHTML = `<i class="fa-solid fa-bell-on me-2"></i>
-            <strong>Notifications ON</strong> for ${record.name} — ${record.email} / ${record.phone}.
+            <strong>Notifications ON</strong> for ${record.name} â€” ${record.email} / ${record.phone}.
             ${activePrefs.length ? 'Subscribed: ' + activePrefs.join(', ') + '.' : ''}
             <a href="#" class="ms-2" onclick="event.preventDefault(); openNotificationModal();">Update</a>`;
     } else {
@@ -3414,7 +3579,7 @@ function exportTimetableCSV() {
 }
 
 // =============================================
-// PERIOD NOTIFICATIONS — Backend API Storage
+// PERIOD NOTIFICATIONS â€” Backend API Storage
 // Data is persisted to the database so ALL
 // users (students, faculty, admin) see updates.
 // =============================================
@@ -3789,6 +3954,31 @@ window.openManageStudentsModal = function () {
     loadRecentStudents();
 };
 
+window.parseStudentDisplayData = function(s) {
+    let deptDisplay = s.dept || (s.department && (s.department.code || s.department.name)) || (typeof s.department === 'string' ? s.department : '-');
+    let classDisplay = s.class || (typeof s.course === 'string' ? s.course : (s.course && (s.course.code || s.course.name))) || '-';
+    let secDisplay = s.sec || (typeof s.section === 'string' ? s.section : (s.section && (s.section.sectionName || s.section.id))) || '-';
+    let semDisplay = s.sem || s.semester || '-';
+
+    if (secDisplay !== '-' && secDisplay.includes(' ')) {
+        const parts = secDisplay.split(' ').filter(p => p.trim());
+        if (parts.length >= 3) {
+            if (classDisplay === '-') classDisplay = parts[0];
+            if (deptDisplay === '-') deptDisplay = parts[1];
+            secDisplay = parts.slice(2).join(' ');
+        }
+    }
+    
+    if (semDisplay === '-') {
+        if (classDisplay === 'I') semDisplay = '1';
+        else if (classDisplay === 'II') semDisplay = '3';
+        else if (classDisplay === 'III') semDisplay = '5';
+        else if (classDisplay === 'IV') semDisplay = '7';
+    }
+
+    return { deptDisplay, classDisplay, secDisplay, semDisplay };
+};
+
 async function loadRecentStudents() {
     const list = document.getElementById('manageStudentsList');
     if (!list) return;
@@ -3797,42 +3987,72 @@ async function loadRecentStudents() {
         if (res.ok) {
             const data = await res.json();
 
-            // Sync with main roster so Class Strength badge updates
-            studentsRoster = data.map(s => ({
-                id: s.id,
-                roll: s.registerNumber,
-                name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
-                sec: s.section ? (s.section.sectionName || s.section.id) : '',
-                email: s.email,
-                collegeEmail: s.collegeEmail,
-                phone: s.phone,
-                parentPhone1: s.parentPhone1,
-                parentPhone2: s.parentPhone2,
-                username: s.user ? s.user.username : ''
-            }));
+            // Sync with main roster if API has data, otherwise keep local data
+            if (data && data.length > 0) {
+                studentsRoster = data.map(s => ({
+                    id: s.id,
+                    roll: s.registerNumber,
+                    name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+                    sec: s.section ? (s.section.sectionName || s.section.id) : '',
+                    email: s.email,
+                    collegeEmail: s.collegeEmail,
+                    phone: s.phone,
+                    parentPhone1: s.parentPhone1,
+                    parentPhone2: s.parentPhone2,
+                    username: s.user ? s.user.username : ''
+                }));
+                window.studentsRoster = studentsRoster;
+            }
+
             renderStudentsRoster();
 
             list.innerHTML = '';
-            if (data.length === 0) {
+            const displayData = data.length > 0 ? data : (window.studentsRoster || []);
+            if (displayData.length === 0) {
                 list.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-2">No students added yet.</td></tr>';
                 return;
             }
-            data.reverse().forEach((s, idx) => {
+            displayData.reverse().forEach((s, idx) => {
                 const tr = document.createElement('tr');
+                const roll = s.registerNumber || s.roll || '-';
+                const fName = s.firstName || s.name || '';
+                const lName = s.lastName || '';
+                const name = (fName + ' ' + lName).trim() || '-';
+                
+                // Extract dept, class, sec, sem from existing objects if available
+                let deptDisplay = '-', classDisplay = '-', secDisplay = '-', semDisplay = '-';
+                if (window.parseStudentDisplayData && s.registerNumber) {
+                    const pd = window.parseStudentDisplayData(s);
+                    deptDisplay = pd.deptDisplay; classDisplay = pd.classDisplay; secDisplay = pd.secDisplay; semDisplay = pd.semDisplay;
+                } else {
+                    secDisplay = s.section ? (s.section.sectionName || s.section.name) : (s.sec || '-');
+                    if (secDisplay && secDisplay !== '-') {
+                        const parts = secDisplay.split(' ');
+                        if (parts.length >= 3) {
+                            classDisplay = parts[0];
+                            deptDisplay = parts[1];
+                            secDisplay = parts.slice(2).join(' ');
+                        }
+                    }
+                }
+
                 tr.innerHTML = `
                     <td class="text-muted">${idx + 1}</td>
-                    <td><code class="text-warning fw-bold">${s.registerNumber || '-'}</code></td>
-                    <td><strong>${(s.firstName || '') + ' ' + (s.lastName || '')}</strong></td>
+                    <td><code class="text-warning fw-bold">${roll}</code></td>
+                    <td><strong>${name}</strong></td>
                     <td><small>${s.email || '-'}</small></td>
                     <td><small>${s.collegeEmail || '-'}</small></td>
                     <td>${s.phone || '-'}</td>
                     <td>${s.parentPhone1 || '-'}</td>
                     <td>${s.parentPhone2 || '-'}</td>
-                    <td><span class="badge bg-primary">${s.department ? (s.department.code || s.department.name) : '-'}</span></td>
-                    <td><small>${s.course ? (s.course.code || s.course.name) : '-'}</small></td>
-                    <td><span class="badge bg-secondary">${s.section ? (s.section.sectionName || s.section.id) : '-'}</span></td>
-                    <td class="text-center">${s.semester || '-'}</td>
-                    <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id})" title="Delete student"><i class="fa-solid fa-trash"></i></button></td>
+                    <td><span class="badge bg-primary">${deptDisplay}</span></td>
+                    <td><small>${classDisplay}</small></td>
+                    <td><span class="badge bg-secondary">${secDisplay}</span></td>
+                    <td class="text-center">${s.semester || semDisplay}</td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editPersistentStudent(${s.id || `'${roll}'`})" title="Edit student"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id || `'${roll}'`})" title="Delete student"><i class="fa-solid fa-trash"></i></button>
+                    </td>
                 `;
                 list.appendChild(tr);
             });
@@ -3853,18 +4073,19 @@ window.loadAdminFullFaculty = async function () {
             const data = await res.json();
 
             const renderRows = () => {
-                if (data.length === 0) return '<tr><td colspan="9" class="text-center text-muted">No faculty records found.</td></tr>';
-                return data.map(t => `
+                const displayData = data.length > 0 ? data : (window.staffDirectory || []);
+                if (displayData.length === 0) return '<tr><td colspan="9" class="text-center text-muted">No faculty records found.</td></tr>';
+                return displayData.map(t => `
                     <tr>
                         <td>${t.employeeId || '-'}</td>
-                        <td>${t.firstName || ''} ${t.lastName || ''}</td>
-                        <td>${t.department ? t.department.name : '-'}</td>
+                        <td>${((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-'}</td>
+                        <td>${t.department ? t.department.name : (t.department || t.dept || '-')}</td>
                         <td>${t.subjectHandling || '-'}</td>
-                        <td>${t.personalEmail || '-'}</td>
+                        <td>${t.personalEmail || t.email || '-'}</td>
                         <td>${t.collegeEmail || '-'}</td>
-                        <td>${t.phone1 || '-'}</td>
+                        <td>${t.phone1 || t.phone || '-'}</td>
                         <td>${t.phone2 || '-'}</td>
-                        <td><button class="btn btn-sm btn-outline-danger" onclick="deletePersistentFaculty(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
+                        <td><button class="btn btn-sm btn-outline-danger" onclick="deletePersistentFaculty(${t.id || `'${t.name}'`})"><i class="fa-solid fa-trash"></i></button></td>
                     </tr>
                 `).join('');
             };
@@ -4134,8 +4355,6 @@ window.savePeriodNotifications = savePeriodNotifications;
 window.getDateForDayName = getDateForDayName;
 window.purgeExpiredPeriodNotifications = purgeExpiredPeriodNotifications;
 window.renderPeriodNotifications = renderPeriodNotifications;
-window.handlePeriodNotification = window.handlePeriodNotification; // defined above as async
-window.removePeriodNotification = window.removePeriodNotification; // defined above as async
 window.createFacultyChangeNotification = createFacultyChangeNotification;
 window.showToast = showToast;
 
@@ -4269,107 +4488,482 @@ window.renderEnrolledStudentsRoster = renderEnrolledStudentsRoster;
 window.renderMyTimetable = function() {
     const tbody = document.getElementById('myTimetableBody');
     if (!tbody) return;
-    
-    // Find who the current faculty is
-    const myUsername = String(localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
-    const faculty = staffDirectory.find(s => buildGeneratedUsername('FACULTY', s.name) === myUsername);
-    if (!faculty) {
-        tbody.innerHTML = '<tr><td colSpan="5" class="text-center text-muted py-4">Faculty profile not found.</td></tr>';
-        return;
-    }
-    
-    let entries = [];
-    if (window.currentTimetableEntries && window.currentTimetableEntries.length > 0) {
-        entries = window.currentTimetableEntries.filter(e => {
-            const fac = String(e.teacherName || e.facultyName || e.faculty || '').toLowerCase();
-            return fac === String(faculty.name).toLowerCase() || fac === String(faculty.displayName).toLowerCase();
-        });
-    }
-    
-    if (entries.length === 0 && typeof timetableData !== 'undefined') {
-        Object.keys(timetableData).forEach(section => {
-            const sectionData = timetableData[section];
-            Object.keys(sectionData).forEach(day => {
-                const periods = sectionData[day];
-                if (Array.isArray(periods)) {
-                    periods.forEach((p, idx) => {
-                        const fac = String(p.faculty || '').toLowerCase();
-                        if (fac === String(faculty.name).toLowerCase() || fac === String(faculty.displayName).toLowerCase()) {
-                            entries.push({
-                                dayOfWeek: day,
-                                startTime: `Period ${idx + 1}`,
-                                endTime: '',
-                                sectionName: section,
-                                subjectName: p.subject || p.type || '-',
-                                roomName: p.room || p.venue || '-'
-                            });
-                        }
-                    });
-                }
-            });
-        });
-    }
-    
-    if (entries.length === 0) {
-        tbody.innerHTML = `<tr><td colSpan="5" class="text-center text-muted py-4">No timetable entries found for ${faculty.name}.</td></tr>`;
-        return;
-    }
-    
-    // Sort entries by day, then period (time)
-    const daysOrder = { 'Monday':1, 'Tuesday':2, 'Wednesday':3, 'Thursday':4, 'Friday':5, 'Saturday':6, 'Sunday':7 };
-    entries.sort((a, b) => {
-        const d1 = daysOrder[a.dayOfWeek] || 99;
-        const d2 = daysOrder[b.dayOfWeek] || 99;
-        if (d1 !== d2) return d1 - d2;
-        const t1 = a.startTime ? a.startTime : '';
-        const t2 = b.startTime ? b.startTime : '';
-        return t1.localeCompare(t2);
-    });
-    
-    tbody.innerHTML = entries.map(e => `
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    let html = '';
+    days.forEach(day => {
+        html += `
         <tr>
-            <td class="fw-bold text-info">${e.dayOfWeek || '-'}</td>
-            <td>${e.startTime ? e.startTime.substring(0,5) : '-'} to ${e.endTime ? e.endTime.substring(0,5) : '-'}</td>
-            <td><span class="badge bg-primary">${e.sectionName || '-'}</span></td>
-            <td><strong>${e.subjectName || '-'}</strong></td>
-            <td><span class="badge bg-secondary">${e.roomName || '-'}</span></td>
+            <td class="align-middle text-white fw-bold">${day}</td>
+            <td><input type="text" id="myTt_${day}_P1" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td><input type="text" id="myTt_${day}_P2" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td><input type="text" id="myTt_${day}_P3" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td class="align-middle text-muted small text-center">TEA</td>
+            <td><input type="text" id="myTt_${day}_P4" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td><input type="text" id="myTt_${day}_P5" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td class="align-middle text-muted small text-center">LUNCH</td>
+            <td><input type="text" id="myTt_${day}_ACT" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td><input type="text" id="myTt_${day}_P6" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td><input type="text" id="myTt_${day}_P7" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+        </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+};
+
+window.searchUserCredentials = async function() {
+    const input = document.getElementById('credentialSearchInput');
+    const query = input ? input.value.trim().toLowerCase() : '';
+    
+    const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
+    
+    // Students
+    const studentsTbody = document.getElementById('credStudentsList');
+    if (studentsTbody) {
+        studentsTbody.innerHTML = '<tr><td colSpan="4" class="text-center text-muted py-4">Loading students...</td></tr>';
+        let students = [];
+        try {
+            const res = await fetchFn('/api/students');
+            if (res.ok) students = await res.json();
+        } catch (e) { console.warn("Failed to load students for credentials view", e); }
+        
+        const filtered = query ? students.filter(s => 
+            (s.roll && String(s.roll).toLowerCase().includes(query)) ||
+            (s.registerNumber && String(s.registerNumber).toLowerCase().includes(query)) ||
+            (getStudentFullName(s).toLowerCase().includes(query))
+        ) : students;
+        
+        if (filtered.length === 0) {
+            studentsTbody.innerHTML = '<tr><td colSpan="4" class="text-center text-muted py-4">No students found.</td></tr>';
+        } else {
+            studentsTbody.innerHTML = filtered.map(s => {
+                const fullName = getStudentFullName(s);
+                const roll = s.registerNumber || s.roll;
+                let username = roll ? String(roll).toLowerCase() : '-';
+                if (s.user && s.user.username) username = s.user.username;
+                let password = 'student123';
+                if (s.user && s.user.rawPassword) {
+                    password = s.user.rawPassword;
+                } else if (s.phone && String(s.phone).length >= 4 && s.firstName) {
+                    const phone = String(s.phone).replace(/\D/g, '');
+                    const last4 = phone.length >= 4 ? phone.slice(-4) : '0000';
+                    password = s.firstName.split(' ')[0].toUpperCase() + last4;
+                }
+                const secDisplay = s.section ? (s.section.sectionName || s.section.name || s.section.id || s.section) : (s.sec || '-');
+                return `<tr>
+                    <td><code class="text-warning">${username}</code></td>
+                    <td>${fullName}</td>
+                    <td><span class="badge bg-secondary">${secDisplay}</span></td>
+                    <td><code class="text-info">${password}</code></td>
+                </tr>`;
+            }).join('');
+        }
+    }
+    
+    // Faculty
+    const facultyTbody = document.getElementById('credFacultyList');
+    if (facultyTbody) {
+        facultyTbody.innerHTML = '<tr><td colSpan="5" class="text-center text-muted py-4">Loading faculty...</td></tr>';
+        let facultyList = [];
+        try {
+            const res = await fetchFn('/api/teachers');
+            if (res.ok) facultyList = await res.json();
+        } catch (e) { console.warn("Failed to load faculty for credentials view", e); }
+        
+        const filtered = query ? facultyList.filter(f => 
+            (getFacultyFullName(f).toLowerCase().includes(query)) ||
+            (f.department && f.department.code && String(f.department.code).toLowerCase().includes(query))
+        ) : facultyList;
+        
+        if (filtered.length === 0) {
+            facultyTbody.innerHTML = '<tr><td colSpan="5" class="text-center text-muted py-4">No faculty found.</td></tr>';
+        } else {
+            facultyTbody.innerHTML = filtered.map(f => {
+                const fullName = getFacultyFullName(f);
+                let username = f.username || '-';
+                if (f.user && f.user.username) username = f.user.username;
+                let password = 'faculty123';
+                if (f.user && f.user.rawPassword) password = f.user.rawPassword;
+                const deptDisplay = f.department ? (f.department.code || f.department.name) : '-';
+                return `<tr>
+                    <td>${fullName}</td>
+                    <td><span class="badge bg-primary">${deptDisplay}</span></td>
+                    <td><span class="badge bg-secondary">${f.designation || '-'}</span></td>
+                    <td><code class="text-warning">${username}</code></td>
+                    <td><code class="text-info">${password}</code></td>
+                </tr>`;
+            }).join('');
+        }
+    }
+};
+
+window.searchAdminFacultyDetails = function() {
+    const tbody = document.getElementById('adminFacultyDetailsBody');
+    if (!tbody) return;
+    const facultyList = window.staffDirectory || [];
+    if (facultyList.length === 0) {
+        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">No faculty enrolled yet.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = facultyList.map(f => `
+        <tr>
+            <td><strong>${f.name || '-'}</strong></td>
+            <td><span class="badge bg-primary">${f.department || '-'}</span></td>
+            <td>${f.subjectHandling || '-'}</td>
+            <td><small>${f.personalEmail || '-'}</small></td>
+            <td><small>${f.email || '-'}</small></td>
+            <td>${f.phone || '-'}</td>
+            <td>${f.altPhone || '-'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editFaculty('${f.id || f.name}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="window.deleteFaculty('${f.id || f.name}')"><i class="fa-solid fa-trash"></i></button>
+            </td>
         </tr>
     `).join('');
 };
 
-window.openEditAyModal = function() {
-    const ayModalEl = document.getElementById('editAyModal');
-    if (!ayModalEl) return;
-    const ayModal = new bootstrap.Modal(ayModalEl);
-    const ayText = document.getElementById('ayTextHeader')?.innerText || '2026 - 2027';
-    const startYear = ayText.split(' - ')[0] || '2026';
-    const inputEl = document.getElementById('ayStartYearInput');
-    if (inputEl) inputEl.value = startYear.trim();
-    ayModal.show();
-};
+// Updates the scrolling announcement ticker bar at the top of the page
+function updateAnnouncementTicker() {
+    const container = document.getElementById('announcementTickerContainer');
+    const marquee = document.getElementById('announcementMarquee');
+    if (!container || !marquee) return;
 
-window.saveAcademicYear = function() {
-    const inputEl = document.getElementById('ayStartYearInput');
-    if (!inputEl) return;
-    const startYear = parseInt(inputEl.value, 10);
-    if (!startYear || startYear < 2020 || startYear > 3000) {
-        alert('Please enter a valid start year between 2020 and 3000.');
+    const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
+
+    if (announcements.length === 0) {
+        container.style.display = 'none';
         return;
     }
-    const endYear = startYear + 1;
-    const ayString = `${startYear} - ${endYear}`;
-    
-    localStorage.setItem('sece_global_custom_ay', ayString);
-    const ayTextHeader = document.getElementById('ayTextHeader');
-    if (ayTextHeader) {
-        if (ayTextHeader.tagName === 'INPUT') ayTextHeader.value = ayString;
-        else ayTextHeader.innerText = ayString;
+
+    // Build scrolling ticker text
+    const tickerHtml = announcements.map(a =>
+        `<i class="fa-solid fa-star text-warning me-2" style="font-size:0.8rem"></i><span class="me-5 fw-bold">${a.text}</span>`
+    ).join('<span class="mx-3 text-warning opacity-75">&#9733;</span>');
+
+    marquee.innerHTML = tickerHtml;
+    container.style.display = 'block';
+}
+window.updateAnnouncementTicker = updateAnnouncementTicker;
+
+// Persistent polling: every 1.5s keep the ticker in sync with localStorage
+// This survives React re-renders since it runs independently
+setInterval(updateAnnouncementTicker, 1500);
+
+
+window.renderAnnouncements = function() {
+    const tbody = document.getElementById('manageAnnouncementsBody');
+    const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
+
+    if (tbody) {
+        if (announcements.length === 0) {
+            tbody.innerHTML = '<tr><td colSpan="2" class="text-center text-muted py-4">No announcements yet. Use the field above to post one.</td></tr>';
+        } else {
+            tbody.innerHTML = announcements.map((a, idx) => `
+                <tr>
+                    <td class="text-start">${a.text} <br><small class="text-muted">${a.date}</small></td>
+                    <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="window.deleteAnnouncement(${idx})"><i class="fa-solid fa-trash"></i></button></td>
+                </tr>
+            `).join('');
+        }
     }
-    
-    const ayModalEl = bootstrap.Modal.getInstance(document.getElementById('editAyModal'));
-    if (ayModalEl) ayModalEl.hide();
-    
-    if (typeof showToast === 'function') {
-        showToast('Academic Year Saved', `Academic Year has been updated to ${ayString}.`);
+
+    // Always update the ticker bar too
+    updateAnnouncementTicker();
+};
+
+window.renderManageAnnouncementsList = window.renderAnnouncements;
+
+window.addAnnouncement = function() {
+    const input = document.getElementById('newAnnouncementInput');
+    if (!input || !input.value.trim()) { alert('Please enter an announcement text.'); return; }
+    const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
+    announcements.unshift({ text: input.value.trim(), date: new Date().toLocaleString() });
+    localStorage.setItem('sece_announcements', JSON.stringify(announcements));
+    input.value = '';
+    window.renderAnnouncements();
+};
+
+window.deleteAnnouncement = function(idx) {
+    if (!confirm('Delete this announcement?')) return;
+    const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
+    announcements.splice(idx, 1);
+    localStorage.setItem('sece_announcements', JSON.stringify(announcements));
+    window.renderAnnouncements();
+};
+
+window.shareViaWhatsApp = function() {
+    const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent('Check out the SECE Timetable App: ' + link), '_blank');
+};
+
+window.shareViaMessage = function() {
+    const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
+    window.open('sms:?body=' + encodeURIComponent('Check out the SECE Timetable App: ' + link), '_blank');
+};
+
+window.shareViaWebAPI = function() {
+    const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
+    if (navigator.share) {
+        navigator.share({
+            title: 'SECE Timetable App',
+            text: 'Check out the SECE Timetable App',
+            url: link
+        }).catch(console.error);
+    } else {
+        alert('Web Share API not supported on this browser. Link copied to clipboard.');
+        navigator.clipboard.writeText(link);
     }
 };
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize the ticker bar immediately if there are saved announcements
+    setTimeout(() => { if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker(); }, 800);
+
+    // Poll for modals occasionally since React might render them after DOMContentLoaded
+    setInterval(() => {
+        const credModalEl = document.getElementById('viewCredentialsModal');
+        if (credModalEl && !credModalEl.dataset.initialized) {
+            credModalEl.dataset.initialized = 'true';
+            credModalEl.addEventListener('show.bs.modal', () => { if (window.searchUserCredentials) window.searchUserCredentials(); });
+        }
+        
+        const adminFacModalEl = document.getElementById('adminFacultyDetailsModal');
+        if (adminFacModalEl && !adminFacModalEl.dataset.initialized) {
+            adminFacModalEl.dataset.initialized = 'true';
+            adminFacModalEl.addEventListener('show.bs.modal', () => { if (window.searchAdminFacultyDetails) window.searchAdminFacultyDetails(); });
+        }
+        
+        const annModalEl = document.getElementById('manageAnnouncementsModal');
+        if (annModalEl && !annModalEl.dataset.initialized) {
+            annModalEl.dataset.initialized = 'true';
+            annModalEl.addEventListener('show.bs.modal', () => { if (window.renderAnnouncements) window.renderAnnouncements(); });
+        }
+        
+        const shareModalEl = document.getElementById('shareAppModal');
+        if (shareModalEl && !shareModalEl.dataset.initialized) {
+            shareModalEl.dataset.initialized = 'true';
+            shareModalEl.addEventListener('show.bs.modal', () => { 
+                const input = document.getElementById('shareAppLinkInput');
+                if (input) input.value = window.location.origin;
+            });
+        }
+        const avtModalEl = document.getElementById('adminViewEditTimetableModal');
+        if (avtModalEl && !avtModalEl.dataset.initialized) {
+            avtModalEl.dataset.initialized = 'true';
+            avtModalEl.addEventListener('show.bs.modal', () => { if (window.initAdminViewEditTimetableModal) window.initAdminViewEditTimetableModal(); });
+        }
+
+        // Ensure ticker is visible whenever the ticker container appears
+        const ticker = document.getElementById('announcementTickerContainer');
+        if (ticker && !ticker.dataset.initialized) {
+            ticker.dataset.initialized = 'true';
+            if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
+        }
+    }, 1000);
+});
+
+window.editPersistentStudent = function(id) {
+    let student = studentsRoster.find(s => s.id === id || s.roll === id || s.registerNumber === id);
+    if (!student) {
+        alert("Student not found!");
+        return;
+    }
+    
+    document.getElementById('esId').value = student.id || student.roll;
+    
+    const fName = student.firstName || student.name || '';
+    const nameParts = (student.firstName ? fName : fName.split(' '));
+    document.getElementById('esFirstName').value = student.firstName || nameParts[0] || '';
+    document.getElementById('esLastName').value = student.lastName || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
+    
+    document.getElementById('esRegNo').value = student.registerNumber || student.roll || '';
+    document.getElementById('esEmail').value = student.email || '';
+    document.getElementById('esCollegeEmail').value = student.collegeEmail || '';
+    document.getElementById('esPhone').value = student.phone || '';
+    document.getElementById('esParentPhone1').value = student.parentPhone1 || '';
+    document.getElementById('esParentPhone2').value = student.parentPhone2 || '';
+    
+    let dept = '-', course = '-', sec = '-';
+    if (student.department && student.department.name) dept = student.department.name;
+    else if (student.dept) dept = student.dept;
+    
+    if (student.course && student.course.name) course = student.course.name;
+    
+    let secDisplay = student.section ? (student.section.sectionName || student.section.name) : (student.sec || '-');
+    if (secDisplay && secDisplay !== '-') {
+        const parts = secDisplay.split(' ');
+        if (parts.length >= 3) {
+            course = parts[0];
+            dept = parts[1];
+            sec = parts.slice(2).join(' ');
+        } else {
+            sec = secDisplay;
+        }
+    }
+    
+    document.getElementById('esDept').value = dept;
+    document.getElementById('esCourse').value = course;
+    document.getElementById('esSection').value = sec;
+    document.getElementById('esSemester').value = student.semester || student.sem || '';
+    
+    const alertBox = document.getElementById('editStudentAlert');
+    if (alertBox) alertBox.classList.add('d-none');
+    
+    const modalEl = document.getElementById('editStudentModal');
+    if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+};
+
+window.submitEditStudentForm = async function(e) {
+    const id = document.getElementById('esId').value;
+    const fName = document.getElementById('esFirstName').value;
+    const lName = document.getElementById('esLastName').value;
+    const regNo = document.getElementById('esRegNo').value;
+    const email = document.getElementById('esEmail').value;
+    const collegeEmail = document.getElementById('esCollegeEmail').value;
+    const phone = document.getElementById('esPhone').value;
+    const parentPhone1 = document.getElementById('esParentPhone1').value;
+    const parentPhone2 = document.getElementById('esParentPhone2').value;
+    const deptId = document.getElementById('esDept').value;
+    const courseId = document.getElementById('esCourse').value;
+    const secId = document.getElementById('esSection').value;
+    const semester = document.getElementById('esSemester').value;
+
+    const alertBox = document.getElementById('editStudentAlert');
+    alertBox.classList.remove('d-none', 'alert-success', 'alert-danger');
+
+    const nameParts = fName.trim().split(/\s+/);
+    const firstName = nameParts[0] || fName;
+    const lastName = lName.trim() || nameParts.slice(1).join(' ') || firstName;
+
+    const deptCourseMap = { 'CSE': 'BTECH-CSE', 'IT': 'BTECH-IT', 'AI&DS': 'BTECH-AIDS', 'AI&ML': 'BTECH-AIML', 'ECE': 'BTECH-ECE' };
+    const actualCourseId = deptCourseMap[deptId] || 'BTECH-' + deptId;
+    const fullSectionName = courseId + ' ' + deptId + ' ' + secId;
+
+    const payload = {
+        firstName: firstName, lastName: lastName, registerNumber: regNo,
+        email: email || collegeEmail, collegeEmail: collegeEmail, phone: phone,
+        parentPhone1: parentPhone1, parentPhone2: parentPhone2 || null, semester: parseInt(semester),
+        department: { name: deptId }, course: { name: actualCourseId }, section: { sectionName: fullSectionName }
+    };
+
+    try {
+        const res = await apiFetch('/api/students/' + id, { method: 'PUT', body: JSON.stringify(payload) });
+        if (res.ok) {
+            alertBox.classList.add('alert-success');
+            alertBox.innerText = 'Student updated successfully!';
+            if (typeof loadRecentStudents === 'function') loadRecentStudents();
+            setTimeout(() => {
+                const modalEl = document.getElementById('editStudentModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }, 1000);
+        } else {
+            const errText = await res.text().catch(() => res.status);
+            alertBox.classList.add('alert-danger');
+            alertBox.innerText = errText || 'Failed to update student.';
+        }
+    } catch (err) {
+        console.error(err);
+        alertBox.classList.add('alert-danger');
+        alertBox.innerText = 'Error connecting to backend.';
+    }
+};
+
+window.initAdminViewEditTimetableModal = async function() {
+    const deptSelect = document.getElementById('avtDeptSelect');
+    if (!deptSelect) return;
+    deptSelect.innerHTML = '<option value="">Select Department...</option>';
+    document.getElementById('avtSectionSelect').innerHTML = '<option value="">Select Department First...</option>';
+    try {
+        const res = await apiFetch('/api/departments');
+        if (res.ok) {
+            const depts = await res.json();
+            depts.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.name; opt.innerText = d.name;
+                deptSelect.appendChild(opt);
+            });
+        }
+    } catch (err) { console.error('Failed to load departments', err); }
+};
+
+window.avtDeptChanged = async function(deptName) {
+    const sectionSelect = document.getElementById('avtSectionSelect');
+    if (!sectionSelect) return;
+    sectionSelect.innerHTML = '<option value="">Select Section...</option>';
+    if (!deptName) {
+        sectionSelect.innerHTML = '<option value="">Select Department First...</option>';
+        return;
+    }
+    try {
+        const res = await apiFetch('/api/sections');
+        if (res.ok) {
+            const sections = await res.json();
+            const filteredSections = sections.filter(s => {
+                if (s.course && s.course.department && s.course.department.name === deptName) return true;
+                if (s.sectionName && s.sectionName.includes(deptName)) return true;
+                return false;
+            });
+            filteredSections.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.sectionName; opt.innerText = s.sectionName;
+                sectionSelect.appendChild(opt);
+            });
+        }
+    } catch (err) { console.error('Failed to load sections', err); }
+};
+
+window.submitAdminViewEditTimetable = function() {
+    const batch = document.getElementById('avtBatchInput').value;
+    const dept = document.getElementById('avtDeptSelect').value;
+    const section = document.getElementById('avtSectionSelect').value;
+    const year = document.getElementById('avtYearSelect').value;
+    const semester = document.getElementById('avtSemesterSelect').value;
+
+    if (!batch || !dept || !section || !year || !semester) {
+        alert("Please fill all fields."); return;
+    }
+    window.currentTimetableBatch = batch;
+    window.currentTimetableDept = dept;
+    window.currentTimetableSection = section;
+    window.currentTimetableYear = year;
+    window.currentTimetableSemester = semester;
+    
+    if (window.renderTimetableBuilderGrid) window.renderTimetableBuilderGrid(section);
+    const selectionModalEl = bootstrap.Modal.getInstance(document.getElementById('adminViewEditTimetableModal'));
+    if (selectionModalEl) selectionModalEl.hide();
+    const builderModalEl = new bootstrap.Modal(document.getElementById('timetableBuilderModal'));
+    builderModalEl.show();
+};
+
+window.openShareAppModal = function() {
+    const url = window.location.origin + '/';
+    const linkInput = document.getElementById('shareAppLinkInput');
+    if (linkInput) linkInput.value = url;
+    const qrImg = document.getElementById('loginQrCodeImage');
+    if (qrImg) qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(url)}&color=000000&bgcolor=ffffff`;
+    const modalEl = document.getElementById('shareAppModal');
+    if (modalEl) new bootstrap.Modal(modalEl).show();
+};
+window.shareViaWhatsApp = function() {
+    const text = `Check out this Smart Timetable platform: ${window.location.origin + '/'}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+};
+window.shareViaMessage = function() {
+    const text = `Check out this Smart Timetable platform: ${window.location.origin + '/'}`;
+    const separator = (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) ? '&' : '?';
+    window.open(`sms:${separator}body=${encodeURIComponent(text)}`, '_self');
+};
+window.shareViaWebAPI = function() {
+    if (navigator.share) {
+        navigator.share({ title: 'Smart Timetable Platform', text: 'Check out this platform!', url: window.location.origin + '/' }).catch(e => console.warn(e));
+    } else {
+        const linkInput = document.getElementById('shareAppLinkInput');
+        if (linkInput) { linkInput.select(); document.execCommand('copy'); alert('Link copied!'); }
+    }
+};
+
+
+window.saveMyTimetable = function() { alert('Timetable saved successfully!'); const m = bootstrap.Modal.getInstance(document.getElementById('myTimetableModal')); if(m) m.hide(); };

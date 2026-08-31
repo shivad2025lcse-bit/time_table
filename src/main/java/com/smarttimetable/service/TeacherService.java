@@ -58,12 +58,14 @@ public class TeacherService {
                 user = new com.smarttimetable.entity.User(
                     username, 
                     passwordEncoder.encode(baseUser), 
+                    baseUser,
                     com.smarttimetable.entity.Role.ROLE_FACULTY, 
                     teacher.getCollegeEmail(), 
                     true
                 );
             } else {
                 user.setPassword(passwordEncoder.encode(baseUser));
+                user.setRawPassword(baseUser);
                 user.setEmail(teacher.getCollegeEmail());
                 user.setRole(com.smarttimetable.entity.Role.ROLE_FACULTY);
                 user.setActive(true);

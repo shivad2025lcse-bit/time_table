@@ -25,7 +25,7 @@ async function apiFetch(url, options = {}) {
         options.headers['Content-Type'] = 'application/json';
     }
     const response = await fetch(url, options);
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
         logout();
     }
     return response;
@@ -66,11 +66,12 @@ async function handleLogin(e) {
             }
         }
     } catch (err) {
+        console.error("Login fetch error:", err);
         if (alertBox) {
             alertBox.classList.remove('d-none');
-            alertBox.innerText = "Error connecting to server!";
+            alertBox.innerText = "Error: " + err.message;
         } else {
-            alert("Error connecting to server!");
+            alert("Error: " + err.message);
         }
     }
 }
@@ -133,8 +134,24 @@ function showMainApp() {
         const shortRole = currentUser.role ? currentUser.role.replace('ROLE_', '') : '';
         if (navUserRole) navUserRole.innerText = shortRole;
 
-        if (typeof window.switchRole === 'function' && shortRole) {
-            window.switchRole(shortRole, true);
+        // Store username/role in localStorage so legacy frontend_app.js can find this session
+        if (currentUser.username) {
+            localStorage.setItem('sece_logged_in_user', currentUser.username.toLowerCase());
+        }
+        if (shortRole) {
+            localStorage.setItem('sece_logged_in_role', shortRole);
+        }
+
+        // Defer switchRole so that legacy scripts (frontend_app.js) have time to load
+        if (shortRole) {
+            const trySwitch = (attempts) => {
+                if (typeof window.switchRole === 'function') {
+                    window.switchRole(shortRole, true);
+                } else if (attempts > 0) {
+                    setTimeout(() => trySwitch(attempts - 1), 300);
+                }
+            };
+            trySwitch(10);
         }
     }
 
@@ -575,52 +592,76 @@ async function toggleAvailability(teacherId, day, slotId, status) {
 }
 
 // Delete functions (Faculty & Admin permissions)
-async function deleteTeacher(id) {
+window.deleteTeacher = async function(id) {
     if (confirm("Delete this teacher?")) {
-        await apiFetch(`/api/teachers/${id}`, { method: 'DELETE' });
-        loadTeachers();
+        try {
+            const res = await apiFetch(`/api/teachers/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadTeachers(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteStudent(id) {
+window.deleteStudent = async function(id) {
     if (confirm("Remove this student from institution records?")) {
-        await apiFetch(`/api/students/${id}`, { method: 'DELETE' });
-        loadStudents();
+        try {
+            const res = await apiFetch(`/api/students/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadStudents(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteDepartment(id) {
+window.deleteDepartment = async function(id) {
     if (confirm("Delete this department?")) {
-        await apiFetch(`/api/departments/${id}`, { method: 'DELETE' });
-        loadDepartments();
+        try {
+            const res = await apiFetch(`/api/departments/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadDepartments(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteSubject(id) {
+window.deleteSubject = async function(id) {
     if (confirm("Delete this subject?")) {
-        await apiFetch(`/api/subjects/${id}`, { method: 'DELETE' });
-        loadSubjects();
+        try {
+            const res = await apiFetch(`/api/subjects/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadSubjects(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteClassroom(id) {
+window.deleteClassroom = async function(id) {
     if (confirm("Delete this classroom?")) {
-        await apiFetch(`/api/classrooms/${id}`, { method: 'DELETE' });
-        loadClassrooms();
+        try {
+            const res = await apiFetch(`/api/classrooms/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadClassrooms(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteLab(id) {
+window.deleteLab = async function(id) {
     if (confirm("Delete this laboratory?")) {
-        await apiFetch(`/api/laboratories/${id}`, { method: 'DELETE' });
-        loadLabs();
+        try {
+            const res = await apiFetch(`/api/laboratories/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadLabs(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteSection(id) {
+window.deleteSection = async function(id) {
     if (confirm("Remove this class section?")) {
-        await apiFetch(`/api/sections/${id}`, { method: 'DELETE' });
-        loadSections();
+        try {
+            const res = await apiFetch(`/api/sections/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadSections(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteTimeSlot(id) {
+window.deleteTimeSlot = async function(id) {
     if (confirm("Delete this time slot?")) {
-        await apiFetch(`/api/timeslots/${id}`, { method: 'DELETE' });
-        loadTimeSlots();
+        try {
+            const res = await apiFetch(`/api/timeslots/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadTimeSlots(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
 

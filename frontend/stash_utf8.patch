@@ -1,0 +1,2125 @@
+﻿diff --git a/data/smart_timetable.mv.db b/data/smart_timetable.mv.db
+index 34cc613..3e05b1b 100644
+Binary files a/data/smart_timetable.mv.db and b/data/smart_timetable.mv.db differ
+diff --git a/frontend/index.html b/frontend/index.html
+index ede02b2..5bf956b 100644
+--- a/frontend/index.html
++++ b/frontend/index.html
+@@ -14,6 +14,8 @@
+     <!-- html2canvas for PNG Timetable Image Download -->
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
++    <!-- SheetJS for Excel Import -->
++    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+   </head>
+   <body>
+     <div id="root"></div>
+diff --git a/frontend/public/js/frontend_app.js b/frontend/public/js/frontend_app.js
+index 2ba96c1..3980144 100644
+--- a/frontend/public/js/frontend_app.js
++++ b/frontend/public/js/frontend_app.js
+@@ -1667,21 +1667,46 @@ function switchRole(role, silent = false) {
+     const deptFilterWrapper = document.getElementById('deptFilterWrapper');
+     const secFilterWrapper = document.getElementById('secFilterWrapper');
+     const ttPopupOverlayWrapper = document.getElementById('ttPopupOverlayWrapper');
+-    
++    const adminControlPanelContainer = document.getElementById('adminControlPanelContainer');
++    const referenceTableArea = document.getElementById('referenceTableArea');
++    const studentFacultyAvailabilityArea = document.getElementById('studentFacultyAvailabilityArea');
++    const adminTTPlaceholder = document.getElementById('adminTTPlaceholder');
++
++    // Admin Control Panel
++    if (adminControlPanelContainer) {
++        if (role === 'ADMIN') {
++            adminControlPanelContainer.style.display = 'block';
++        } else {
++            adminControlPanelContainer.style.display = 'none';
++        }
++    }
++
++    // Timetable & Related Tables Visibility
++    if (role === 'ADMIN') {
++        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.add('d-none');
++        if (referenceTableArea) referenceTableArea.classList.add('d-none');
++        if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.add('d-none');
++        if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none'); // Hide the placeholder too
++    } else if (role === 'FACULTY') {
++        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.remove('d-none');
++        if (referenceTableArea) referenceTableArea.classList.remove('d-none');
++        if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.add('d-none');
++        if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
++    } else { // STUDENT
++        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.remove('d-none');
++        if (referenceTableArea) referenceTableArea.classList.add('d-none');
++        if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.remove('d-none');
++        if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
++    }
++
++    // Filters Visibility
+     if (deptFilterWrapper && secFilterWrapper) {
+         if (role === 'STUDENT') {
+             deptFilterWrapper.classList.add('d-none');
+             secFilterWrapper.classList.add('d-none');
+-            if (ttPopupOverlayWrapper) {
+-                ttPopupOverlayWrapper.classList.remove('d-none');
+-                window.closeTtPopup?.();
+-            }
+         } else {
+             deptFilterWrapper.classList.remove('d-none');
+             secFilterWrapper.classList.remove('d-none');
+-            if (ttPopupOverlayWrapper) {
+-                ttPopupOverlayWrapper.classList.add('d-none');
+-            }
+         }
+     }
+ 
+@@ -3789,6 +3814,31 @@ window.openManageStudentsModal = function () {
+     loadRecentStudents();
+ };
+ 
++window.parseStudentDisplayData = function(s) {
++    let deptDisplay = s.dept || (s.department && (s.department.code || s.department.name)) || (typeof s.department === 'string' ? s.department : '-');
++    let classDisplay = s.class || (typeof s.course === 'string' ? s.course : (s.course && (s.course.code || s.course.name))) || '-';
++    let secDisplay = s.sec || (typeof s.section === 'string' ? s.section : (s.section && (s.section.sectionName || s.section.id))) || '-';
++    let semDisplay = s.sem || s.semester || '-';
++
++    if (secDisplay !== '-' && secDisplay.includes(' ')) {
++        const parts = secDisplay.split(' ').filter(p => p.trim());
++        if (parts.length >= 3) {
++            if (classDisplay === '-') classDisplay = parts[0];
++            if (deptDisplay === '-') deptDisplay = parts[1];
++            secDisplay = parts.slice(2).join(' ');
++        }
++    }
++    
++    if (semDisplay === '-') {
++        if (classDisplay === 'I') semDisplay = '1';
++        else if (classDisplay === 'II') semDisplay = '3';
++        else if (classDisplay === 'III') semDisplay = '5';
++        else if (classDisplay === 'IV') semDisplay = '7';
++    }
++
++    return { deptDisplay, classDisplay, secDisplay, semDisplay };
++};
++
+ async function loadRecentStudents() {
+     const list = document.getElementById('manageStudentsList');
+     if (!list) return;
+@@ -3797,42 +3847,72 @@ async function loadRecentStudents() {
+         if (res.ok) {
+             const data = await res.json();
+ 
+-            // Sync with main roster so Class Strength badge updates
+-            studentsRoster = data.map(s => ({
+-                id: s.id,
+-                roll: s.registerNumber,
+-                name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+-                sec: s.section ? (s.section.sectionName || s.section.id) : '',
+-                email: s.email,
+-                collegeEmail: s.collegeEmail,
+-                phone: s.phone,
+-                parentPhone1: s.parentPhone1,
+-                parentPhone2: s.parentPhone2,
+-                username: s.user ? s.user.username : ''
+-            }));
++            // Sync with main roster if API has data, otherwise keep local data
++            if (data && data.length > 0) {
++                studentsRoster = data.map(s => ({
++                    id: s.id,
++                    roll: s.registerNumber,
++                    name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
++                    sec: s.section ? (s.section.sectionName || s.section.id) : '',
++                    email: s.email,
++                    collegeEmail: s.collegeEmail,
++                    phone: s.phone,
++                    parentPhone1: s.parentPhone1,
++                    parentPhone2: s.parentPhone2,
++                    username: s.user ? s.user.username : ''
++                }));
++                window.studentsRoster = studentsRoster;
++            }
++
+             renderStudentsRoster();
+ 
+             list.innerHTML = '';
+-            if (data.length === 0) {
++            const displayData = data.length > 0 ? data : (window.studentsRoster || []);
++            if (displayData.length === 0) {
+                 list.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-2">No students added yet.</td></tr>';
+                 return;
+             }
+-            data.reverse().forEach((s, idx) => {
++            displayData.reverse().forEach((s, idx) => {
+                 const tr = document.createElement('tr');
++                const roll = s.registerNumber || s.roll || '-';
++                const fName = s.firstName || s.name || '';
++                const lName = s.lastName || '';
++                const name = (fName + ' ' + lName).trim() || '-';
++                
++                // Extract dept, class, sec, sem from existing objects if available
++                let deptDisplay = '-', classDisplay = '-', secDisplay = '-', semDisplay = '-';
++                if (window.parseStudentDisplayData && s.registerNumber) {
++                    const pd = window.parseStudentDisplayData(s);
++                    deptDisplay = pd.deptDisplay; classDisplay = pd.classDisplay; secDisplay = pd.secDisplay; semDisplay = pd.semDisplay;
++                } else {
++                    secDisplay = s.section ? (s.section.sectionName || s.section.name) : (s.sec || '-');
++                    if (secDisplay && secDisplay !== '-') {
++                        const parts = secDisplay.split(' ');
++                        if (parts.length >= 3) {
++                            classDisplay = parts[0];
++                            deptDisplay = parts[1];
++                            secDisplay = parts.slice(2).join(' ');
++                        }
++                    }
++                }
++
+                 tr.innerHTML = `
+                     <td class="text-muted">${idx + 1}</td>
+-                    <td><code class="text-warning fw-bold">${s.registerNumber || '-'}</code></td>
+-                    <td><strong>${(s.firstName || '') + ' ' + (s.lastName || '')}</strong></td>
++                    <td><code class="text-warning fw-bold">${roll}</code></td>
++                    <td><strong>${name}</strong></td>
+                     <td><small>${s.email || '-'}</small></td>
+                     <td><small>${s.collegeEmail || '-'}</small></td>
+                     <td>${s.phone || '-'}</td>
+                     <td>${s.parentPhone1 || '-'}</td>
+                     <td>${s.parentPhone2 || '-'}</td>
+-                    <td><span class="badge bg-primary">${s.department ? (s.department.code || s.department.name) : '-'}</span></td>
+-                    <td><small>${s.course ? (s.course.code || s.course.name) : '-'}</small></td>
+-                    <td><span class="badge bg-secondary">${s.section ? (s.section.sectionName || s.section.id) : '-'}</span></td>
+-                    <td class="text-center">${s.semester || '-'}</td>
+-                    <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id})" title="Delete student"><i class="fa-solid fa-trash"></i></button></td>
++                    <td><span class="badge bg-primary">${deptDisplay}</span></td>
++                    <td><small>${classDisplay}</small></td>
++                    <td><span class="badge bg-secondary">${secDisplay}</span></td>
++                    <td class="text-center">${s.semester || semDisplay}</td>
++                    <td class="text-center">
++                        <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editPersistentStudent(${s.id || `'${roll}'`})" title="Edit student"><i class="fa-solid fa-pen"></i></button>
++                        <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id || `'${roll}'`})" title="Delete student"><i class="fa-solid fa-trash"></i></button>
++                    </td>
+                 `;
+                 list.appendChild(tr);
+             });
+@@ -3853,18 +3933,19 @@ window.loadAdminFullFaculty = async function () {
+             const data = await res.json();
+ 
+             const renderRows = () => {
+-                if (data.length === 0) return '<tr><td colspan="9" class="text-center text-muted">No faculty records found.</td></tr>';
+-                return data.map(t => `
++                const displayData = data.length > 0 ? data : (window.staffDirectory || []);
++                if (displayData.length === 0) return '<tr><td colspan="9" class="text-center text-muted">No faculty records found.</td></tr>';
++                return displayData.map(t => `
+                     <tr>
+                         <td>${t.employeeId || '-'}</td>
+-                        <td>${t.firstName || ''} ${t.lastName || ''}</td>
+-                        <td>${t.department ? t.department.name : '-'}</td>
++                        <td>${((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-'}</td>
++                        <td>${t.department ? t.department.name : (t.department || t.dept || '-')}</td>
+                         <td>${t.subjectHandling || '-'}</td>
+-                        <td>${t.personalEmail || '-'}</td>
++                        <td>${t.personalEmail || t.email || '-'}</td>
+                         <td>${t.collegeEmail || '-'}</td>
+-                        <td>${t.phone1 || '-'}</td>
++                        <td>${t.phone1 || t.phone || '-'}</td>
+                         <td>${t.phone2 || '-'}</td>
+-                        <td><button class="btn btn-sm btn-outline-danger" onclick="deletePersistentFaculty(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
++                        <td><button class="btn btn-sm btn-outline-danger" onclick="deletePersistentFaculty(${t.id || `'${t.name}'`})"><i class="fa-solid fa-trash"></i></button></td>
+                     </tr>
+                 `).join('');
+             };
+@@ -4373,3 +4454,192 @@ window.saveAcademicYear = function() {
+         showToast('Academic Year Saved', `Academic Year has been updated to ${ayString}.`);
+     }
+ };
++
++window.searchUserCredentials = function() {
++    const input = document.getElementById('credentialSearchInput');
++    const query = input ? input.value.trim().toLowerCase() : '';
++    
++    // Students
++    const studentsTbody = document.getElementById('credStudentsList');
++    if (studentsTbody) {
++        const students = window.studentsRoster || [];
++        const filtered = query ? students.filter(s => 
++            (s.registerNumber && String(s.registerNumber).toLowerCase().includes(query)) ||
++            (s.name && String(s.name).toLowerCase().includes(query))
++        ) : students;
++        if (filtered.length === 0) {
++            studentsTbody.innerHTML = '<tr><td colSpan="4" class="text-center text-muted py-4">No students found.</td></tr>';
++        } else {
++            studentsTbody.innerHTML = filtered.map(s => {
++                const username = (s.user && s.user.username) ? s.user.username : (s.registerNumber || '-');
++                const password = (s.name && s.registerNumber && s.registerNumber.length >= 4) ? 
++                    (s.name.trim().split(' ')[0] + String(s.registerNumber).slice(-4)) : 'student123';
++                return `<tr>
++                    <td><code class="text-warning">${username}</code></td>
++                    <td>${s.name || '-'}</td>
++                    <td><span class="badge bg-secondary">${s.section || '-'}</span></td>
++                    <td><code class="text-info">${password}</code></td>
++                </tr>`;
++            }).join('');
++        }
++    }
++    
++    // Faculty
++    const facultyTbody = document.getElementById('credFacultyList');
++    if (facultyTbody) {
++        const facultyList = window.staffDirectory || [];
++        const filtered = query ? facultyList.filter(f => 
++            (f.name && String(f.name).toLowerCase().includes(query)) ||
++            (f.department && String(f.department).toLowerCase().includes(query))
++        ) : facultyList;
++        if (filtered.length === 0) {
++            facultyTbody.innerHTML = '<tr><td colSpan="5" class="text-center text-muted py-4">No faculty found.</td></tr>';
++        } else {
++            facultyTbody.innerHTML = filtered.map(f => {
++                const username = f.username || (typeof buildGeneratedUsername === 'function' ? buildGeneratedUsername('FACULTY', f.name) : '-');
++                const password = f.name ? (f.name.replace(/[^a-zA-Z]/g, '').toLowerCase() + '123') : 'faculty123';
++                return `<tr>
++                    <td>${f.name || '-'}</td>
++                    <td><span class="badge bg-primary">${f.department || '-'}</span></td>
++                    <td><small>${f.email || '-'}</small></td>
++                    <td><code class="text-warning">${username}</code></td>
++                    <td><code class="text-info">${password}</code></td>
++                </tr>`;
++            }).join('');
++        }
++    }
++
++    // Advisors
++    const advisorTbody = document.getElementById('credAdvisorList');
++    if (advisorTbody) {
++        const facultyList = window.staffDirectory || [];
++        const advisors = facultyList.filter(f => f.role === 'ADVISOR' || (f.designation && f.designation.toLowerCase().includes('advisor')));
++        const displayAdvisors = advisors.length > 0 ? advisors : facultyList.slice(0, 5);
++        const filtered = query ? displayAdvisors.filter(a => String(a.name).toLowerCase().includes(query)) : displayAdvisors;
++        if (filtered.length === 0) {
++            advisorTbody.innerHTML = '<tr><td colSpan="3" class="text-center text-muted py-4">No advisors found.</td></tr>';
++        } else {
++            advisorTbody.innerHTML = filtered.map(a => `
++                <tr>
++                    <td>${a.name || '-'}</td>
++                    <td><span class="badge bg-primary">${a.department || '-'}</span></td>
++                    <td><span class="badge bg-secondary">-</span></td>
++                </tr>
++            `).join('');
++        }
++    }
++};
++
++window.searchAdminFacultyDetails = function() {
++    const tbody = document.getElementById('adminFacultyDetailsBody');
++    if (!tbody) return;
++    const facultyList = window.staffDirectory || [];
++    if (facultyList.length === 0) {
++        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">No faculty enrolled yet.</td></tr>';
++        return;
++    }
++    tbody.innerHTML = facultyList.map(f => `
++        <tr>
++            <td><strong>${f.name || '-'}</strong></td>
++            <td><span class="badge bg-primary">${f.department || '-'}</span></td>
++            <td>${f.subjectHandling || '-'}</td>
++            <td><small>${f.personalEmail || '-'}</small></td>
++            <td><small>${f.email || '-'}</small></td>
++            <td>${f.phone || '-'}</td>
++            <td>${f.altPhone || '-'}</td>
++            <td>
++                <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editFaculty('${f.id || f.name}')"><i class="fa-solid fa-pen"></i></button>
++                <button class="btn btn-sm btn-outline-danger" onclick="window.deleteFaculty('${f.id || f.name}')"><i class="fa-solid fa-trash"></i></button>
++            </td>
++        </tr>
++    `).join('');
++};
++
++window.renderAnnouncements = function() {
++    const tbody = document.getElementById('manageAnnouncementsBody');
++    if (!tbody) return;
++    const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
++    if (announcements.length === 0) {
++        tbody.innerHTML = '<tr><td colSpan="2" class="text-center text-muted py-4">No announcements available.</td></tr>';
++        return;
++    }
++    tbody.innerHTML = announcements.map((a, idx) => `
++        <tr>
++            <td class="text-start">${a.text} <br><small class="text-muted">${a.date}</small></td>
++            <td><button class="btn btn-sm btn-outline-danger" onclick="window.deleteAnnouncement(${idx})"><i class="fa-solid fa-trash"></i></button></td>
++        </tr>
++    `).join('');
++};
++
++window.addAnnouncement = function() {
++    const input = document.getElementById('newAnnouncementInput');
++    if (!input || !input.value.trim()) return;
++    const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
++    announcements.unshift({ text: input.value.trim(), date: new Date().toLocaleString() });
++    localStorage.setItem('sece_announcements', JSON.stringify(announcements));
++    input.value = '';
++    window.renderAnnouncements();
++};
++
++window.deleteAnnouncement = function(idx) {
++    const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
++    announcements.splice(idx, 1);
++    localStorage.setItem('sece_announcements', JSON.stringify(announcements));
++    window.renderAnnouncements();
++};
++
++window.shareViaWhatsApp = function() {
++    const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
++    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent('Check out the SECE Timetable App: ' + link), '_blank');
++};
++
++window.shareViaMessage = function() {
++    const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
++    window.open('sms:?body=' + encodeURIComponent('Check out the SECE Timetable App: ' + link), '_blank');
++};
++
++window.shareViaWebAPI = function() {
++    const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
++    if (navigator.share) {
++        navigator.share({
++            title: 'SECE Timetable App',
++            text: 'Check out the SECE Timetable App',
++            url: link
++        }).catch(console.error);
++    } else {
++        alert('Web Share API not supported on this browser. Link copied to clipboard.');
++        navigator.clipboard.writeText(link);
++    }
++};
++
++document.addEventListener('DOMContentLoaded', () => {
++    // Poll for modals occasionally since React might render them after DOMContentLoaded
++    setInterval(() => {
++        const credModalEl = document.getElementById('viewCredentialsModal');
++        if (credModalEl && !credModalEl.dataset.initialized) {
++            credModalEl.dataset.initialized = 'true';
++            credModalEl.addEventListener('show.bs.modal', () => { if (window.searchUserCredentials) window.searchUserCredentials(); });
++        }
++        
++        const adminFacModalEl = document.getElementById('adminFacultyDetailsModal');
++        if (adminFacModalEl && !adminFacModalEl.dataset.initialized) {
++            adminFacModalEl.dataset.initialized = 'true';
++            adminFacModalEl.addEventListener('show.bs.modal', () => { if (window.searchAdminFacultyDetails) window.searchAdminFacultyDetails(); });
++        }
++        
++        const annModalEl = document.getElementById('manageAnnouncementsModal');
++        if (annModalEl && !annModalEl.dataset.initialized) {
++            annModalEl.dataset.initialized = 'true';
++            annModalEl.addEventListener('show.bs.modal', () => { if (window.renderAnnouncements) window.renderAnnouncements(); });
++        }
++        
++        const shareModalEl = document.getElementById('shareAppModal');
++        if (shareModalEl && !shareModalEl.dataset.initialized) {
++            shareModalEl.dataset.initialized = 'true';
++            shareModalEl.addEventListener('show.bs.modal', () => { 
++                const input = document.getElementById('shareAppLinkInput');
++                if (input) input.value = window.location.origin;
++            });
++        }
++    }, 1000);
++});
+diff --git a/frontend/src/DashboardLayout.jsx b/frontend/src/DashboardLayout.jsx
+index ac95d98..d20414d 100644
+--- a/frontend/src/DashboardLayout.jsx
++++ b/frontend/src/DashboardLayout.jsx
+@@ -7,6 +7,7 @@ export default function DashboardLayout() {
+     const isLoginPage = location.pathname === "/login" || location.pathname === "/";
+     const isAdmin = location.pathname === "/admin";
+     const isStudent = location.pathname === "/student";
++    const isFaculty = location.pathname === "/faculty";
+     useEffect(() => {
+         // Guard against double-injection: React 19 StrictMode double-fires
+         // effects in dev, and every route ("/login", "/admin", "/faculty",
+@@ -28,6 +29,15 @@ export default function DashboardLayout() {
+         });
+     }, []);
+ 
++    useEffect(() => {
++        // When the React route changes, wait for DOM update and then trigger legacy rendering scripts
++        const timer = setTimeout(() => {
++            if (window.renderStaffAvailability) window.renderStaffAvailability();
++            if (window.renderEnrolledStudentsRoster) window.renderEnrolledStudentsRoster();
++        }, 300);
++        return () => clearTimeout(timer);
++    }, [location.pathname]);
++
+     return (
+         <>
+ 
+@@ -36,7 +46,7 @@ export default function DashboardLayout() {
+             <section id="loginScreen" style={{ display: isLoginPage ? "flex" : "none" }}>
+                 <div className="login-shell">
+                     <div className="login-brand">
+-                        <div className="sece-logo-badge">SECE</div>
++                        <img src="/images/sece-logo.png" alt="SECE Logo" style={{ width: "45px", height: "45px", objectFit: "contain" }} />
+                         <h1 className="h3 fw-bold text-white mb-2">SRI ESHWAR COLLEGE OF ENGINEERING</h1>
+                         <p className="text-muted mb-0">Smart Class & Timetable Scheduler</p>
+                     </div>
+@@ -67,6 +77,11 @@ export default function DashboardLayout() {
+                                 <button className="btn btn-danger w-100">Continue as Admin</button>
+                             </div>
+                         </div>
++                        <div className="text-center mt-4">
++                            <button type="button" className="btn btn-outline-info rounded-pill px-4" onClick={() => window.openShareAppModal && window.openShareAppModal()}>
++                                <i className="fa-solid fa-share-nodes me-2"></i> Share App
++                            </button>
++                        </div>
+                     </div>
+ 
+ 
+@@ -86,7 +101,7 @@ export default function DashboardLayout() {
+                             <p id="loginHint" className="small text-muted mb-0">Username = role letter + first 4 letters of first name + last-name initial + 012345</p>
+                         </div>
+ 
+-                        <form id="roleLoginForm" onSubmit={(event) => window.handleLogin(event)} >
++                        <form id="roleLoginForm" onSubmit={(event) => window.handleRoleLogin && window.handleRoleLogin(event)} >
+                             <input type="hidden" id="selectedLoginRole" defaultValue="STUDENT" />
+ 
+                             <div className="mb-3">
+@@ -134,7 +149,7 @@ export default function DashboardLayout() {
+                     <div className="container-fluid px-4">
+                         <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                             <div className="d-flex align-items-center gap-3">
+-                                <div className="sece-logo-badge">SECE</div>
++                                <img src="/images/sece-logo.png" alt="SECE Logo" style={{ width: "45px", height: "45px", objectFit: "contain" }} />
+                                 <div>
+                                     <h1 className="h5 mb-0 fw-bold text-white tracking-tight">SRI ESHWAR COLLEGE OF ENGINEERING</h1>
+                                     <div className="d-flex align-items-center gap-2 mt-1 flex-wrap">
+@@ -190,6 +205,11 @@ export default function DashboardLayout() {
+                                     <i className="fa-solid fa-chalkboard-user"></i> Add Faculty
+                                 </button>
+ 
++                                <button id="manageAnnouncementsBtn" className="btn btn-sm btn-outline-success d-flex align-items-center gap-1"
++                                    type="button" data-bs-toggle="modal" data-bs-target="#manageAnnouncementsModal" style={{ display: "none" }} onClick={() => window.renderManageAnnouncementsList && window.renderManageAnnouncementsList()}>
++                                    <i className="fa-solid fa-bullhorn"></i> Manage Announcements
++                                </button>
++
+                                 <button id="adminViewFacultyBtn" className="btn btn-sm btn-outline-info align-items-center gap-1 d-none" type="button" data-bs-toggle="modal" data-bs-target="#adminViewFacultyModal">
+                                     <i className="fa-solid fa-address-card"></i> View Full Faculty Details
+                                 </button>
+@@ -225,9 +245,11 @@ export default function DashboardLayout() {
+                                 <button id="studentDayNotificationBtn" className="btn btn-sm btn-outline-info align-items-center gap-1 d-none" type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
+ 
+ 
+-                                <button id="substitutionBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#substitutionModal">
+-                                    <i className="fa-solid fa-people-arrows"></i> Staff Availability / Substitution
+-                                </button>
++                                {(!isAdmin && !isStudent) && (
++                                    <button id="substitutionBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#substitutionModal">
++                                        <i className="fa-solid fa-people-arrows"></i> Staff Availability / Substitution
++                                    </button>
++                                )}
+ 
+                                 {(!isAdmin && !isStudent) && (
+                                     <button id="myTimetableBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => window.renderMyTimetable && window.renderMyTimetable()}>
+@@ -251,50 +273,54 @@ export default function DashboardLayout() {
+                     </div>
+                 </header>
+ 
++                <div id="announcementTickerContainer" className="w-100 bg-success text-white py-1 d-none marquee-l2r-container" style={{ borderBottom: "2px solid #198754" }}>
++                    <div id="announcementMarquee" className="marquee-l2r-content mb-0 fw-bold fs-6" style={{ letterSpacing: "0.5px" }}></div>
++                </div>
++
+ 
+                 <main className="container-fluid px-4 py-3">
+ 
+ 
+-                    <div className="glass-panel p-3">
+-                        <div className="row g-3 align-items-center">
+-
+-                            {(isAdmin || location.pathname === "/faculty") && (
+-                                <>
+-                                    <div className="col-md-3 col-sm-6" id="deptFilterWrapper">
+-                                        <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-building-columns text-primary me-1"></i> Department</label>
+-                                        <select id="deptSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.populateSectionSelects?.(); window.onFilterChange?.(); }} >
+-                                            <option value="">-- Select Department --</option>
+-                                            <option value="CSE">CSE - Computer Science & Engg</option>
+-                                            <option value="IT">IT - Information Technology</option>
+-                                            <option value="AIDS">AI&DS - Artificial Intelligence & Data Science</option>
+-                                            <option value="ECE">ECE - Electronics & Comm Engg</option>
+-                                            <option value="EEE">EEE - Electrical & Electronics Engg</option>
+-                                            <option value="MECH">MECH - Mechanical Engineering</option>
+-                                            <option value="CIVIL">CIVIL - Civil Engineering</option>
+-                                            <option value="CSD">CSD - Computer Science & Design</option>
+-                                        </select>
+-                                    </div>
++                    {!isAdmin && (
++                        <div className="glass-panel p-3 mb-3">
++                            <div className="row g-3 align-items-center">
++
++                                {location.pathname === "/faculty" && (
++                                    <>
++                                        <div className="col-md-3 col-sm-6" id="deptFilterWrapper">
++                                            <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-building-columns text-primary me-1"></i> Department</label>
++                                            <select id="deptSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.populateSectionSelects?.(); window.onFilterChange?.(); }} >
++                                                <option value="">-- Select Department --</option>
++                                                <option value="CSE">CSE - Computer Science & Engg</option>
++                                                <option value="IT">IT - Information Technology</option>
++                                                <option value="AIDS">AI&DS - Artificial Intelligence & Data Science</option>
++                                                <option value="ECE">ECE - Electronics & Comm Engg</option>
++                                                <option value="EEE">EEE - Electrical & Electronics Engg</option>
++                                                <option value="MECH">MECH - Mechanical Engineering</option>
++                                                <option value="CIVIL">CIVIL - Civil Engineering</option>
++                                                <option value="CSD">CSD - Computer Science & Design</option>
++                                            </select>
++                                        </div>
+ 
+ 
+-                                    <div className="col-md-2 col-sm-6" id="secFilterWrapper">
+-                                        <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-layer-group text-info me-1"></i> Section</label>
+-                                        <select id="sectionSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.onFilterChange?.(); }} >
+-                                            <option value="CSE_C">II CSE C [SF 04]</option>
+-                                            <option value="CSE_A">II CSE A [SF 02]</option>
+-                                            <option value="CSE_B">II CSE B [SF 03]</option>
+-                                            <option value="IT_A">II IT A [IT 101]</option>
+-                                            <option value="AIDS_A">II AI&DS A [AI 201]</option>
+-                                            <option value="ECE_A">II ECE A [EC 301]</option>
+-                                        </select>
+-                                    </div>
+-                                    
+-                                    <div className="col-md-2 col-sm-6 d-flex align-items-end" id="adminSubmitFilterWrapper">
+-                                        <button className="btn btn-sm btn-success w-100 fw-bold" onClick={() => { window.onFilterChange?.(); window.showTtPopup?.(); }}><i className="fa-solid fa-check-circle me-1"></i> Submit</button>
+-                                    </div>
+-                                </>
+-                            )}
++                                        <div className="col-md-2 col-sm-6" id="secFilterWrapper">
++                                            <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-layer-group text-info me-1"></i> Section</label>
++                                            <select id="sectionSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.onFilterChange?.(); }} >
++                                                <option value="CSE_C">II CSE C [SF 04]</option>
++                                                <option value="CSE_A">II CSE A [SF 02]</option>
++                                                <option value="CSE_B">II CSE B [SF 03]</option>
++                                                <option value="IT_A">II IT A [IT 101]</option>
++                                                <option value="AIDS_A">II AI&DS A [AI 201]</option>
++                                                <option value="ECE_A">II ECE A [EC 301]</option>
++                                            </select>
++                                        </div>
++                                        
++                                        <div className="col-md-2 col-sm-6 d-flex align-items-end" id="adminSubmitFilterWrapper">
++                                            <button className="btn btn-sm btn-success w-100 fw-bold" onClick={() => { window.onFilterChange?.(); window.showTtPopup?.(); }}><i className="fa-solid fa-check-circle me-1"></i> Submit</button>
++                                        </div>
++                                    </>
++                                )}
+ 
+-                            {!isAdmin && (
+                                 <div className="col-md-7 d-flex justify-content-md-end justify-content-start gap-4">
+                                     <div id="batchInfoCard" className="card shadow border-secondary bg-dark" style={{ minWidth: "250px", borderRadius: "8px" }}>
+                                         <div id="batchInfoCardBody" className="card-body p-3 text-light" style={{ fontSize: "0.9rem" }}>
+@@ -325,38 +351,43 @@ export default function DashboardLayout() {
+                                                     <i id="ayEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Academic Year"></i>
+                                                 </div>
+                                             </div>
++                                            <div id="studentAdvisorBannerRow" className="d-none align-items-center">
++                                                <div>
++                                                    <strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Advisor:</strong>
++                                                </div>
++                                                <div className="ms-2">
++                                                    <span id="studentAdvisorNameBanner" className="fw-bold text-warning"></span>
++                                                    <span id="studentAdvisorPhoneBanner" className="ms-2 badge bg-dark border border-secondary text-light"></span>
++                                                </div>
++                                            </div>
+                                         </div>
+                                     </div>
+                                     <div id="classInfoBlock" className="d-flex flex-column justify-content-center gap-2 text-light p-3 card shadow border-secondary bg-dark" style={{ borderRadius: "8px", fontSize: "0.9rem" }}>
+                                         <div><strong className="text-muted"><i className="fa-solid fa-users text-primary me-1"></i> Class Strength:</strong> <span className="badge bg-success ms-1" id="classStrengthBadge">61 Students</span></div>
+-                                        <div><strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Class Advisor:</strong> <span className="text-warning ms-1">Ms.J.Keerthika, AP/CSE</span></div>
++                                        <div><strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Class Advisor:</strong> <span className="text-warning ms-1" id="classAdvisorLabel">Ms.J.Keerthika, AP/CSE</span></div>
++                                        <div id="classTutorsRow" className="d-none"><strong className="text-muted"><i className="fa-solid fa-chalkboard-user text-info me-1"></i> Class Tutors:</strong> <span className="text-light ms-1" id="classTutorsLabel"></span></div>
+                                     </div>
+                                 </div>
+-                            )}
++                            </div>
+                         </div>
+-                    </div>
++                    )}
+ 
+ 
+-                    {!isAdmin && (
+-                        <>
+                             <div id="roleBanner" className="alert alert-info py-2 px-3 border-0 rounded-3 d-flex align-items-center justify-content-between mb-3 shadow-sm">
+                                 <div id="roleBannerTextContainer">
+                                     <i className="fa-solid fa-shield-halved me-2"></i>
+                                     <span id="roleBannerText">Logged in as <strong>ADMIN</strong>. Click on any period cell in the grid to edit schedule, swap slots, or assign Placement ALT.</span>
+                                 </div>
+                                 <div className="d-flex align-items-center gap-2">
+-                                    <button className="btn btn-sm btn-outline-dark  py-0 border-0" onClick={() => window.quickAssignWednesdayALT()} ><i className="fa-solid fa-bolt text-warning me-1"></i> Quick Preset: Wed 4,5 ALT</button>
+-                                    <button id="resetTimetableBtn" className="btn btn-sm btn-outline-danger py-0 d-none" onClick={() => window.resetTimetableEdits()} ><i className="fa-solid fa-rotate-left me-1"></i> Reset Edits to Default</button>
+-                                    <button className="btn btn-sm btn-success py-0" onClick={() => window.downloadTimetablePNG()} ><i className="fa-solid fa-download me-1"></i> Download PNG</button>
++                                    <button id="quickAssignBtn" className="btn btn-sm btn-outline-dark py-0 border-0 d-none" onClick={() => window.quickAssignWednesdayALT()}><i className="fa-solid fa-bolt text-warning me-1"></i> Quick Preset: Wed 4,5 ALT</button>
++                                    <button id="resetTimetableBtn" className="btn btn-sm btn-outline-danger py-0 d-none" onClick={() => window.resetTimetableEdits()}><i className="fa-solid fa-rotate-left me-1"></i> Reset Edits to Default</button>
++                                    <button className="btn btn-sm btn-success py-0" onClick={() => window.downloadTimetablePNG()}><i className="fa-solid fa-download me-1"></i> Download PNG</button>
+                                 </div>
+                             </div>
+ 
+-
+                             <div id="notifStatusPanel" className="alert alert-secondary py-2 px-3 border-0 rounded-3 mb-3 shadow-sm small">
+-
+                             </div>
+ 
+-
+                             <div id="adminTTPlaceholder" className="alert alert-warning py-3 px-4 border-0 rounded-3 mb-4 shadow-sm text-center d-none">
+                                 <i className="fa-solid fa-circle-info me-2 fs-5 mb-2 d-block"></i>
+                                 <strong>Please select a Department and Section from the dropdowns above to view and edit its timetable.</strong>
+@@ -381,15 +412,16 @@ export default function DashboardLayout() {
+                                         <thead>
+                                             <tr>
+                                                 <th style={{ width: "100px" }}>Day Order</th>
+-                                                <th>1<br /><small className="text-dim">08.40 - 09.40</small></th>
+-                                                <th>2<br /><small className="text-dim">09.40 - 10.40</small></th>
+-                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }}>10.40-11.00</th>
+-                                                <th>3<br /><small className="text-dim">11.00 - 12.00</small></th>
+-                                                <th>4<br /><small className="text-dim">12.00 - 01.00</small></th>
+-                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }}>01.00-01.40</th>
+-                                                <th>5<br /><small className="text-dim">01.40 - 02.30</small></th>
+-                                                <th>6<br /><small className="text-dim">02.30 - 03.20</small></th>
+-                                                <th>7<br /><small className="text-dim">03.20 - 04.10</small></th>
++                                                <th>1<br /><small className="text-dim" id="ttHeaderP1">08.40 - 09.40</small></th>
++                                                <th>2<br /><small className="text-dim" id="ttHeaderP2">09.40 - 10.40</small></th>
++                                                <th>3<br /><small className="text-dim" id="ttHeaderP3">11.00 - 12.00</small></th>
++                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }} id="ttHeaderTea">12.00-12.15</th>
++                                                <th>4<br /><small className="text-dim" id="ttHeaderP4">12.00 - 01.00</small></th>
++                                                <th>5<br /><small className="text-dim" id="ttHeaderP5">01.40 - 02.30</small></th>
++                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }} id="ttHeaderLunch">02.30-03.15</th>
++                                                <th>ACT<br /><small className="text-dim" id="ttHeaderAct">Activity</small></th>
++                                                <th>6<br /><small className="text-dim" id="ttHeaderP6">02.30 - 03.20</small></th>
++                                                <th>7<br /><small className="text-dim" id="ttHeaderP7">03.20 - 04.10</small></th>
+                                             </tr>
+                                         </thead>
+                                         <tbody id="ttGridBody">
+@@ -419,18 +451,32 @@ export default function DashboardLayout() {
+                                             </tr>
+                                         </thead>
+                                         <tbody id="courseRefBody">
+-
+                                         </tbody>
+                                     </table>
+                                 </div>
+                             </div>
+-                            </div>
+ 
+-                        </>
+-                    )}
++                            <div className="glass-panel mt-3" id="studentFacultyAvailabilityArea">
++                                    <div className="panel-header">
++                                        <h3 className="panel-title"><i className="fa-solid fa-people-arrows text-warning"></i> All Faculty Availability (Today)</h3>
++                                    </div>
++                                    <div className="table-responsive p-2">
++                                        <table className="ref-table">
++                                            <thead>
++                                                <tr>
++                                                    <th>Staff Name</th>
++                                                    <th>Department</th>
++                                                    <th>Status (Today)</th>
++                                                </tr>
++                                            </thead>
++                                            <tbody id="studentFacultyAvailabilityBody">
++                                            </tbody>
++                                        </table>
++                                    </div>
++                                </div>
++                        </div>
+ 
+-                    {isAdmin && (
+-                        <div className="mt-4 px-2">
++                        <div className="mt-4 px-2" id="adminControlPanelContainer">
+                             <h4 className="text-info fw-bold mb-4"><i className="fa-solid fa-shield-halved me-2"></i> Admin Control Panel</h4>
+                             <div className="row g-4">
+                                 <div className="col-md-4 col-sm-6">
+@@ -460,37 +506,35 @@ export default function DashboardLayout() {
+                                         </div>
+                                     </div>
+                                 </div>
+-                                <div className="col-md-4 col-sm-6">
+-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageFacultyModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
++                                <div className="col-lg-4 col-md-6 col-sm-12">
++                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminFacultyDetailsModal" onClick={() => window.renderAdminFacultyDetails && window.renderAdminFacultyDetails()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+-                                            <i className="fa-solid fa-chalkboard-user text-warning mb-3" style={{ fontSize: "2.5rem" }}></i>
+-                                            <h5 className="text-light fw-bold mb-2">Manage Faculty</h5>
+-                                            <p className="text-muted small mb-0">Add new faculty accounts and manage assignments.</p>
++                                            <i className="fa-solid fa-address-card text-warning mb-3" style={{ fontSize: "2.5rem" }}></i>
++                                            <h5 className="text-light fw-bold mb-2">Faculty Details</h5>
++                                            <p className="text-muted small mb-0">View complete details of enrolled faculty members.</p>
+                                         </div>
+                                     </div>
+                                 </div>
+-                                <div className="col-md-4 col-sm-6">
+-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageStudentsModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(13,110,253,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
++                                <div className="col-lg-4 col-md-6 col-sm-12">
++                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,100,200,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+-                                            <i className="fa-solid fa-users text-primary mb-3" style={{ fontSize: "2.5rem" }}></i>
+-                                            <h5 className="text-light fw-bold mb-2">Student Directory</h5>
+-                                            <p className="text-muted small mb-0">View comprehensive list of all enrolled students.</p>
++                                            <i className="fa-solid fa-table-list text-pink mb-3" style={{ fontSize: "2.5rem", color: "var(--bs-pink, #d63384)" }}></i>
++                                            <h5 className="text-light fw-bold mb-2">View / Edit Timetable</h5>
++                                            <p className="text-muted small mb-0">Select batch, dept, year, and section to edit timetable.</p>
+                                         </div>
+                                     </div>
+                                 </div>
+-                                <div className="col-md-4 col-sm-6">
+-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#timetableDefaultsModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
++                                <div className="col-lg-4 col-md-6 col-sm-12">
++                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageStudentsModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(13,110,253,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+-                                            <i className="fa-solid fa-calendar-days text-warning mb-3" style={{ fontSize: "2.5rem" }}></i>
+-                                            <h5 className="text-light fw-bold mb-2">Timetable Defaults</h5>
+-                                            <p className="text-muted small mb-0">Set global Batch, Semester and Academic Year defaults.</p>
++                                            <i className="fa-solid fa-users text-primary mb-3" style={{ fontSize: "2.5rem" }}></i>
++                                            <h5 className="text-light fw-bold mb-2">Student Directory</h5>
++                                            <p className="text-muted small mb-0">View comprehensive list of all enrolled students.</p>
+                                         </div>
+                                     </div>
+                                 </div>
+-                            </div>
+-                            
+-                            <div className="row g-4 mt-1">
+-                                <div className="col-md-4 col-sm-6">
++
++                                <div className="col-lg-4 col-md-6 col-sm-12">
+                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(230,100,50,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                             <i className="fa-solid fa-folder-tree text-danger mb-3" style={{ fontSize: "2.5rem" }}></i>
+@@ -499,9 +543,17 @@ export default function DashboardLayout() {
+                                         </div>
+                                     </div>
+                                 </div>
++                                <div className="col-lg-4 col-md-6 col-sm-12">
++                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewCredentialsModal" onClick={() => window.renderCredentialsList && window.renderCredentialsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,255,150,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
++                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
++                                            <i className="fa-solid fa-key text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
++                                            <h5 className="text-light fw-bold mb-2">View Usernames / Passwords</h5>
++                                            <p className="text-muted small mb-0">View all Enrolled Student and Faculty Credentials.</p>
++                                        </div>
++                                    </div>
++                                </div>
+                             </div>
+                         </div>
+-                    )}
+ 
+                 </main>
+             </div>
+@@ -727,34 +779,7 @@ export default function DashboardLayout() {
+ 
+                             <div>
+                             <div className="row g-2 mb-3 align-items-end">
+-                                <div className="col-md-2">
+-                                    <label className="form-label small text-warning mb-1">Department</label>
+-                                    <select id="rosterFilterDept" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={(e) => window.onRosterFilterChange?.()}>
+-                                        <option value="">All</option>
+-                                        <option value="CSE">CSE</option>
+-                                        <option value="IT">IT</option>
+-                                        <option value="AIDS">AI&DS</option>
+-                                        <option value="ECE">ECE</option>
+-                                        <option value="EEE">EEE</option>
+-                                        <option value="MECH">MECH</option>
+-                                    </select>
+-                                </div>
+-                                <div className="col-md-2">
+-                                    <label className="form-label small text-warning mb-1">Year</label>
+-                                    <select id="rosterFilterYear" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={(e) => window.onRosterFilterChange?.()}>
+-                                        <option value="">All</option>
+-                                        <option value="I">I Year</option>
+-                                        <option value="II">II Year</option>
+-                                        <option value="III">III Year</option>
+-                                        <option value="IV">IV Year</option>
+-                                    </select>
+-                                </div>
+-                                <div className="col-md-2">
+-                                    <label className="form-label small text-warning mb-1">Section</label>
+-                                    <input type="text" id="rosterFilterSection" list="rosterFilterDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="All Sections" onChange={(e) => window.onRosterFilterChange?.()} autoComplete="off" />
+-                                    <datalist id="rosterFilterDatalist"></datalist>
+-                                </div>
+-                                <div className="col-md-6 d-flex gap-2 justify-content-end align-items-end">
++                                <div className="col-md-12 d-flex gap-2 justify-content-end align-items-end">
+                                     <div className="input-group input-group-sm" style={{ maxWidth: '200px' }}>
+                                         <input type="text" id="rosterSearchRegNo" className="form-control bg-dark text-white border-secondary" placeholder="Reg No..." />
+                                         <button type="button" className="btn btn-outline-info" onClick={() => window.searchStudentInRoster()} title="Search Details"><i className="fa-solid fa-search"></i></button>
+@@ -762,6 +787,10 @@ export default function DashboardLayout() {
+                                     {!isAdmin && (
+                                         <button id="addStudentBtn" className="btn btn-sm btn-success" style={{ whiteSpace: 'nowrap' }} onClick={() => window.toggleAddStudentForm()} ><i className="fa-solid fa-user-plus me-1"></i> Add Student</button>
+                                     )}
++                                    <input type="file" id="importStudentExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importStudentExcel && window.importStudentExcel(e)} />
++                                    <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importStudentExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
++                                        <i className="fa-solid fa-file-excel me-1"></i> Import Excel
++                                    </button>
+                                 </div>
+                             </div>
+                             <div className="d-flex align-items-center justify-content-between mb-2">
+@@ -938,6 +967,88 @@ export default function DashboardLayout() {
+     </div>
+ </div>
+ 
++<div className="modal fade" id="viewCredentialsModal" tabIndex="-1">
++    <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
++        <div className="modal-content bg-dark text-white border-secondary">
++            <div className="modal-header border-secondary">
++                <h5 className="modal-title text-success fw-bold"><i className="fa-solid fa-key me-2"></i> User Credentials</h5>
++                <div>
++                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
++                </div>
++            </div>
++            <div className="modal-body p-0">
++                <div className="card card-body bg-dark border-0">
++                    <div className="d-flex mb-3 gap-2">
++                        <div className="input-group">
++                            <span className="input-group-text bg-dark text-secondary border-secondary"><i className="fa-solid fa-magnifying-glass"></i></span>
++                            <input type="text" className="form-control bg-dark text-white border-secondary" id="credentialSearchInput" placeholder="Enter exact username (e.g., 25cs316) to search..." onKeyDown={(e) => { if (e.key === 'Enter') window.searchUserCredentials?.(); }} />
++                            <button className="btn btn-primary" type="button" onClick={() => window.searchUserCredentials?.()}>Search</button>
++                        </div>
++                    </div>
++                    <ul className="nav nav-tabs nav-tabs-dark mb-3" role="tablist">
++                        <li className="nav-item" role="presentation">
++                            <button className="nav-link active" data-bs-toggle="tab" data-bs-target="#credStudentsTab" type="button" role="tab">Students</button>
++                        </li>
++                        <li className="nav-item" role="presentation">
++                            <button className="nav-link" data-bs-toggle="tab" data-bs-target="#credFacultyTab" type="button" role="tab">Faculty</button>
++                        </li>
++                        <li className="nav-item" role="presentation">
++                            <button className="nav-link" data-bs-toggle="tab" data-bs-target="#credAdvisorTab" type="button" role="tab">Advisor</button>
++                        </li>
++                    </ul>
++                    <div className="tab-content">
++                        <div className="tab-pane fade show active" id="credStudentsTab" role="tabpanel">
++                            <div className="table-responsive">
++                                <table className="table table-dark table-hover align-middle">
++                                    <thead>
++                                        <tr>
++                                            <th>Register No / Username</th>
++                                            <th>Name</th>
++                                            <th>Section</th>
++                                            <th>Password</th>
++                                        </tr>
++                                    </thead>
++                                    <tbody id="credStudentsList"></tbody>
++                                </table>
++                            </div>
++                        </div>
++                        <div className="tab-pane fade" id="credFacultyTab" role="tabpanel">
++                            <div className="table-responsive">
++                                <table className="table table-dark table-hover align-middle">
++                                    <thead>
++                                        <tr>
++                                            <th>Faculty Name</th>
++                                            <th>Department</th>
++                                            <th>Username</th>
++                                            <th>Password</th>
++                                        </tr>
++                                    </thead>
++                                    <tbody id="credFacultyList"></tbody>
++                                </table>
++                            </div>
++                        </div>
++                        <div className="tab-pane fade" id="credAdvisorTab" role="tabpanel">
++                            <div className="table-responsive">
++                                <table className="table table-dark table-hover align-middle">
++                                    <thead>
++                                        <tr>
++                                            <th>Advisor Name</th>
++                                            <th>Assigned Section</th>
++                                            <th>Username</th>
++                                            <th>Password</th>
++                                        </tr>
++                                    </thead>
++                                    <tbody id="credAdvisorList"></tbody>
++                                </table>
++                            </div>
++                        </div>
++                    </div>
++                </div>
++            </div>
++        </div>
++    </div>
++</div>
++
+ 
+ 
+ 
+@@ -1465,9 +1576,15 @@ export default function DashboardLayout() {
+             <div className="modal fade" id="manageStudentsModal" tabIndex="-1">
+                 <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                     <div className="modal-content bg-dark text-white border-secondary">
+-                        <div className="modal-header border-secondary">
+-                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-users me-2"></i> Manage Students</h5>
+-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
++                        <div className="modal-header border-secondary d-flex justify-content-between align-items-center">
++                            <h5 className="modal-title text-info fw-bold mb-0"><i className="fa-solid fa-users me-2"></i> Manage Students</h5>
++                            <div className="d-flex align-items-center gap-2">
++                                <input type="file" id="importAdminStudentExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importStudentExcel && window.importStudentExcel(e, true)} />
++                                <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importAdminStudentExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
++                                    <i className="fa-solid fa-file-excel me-1"></i> Import Excel
++                                </button>
++                                <button type="button" className="btn-close btn-close-white ms-2" data-bs-dismiss="modal"></button>
++                            </div>
+                         </div>
+                         <div className="modal-body">
+                             <div id="manageStudentsAlert" className="alert d-none small py-2"></div>
+@@ -1605,9 +1722,15 @@ export default function DashboardLayout() {
+             <div className="modal fade" id="manageFacultyModal" tabIndex="-1">
+                 <div className="modal-dialog modal-lg modal-dialog-centered">
+                     <div className="modal-content bg-dark text-white border-secondary">
+-                        <div className="modal-header border-secondary">
+-                            <h5 className="modal-title text-warning fw-bold"><i className="fa-solid fa-chalkboard-user me-2"></i> Add Faculty</h5>
+-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
++                        <div className="modal-header border-secondary d-flex justify-content-between align-items-center">
++                            <h5 className="modal-title text-warning fw-bold mb-0"><i className="fa-solid fa-chalkboard-user me-2"></i> Add Faculty</h5>
++                            <div className="d-flex align-items-center gap-2">
++                                <input type="file" id="importFacultyExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importFacultyExcel && window.importFacultyExcel(e)} />
++                                <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importFacultyExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
++                                    <i className="fa-solid fa-file-excel me-1"></i> Import Excel
++                                </button>
++                                <button type="button" className="btn-close btn-close-white ms-2" data-bs-dismiss="modal"></button>
++                            </div>
+                         </div>
+                         <div className="modal-body">
+                             <p className="small text-muted mb-3">Add new faculty members. A backend User account will be automatically provisioned for them.</p>
+@@ -1665,6 +1788,131 @@ export default function DashboardLayout() {
+                 </div>
+             </div>
+ 
++            <div className="modal fade" id="timetableBuilderModal" tabIndex="-1">
++                <div className="modal-dialog modal-xl modal-dialog-centered">
++                    <div className="modal-content bg-dark text-white border-secondary">
++                        <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
++                            <h5 className="modal-title text-primary fw-bold"><i className="fa-solid fa-table me-2"></i> Timetable Builder</h5>
++                            <div>
++                                <input type="file" id="importExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importTimetableExcel && window.importTimetableExcel(e)} />
++                                <button type="button" className="btn btn-sm btn-outline-success me-3" onClick={() => document.getElementById('importExcelInput').click()}>
++                                    <i className="fa-solid fa-file-excel me-1"></i> Import Excel
++                                </button>
++                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
++                            </div>
++                        </div>
++                        <div className="modal-body">
++                            <form id="timetableBuilderForm" onSubmit={(e) => { e.preventDefault(); if (window.saveTimetableBuilder) window.saveTimetableBuilder(); }}>
++                                <div className="row g-3 mb-4">
++                                    <div className="col-md-6">
++                                        <label className="form-label small text-muted">Class Advisor</label>
++                                        <input type="text" id="ttBuildAdvisor" className="form-control bg-dark text-white border-secondary" placeholder="e.g. Ms.J.Keerthika, AP/CSE" />
++                                    </div>
++                                    <div className="col-md-6">
++                                        <label className="form-label small text-muted">Class Tutors</label>
++                                        <input type="text" id="ttBuildTutors" className="form-control bg-dark text-white border-secondary" placeholder="e.g. Ms.B.Gomathi, Mr.K.Sabarigirivason" />
++                                    </div>
++                                </div>
++                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Period Timings</h6>
++                                <div className="row g-2 mb-4">
++                                    <div className="col"><input type="text" id="ttBuildP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P1 Timing" defaultValue="08.40 - 09.40" /></div>
++                                    <div className="col"><input type="text" id="ttBuildP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P2 Timing" defaultValue="09.40 - 10.40" /></div>
++                                    <div className="col"><input type="text" id="ttBuildP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P3 Timing" defaultValue="11.00 - 12.00" /></div>
++                                    <div className="col"><input type="text" id="ttBuildTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Tea Break" defaultValue="12.00 - 12.15" /></div>
++                                    <div className="col"><input type="text" id="ttBuildP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P4 Timing" defaultValue="12.15 - 01.15" /></div>
++                                    <div className="col"><input type="text" id="ttBuildP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P5 Timing" defaultValue="01.15 - 02.00" /></div>
++                                    <div className="col"><input type="text" id="ttBuildLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Lunch Break" defaultValue="02.00 - 02.40" /></div>
++                                    <div className="col"><input type="text" id="ttBuildAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Activity Timing" defaultValue="02.40 - 03.30" /></div>
++                                    <div className="col"><input type="text" id="ttBuildP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P6 Timing" defaultValue="03.30 - 04.20" /></div>
++                                    <div className="col"><input type="text" id="ttBuildP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P7 Timing" defaultValue="04.20 - 05.10" /></div>
++                                </div>
++
++                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Timetable Entries</h6>
++                                <p className="small text-muted mb-2">Enter Subject / Staff / Venue. Format: <code>Subject, Staff, Venue</code> or just type it in. Leave blank for FREE.</p>
++                                <div className="table-responsive">
++                                    <table className="table table-dark table-bordered border-secondary table-sm text-center" style={{ tableLayout: "fixed" }}>
++                                        <thead>
++                                            <tr>
++                                                <th style={{ width: "100px" }}>Day</th>
++                                                <th>Period 1</th><th>Period 2</th><th>Period 3</th><th className="text-warning">Tea Break</th><th>Period 4</th><th>Period 5</th><th className="text-warning">Lunch Break</th><th className="text-warning">Activity Hour</th><th>Period 6</th><th>Period 7</th>
++                                            </tr>
++                                        </thead>
++                                        <tbody id="ttBuilderGrid">
++                                            {/* Generated by JS */}
++                                        </tbody>
++                                    </table>
++                                </div>
++
++                                <div className="d-flex justify-content-end gap-2 mt-3">
++                                    <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
++                                    <button type="submit" className="btn btn-success"><i className="fa-solid fa-floppy-disk me-1"></i> Save Built Timetable</button>
++                                </div>
++                            </form>
++                        </div>
++                    </div>
++                </div>
++            </div>
++
++            <div className="modal fade" id="adminViewEditTimetableModal" tabIndex="-1">
++                <div className="modal-dialog modal-dialog-centered">
++                    <div className="modal-content bg-dark text-white border-secondary">
++                        <div className="modal-header border-secondary">
++                            <h5 className="modal-title text-pink fw-bold"><i className="fa-solid fa-table-list me-2"></i> View / Edit Timetable</h5>
++                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
++                        </div>
++                        <div className="modal-body">
++                            <form id="adminViewEditTimetableForm" onSubmit={(e) => { e.preventDefault(); if (window.submitAdminViewEditTimetable) window.submitAdminViewEditTimetable(); }}>
++                                <div className="mb-3">
++                                    <label className="form-label small text-muted">Batch Start Year <span className="text-danger">*</span></label>
++                                    <input type="number" id="avtBatchInput" className="form-control bg-dark text-white border-secondary" min="2020" max="3000" defaultValue="2023" required />
++                                </div>
++                                <div className="mb-3">
++                                    <label className="form-label small text-muted">Department <span className="text-danger">*</span></label>
++                                    <select id="avtDeptSelect" className="form-select bg-dark text-white border-secondary" required onChange={(e) => window.avtDeptChanged && window.avtDeptChanged(e.target.value)}>
++                                        <option value="">Select Department...</option>
++                                    </select>
++                                </div>
++                                <div className="mb-3">
++                                    <label className="form-label small text-muted">Section <span className="text-danger">*</span></label>
++                                    <select id="avtSectionSelect" className="form-select bg-dark text-white border-secondary" required>
++                                        <option value="">Select Department First...</option>
++                                    </select>
++                                </div>
++                                <div className="mb-3">
++                                    <label className="form-label small text-muted">Year <span className="text-danger">*</span></label>
++                                    <select id="avtYearSelect" className="form-select bg-dark text-white border-secondary" required onChange={(e) => {
++                                        const y = parseInt(e.target.value);
++                                        const semSelect = document.getElementById('avtSemesterSelect');
++                                        if (semSelect && !isNaN(y)) {
++                                            semSelect.value = (y * 2 - 1).toString(); // e.g. Year 1 -> Sem 1
++                                        }
++                                    }}>
++                                        <option value="1">1st Year</option>
++                                        <option value="2">2nd Year</option>
++                                        <option value="3">3rd Year</option>
++                                        <option value="4">4th Year</option>
++                                    </select>
++                                </div>
++                                <div className="mb-3">
++                                    <label className="form-label small text-muted">Semester <span className="text-danger">*</span></label>
++                                    <select id="avtSemesterSelect" className="form-select bg-dark text-white border-secondary" required>
++                                        <option value="1">I Semester</option>
++                                        <option value="2">II Semester</option>
++                                        <option value="3">III Semester</option>
++                                        <option value="4">IV Semester</option>
++                                        <option value="5">V Semester</option>
++                                        <option value="6">VI Semester</option>
++                                        <option value="7">VII Semester</option>
++                                        <option value="8">VIII Semester</option>
++                                    </select>
++                                </div>
++                                <button type="submit" className="btn btn-pink w-100 mt-2 text-white" style={{ backgroundColor: 'var(--bs-pink, #d63384)' }}>View Timetable</button>
++                            </form>
++                        </div>
++                    </div>
++                </div>
++            </div>
++
+             <div className="modal fade" id="editAyModal" tabIndex="-1">
+                 <div className="modal-dialog modal-sm modal-dialog-centered">
+                     <div className="modal-content bg-dark text-white border-secondary">
+@@ -1687,27 +1935,91 @@ export default function DashboardLayout() {
+ 
+             <div className="modal fade" id="myTimetableModal" tabIndex="-1">
+                 <div className="modal-dialog modal-xl modal-dialog-centered">
++                    <div className="modal-content bg-dark text-white border-secondary">
++                        <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
++                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-calendar-user me-2"></i> Feed Your Timetable</h5>
++                            <div>
++                                <input type="file" id="importExcelInputFaculty" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importFacultyTimetableExcel && window.importFacultyTimetableExcel(e)} />
++                                <button type="button" className="btn btn-sm btn-outline-success me-3" onClick={() => document.getElementById('importExcelInputFaculty').click()}>
++                                    <i className="fa-solid fa-file-excel me-1"></i> Import Excel
++                                </button>
++                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
++                            </div>
++                        </div>
++                        <div className="modal-body p-3">
++                            <form id="myTimetableForm" onSubmit={(e) => { e.preventDefault(); if (window.saveMyTimetable) window.saveMyTimetable(); }}>
++                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Period Timings</h6>
++                                <div className="row g-2 mb-4">
++                                    <div className="col"><input type="text" id="myTtP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P1 Timing" defaultValue="08.40 - 09.40" /></div>
++                                    <div className="col"><input type="text" id="myTtP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P2 Timing" defaultValue="09.40 - 10.40" /></div>
++                                    <div className="col"><input type="text" id="myTtP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P3 Timing" defaultValue="11.00 - 12.00" /></div>
++                                    <div className="col"><input type="text" id="myTtTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Tea Break" defaultValue="12.00 - 12.15" /></div>
++                                    <div className="col"><input type="text" id="myTtP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P4 Timing" defaultValue="12.15 - 01.15" /></div>
++                                    <div className="col"><input type="text" id="myTtP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P5 Timing" defaultValue="01.15 - 02.00" /></div>
++                                    <div className="col"><input type="text" id="myTtLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Lunch Break" defaultValue="02.00 - 02.40" /></div>
++                                    <div className="col"><input type="text" id="myTtAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning" placeholder="Activity Timing" defaultValue="02.40 - 03.30" /></div>
++                                    <div className="col"><input type="text" id="myTtP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P6 Timing" defaultValue="03.30 - 04.20" /></div>
++                                    <div className="col"><input type="text" id="myTtP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center" placeholder="P7 Timing" defaultValue="04.20 - 05.10" /></div>
++                                </div>
++
++                                <h6 className="text-info border-bottom border-secondary pb-2 mb-3">Timetable Entries</h6>
++                                <p className="small text-muted mb-2">Enter Subject / Class / Venue. Format: <code>Subject, Class, Venue</code> or just type it in. Leave blank for FREE.</p>
++                                <div className="table-responsive">
++                                    <table className="table table-dark table-bordered border-secondary table-sm text-center" style={{ tableLayout: "fixed" }}>
++                                        <thead>
++                                            <tr>
++                                                <th style={{ width: "100px" }}>Day</th>
++                                                <th>Period 1</th><th>Period 2</th><th>Period 3</th><th className="text-warning">Tea Break</th><th>Period 4</th><th>Period 5</th><th className="text-warning">Lunch Break</th><th className="text-warning">Activity Hour</th><th>Period 6</th><th>Period 7</th>
++                                            </tr>
++                                        </thead>
++                                        <tbody id="myTimetableBody">
++                                            {/* Generated by JS */}
++                                        </tbody>
++                                    </table>
++                                </div>
++
++                                <div className="d-flex justify-content-end gap-2 mt-3">
++                                    <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
++                                    <button type="submit" className="btn btn-success"><i className="fa-solid fa-floppy-disk me-1"></i> Save Timetable</button>
++                                </div>
++                            </form>
++                        </div>
++                    </div>
++                </div>
++            </div>
++            <div className="modal fade" id="adminFacultyDetailsModal" tabIndex="-1">
++                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                     <div className="modal-content bg-dark text-white border-secondary">
+                         <div className="modal-header border-secondary">
+-                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-calendar-user me-2"></i> Your Timetable</h5>
++                            <h5 className="modal-title text-warning fw-bold"><i className="fa-solid fa-address-card me-2"></i> Enrolled Faculty Details</h5>
+                             <div>
+                                 <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                             </div>
+                         </div>
+                         <div className="modal-body p-0">
+-                            <div className="table-responsive" style={{ maxHeight: "60vh", overflowY: "auto" }}>
++                            <div className="d-flex mb-3 gap-2 px-3 pt-3">
++                                <div className="input-group">
++                                    <span className="input-group-text bg-dark text-secondary border-secondary"><i className="fa-solid fa-magnifying-glass"></i></span>
++                                    <input type="text" className="form-control bg-dark text-white border-secondary" id="adminFacultySearchInput" placeholder="Enter faculty username (e.g., fkeerj012345) to search..." onKeyDown={(e) => { if (e.key === 'Enter') window.searchAdminFacultyDetails?.(); }} />
++                                    <button className="btn btn-primary" type="button" onClick={() => window.searchAdminFacultyDetails?.()}>Search</button>
++                                </div>
++                            </div>
++                            <div className="table-responsive">
+                                 <table className="table table-dark table-striped table-hover align-middle mb-0 text-center">
+                                     <thead className="sticky-top" style={{ backgroundColor: "#1e1e1e" }}>
+                                         <tr>
+-                                            <th>Day</th>
+-                                            <th>Time</th>
+-                                            <th>Class / Section</th>
+-                                            <th>Subject</th>
+-                                            <th>Room</th>
++                                            <th>Name</th>
++                                            <th>Department</th>
++                                            <th>Subject Handling</th>
++                                            <th>Personal Email</th>
++                                            <th>College Email</th>
++                                            <th>Mobile 1</th>
++                                            <th>Mobile 2</th>
++                                            <th>Action</th>
+                                         </tr>
+                                     </thead>
+-                                    <tbody id="myTimetableBody">
+-                                        <tr><td colSpan="5" className="text-center text-muted py-4">Loading timetable...</td></tr>
++                                    <tbody id="adminFacultyDetailsBody">
++                                        <tr><td colSpan="7" className="text-center text-muted py-4">No faculty enrolled yet.</td></tr>
+                                     </tbody>
+                                 </table>
+                             </div>
+@@ -1716,6 +2028,83 @@ export default function DashboardLayout() {
+                 </div>
+             </div>
+ 
++            <div className="modal fade" id="manageAnnouncementsModal" tabIndex="-1">
++                <div className="modal-dialog modal-lg modal-dialog-centered">
++                    <div className="modal-content bg-dark text-white border-secondary">
++                        <div className="modal-header border-secondary">
++                            <h5 className="modal-title text-success fw-bold"><i className="fa-solid fa-bullhorn me-2"></i> Manage Announcements</h5>
++                            <div>
++                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
++                            </div>
++                        </div>
++                        <div className="modal-body">
++                            <div className="mb-4">
++                                <label className="form-label text-warning small">Post New Announcement</label>
++                                <div className="input-group">
++                                    <input type="text" id="newAnnouncementInput" className="form-control bg-dark text-white border-secondary" placeholder="e.g., Tomorrow is a holiday due to the festival..." />
++                                    <button className="btn btn-success" type="button" onClick={() => window.addAnnouncement && window.addAnnouncement()}>Post</button>
++                                </div>
++                            </div>
++                            <h6 className="text-light fw-bold border-bottom border-secondary pb-2 mb-3">Active Announcements</h6>
++                            <div className="table-responsive">
++                                <table className="table table-dark table-striped table-hover align-middle mb-0 text-center">
++                                    <thead className="sticky-top" style={{ backgroundColor: "#1e1e1e" }}>
++                                        <tr>
++                                            <th style={{ width: "80%" }}>Announcement Text</th>
++                                            <th>Action</th>
++                                        </tr>
++                                    </thead>
++                                    <tbody id="manageAnnouncementsBody">
++                                        <tr><td colSpan="2" className="text-center text-muted py-4">Loading announcements...</td></tr>
++                                    </tbody>
++                                </table>
++                            </div>
++                        </div>
++                    </div>
++                </div>
++            </div>
++
++            <div className="modal fade" id="shareAppModal" tabIndex="-1">
++                <div className="modal-dialog modal-dialog-centered">
++                    <div className="modal-content bg-dark text-white border-secondary">
++                        <div className="modal-header border-secondary">
++                            <h5 className="modal-title fw-bold text-info"><i className="fa-solid fa-share-nodes me-2"></i> Share App</h5>
++                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
++                        </div>
++                        <div className="modal-body text-center">
++                            <p className="text-muted small mb-3">Scan this QR Code to directly open the login page on your mobile device:</p>
++                            <div className="bg-white p-2 d-inline-block rounded mb-3 shadow" id="qrCodeContainer">
++                                <img src="" id="loginQrCodeImage" alt="Login QR Code" style={{ width: "160px", height: "160px", objectFit: "contain" }} />
++                            </div>
++                            
++                            <div className="input-group input-group-sm mb-4 mx-auto" style={{maxWidth: "300px"}}>
++                                <input type="text" id="shareAppLinkInput" className="form-control bg-dark text-white border-secondary" readOnly />
++                                <button className="btn btn-outline-secondary" type="button" onClick={() => {
++                                    const link = document.getElementById('shareAppLinkInput').value;
++                                    navigator.clipboard.writeText(link);
++                                    alert('Link copied!');
++                                }}>
++                                    <i className="fa-solid fa-copy"></i>
++                                </button>
++                            </div>
++
++                            <p className="text-muted small mb-3">Or share via link:</p>
++                            <div className="d-flex justify-content-center gap-3">
++                                <button className="btn btn-outline-success rounded-circle" style={{width: "50px", height: "50px"}} onClick={() => window.shareViaWhatsApp && window.shareViaWhatsApp()} title="WhatsApp">
++                                    <i className="fa-brands fa-whatsapp fs-4"></i>
++                                </button>
++                                <button className="btn btn-outline-primary rounded-circle" style={{width: "50px", height: "50px"}} onClick={() => window.shareViaMessage && window.shareViaMessage()} title="Message (SMS)">
++                                    <i className="fa-solid fa-comment-sms fs-4"></i>
++                                </button>
++                                <button className="btn btn-outline-light rounded-circle" style={{width: "50px", height: "50px"}} onClick={() => window.shareViaWebAPI && window.shareViaWebAPI()} title="More Options / Copy Link">
++                                    <i className="fa-solid fa-share fs-4"></i>
++                                </button>
++                            </div>
++                        </div>
++                    </div>
++                </div>
++            </div>
++
+         </>
+     );
+ }
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 703ef48..a00b72f 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -356,6 +356,18 @@
+             color: #e2e8f0;
+         }
+ 
++        /* Light Theme Overrides for Ref Table */
++        body[data-theme="light"] .ref-table th {
++            background: #f1f5f9;
++            color: #334155;
++            border-bottom: 1px solid #cbd5e1;
++        }
++        
++        body[data-theme="light"] .ref-table td {
++            color: #0f172a;
++            border-bottom: 1px solid #e2e8f0;
++        }
++
+         /* Notification Toast Container */
+         .toast-container {
+             position: fixed;
+@@ -451,8 +463,26 @@
+         body.student-view #studentDayNotificationBtn {
+             display: inline-flex !important;
+         }
+-    . t t - f u l l s c r e e n - m o d a l 
+ 
+-   p o s i t i o n :   f i x e d   ! i m p o r t a n t ;   t o p :   0   ! i m p o r t a n t ;   l e f t :   0   ! i m p o r t a n t ;   w i d t h :   1 0 0 v w   ! i m p o r t a n t ;   h e i g h t :   1 0 0 v h   ! i m p o r t a n t ;   
+ 
+- b a c k g r o u n d :   r g b a ( 1 5 ,   2 3 ,   4 2 ,   0 . 9 5 )   ! i m p o r t a n t ;   b a c k d r o p - f i l t e r :   b l u r ( 1 0 p x )   ! i m p o r t a n t ;   z - i n d e x :   1 0 0 0 0   ! i m p o r t a n t ;   
+ 
+- o v e r f l o w - y :   a u t o   ! i m p o r t a n t ;   p a d d i n g :   4 0 p x   5 %   ! i m p o r t a n t ;   
+ 
+- 
+\ No newline at end of file
++    .tt-fullscreen-modal {
++        position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
++        background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px) !important; z-index: 10000 !important;
++        overflow-y: auto !important; padding: 40px 5% !important;
++    }
++ 
++@keyframes scroll-left-to-right {
++  0% { transform: translateX(-100%); }
++  100% { transform: translateX(100vw); }
++}
++
++.marquee-l2r-container {
++  overflow: hidden;
++  white-space: nowrap;
++  width: 100%;
++}
++
++.marquee-l2r-content {
++  display: inline-block;
++  white-space: nowrap;
++  animation: scroll-left-to-right 12s linear infinite;
++  min-width: 100%;
++}
+diff --git a/pom.xml b/pom.xml
+index 85b99ac..bdd0bff 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -100,6 +100,9 @@
+             <plugin>
+                 <groupId>org.springframework.boot</groupId>
+                 <artifactId>spring-boot-maven-plugin</artifactId>
++                <configuration>
++                    <mainClass>com.smarttimetable.SmartTimetableApplication</mainClass>
++                </configuration>
+             </plugin>
+         </plugins>
+     </build>
+diff --git a/src/main/java/com/smarttimetable/controller/AuthController.java b/src/main/java/com/smarttimetable/controller/AuthController.java
+index 5f67974..69ad973 100644
+--- a/src/main/java/com/smarttimetable/controller/AuthController.java
++++ b/src/main/java/com/smarttimetable/controller/AuthController.java
+@@ -6,7 +6,12 @@ import com.smarttimetable.service.AuthService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.core.Authentication;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.Map;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/ClassroomController.java b/src/main/java/com/smarttimetable/controller/ClassroomController.java
+index 3f51061..b60feb3 100644
+--- a/src/main/java/com/smarttimetable/controller/ClassroomController.java
++++ b/src/main/java/com/smarttimetable/controller/ClassroomController.java
+@@ -5,7 +5,15 @@ import com.smarttimetable.service.ClassroomService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/DashboardController.java b/src/main/java/com/smarttimetable/controller/DashboardController.java
+index 5daa332..65cdc9b 100644
+--- a/src/main/java/com/smarttimetable/controller/DashboardController.java
++++ b/src/main/java/com/smarttimetable/controller/DashboardController.java
+@@ -4,7 +4,10 @@ import com.smarttimetable.dto.DashboardStatsDto;
+ import com.smarttimetable.service.DashboardService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ @RestController
+ @RequestMapping("/api/dashboard")
+diff --git a/src/main/java/com/smarttimetable/controller/DepartmentController.java b/src/main/java/com/smarttimetable/controller/DepartmentController.java
+index 0163839..751cc8c 100644
+--- a/src/main/java/com/smarttimetable/controller/DepartmentController.java
++++ b/src/main/java/com/smarttimetable/controller/DepartmentController.java
+@@ -5,7 +5,15 @@ import com.smarttimetable.service.DepartmentService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/FacultyAvailabilityController.java b/src/main/java/com/smarttimetable/controller/FacultyAvailabilityController.java
+index 6c2c64f..a4c8b62 100644
+--- a/src/main/java/com/smarttimetable/controller/FacultyAvailabilityController.java
++++ b/src/main/java/com/smarttimetable/controller/FacultyAvailabilityController.java
+@@ -4,7 +4,16 @@ import com.smarttimetable.entity.FacultyAvailability;
+ import com.smarttimetable.service.FacultyAvailabilityService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/LaboratoryController.java b/src/main/java/com/smarttimetable/controller/LaboratoryController.java
+index 5d4b833..54c3989 100644
+--- a/src/main/java/com/smarttimetable/controller/LaboratoryController.java
++++ b/src/main/java/com/smarttimetable/controller/LaboratoryController.java
+@@ -5,7 +5,15 @@ import com.smarttimetable.service.LaboratoryService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/NotificationController.java b/src/main/java/com/smarttimetable/controller/NotificationController.java
+index dc959b1..74c6a60 100644
+--- a/src/main/java/com/smarttimetable/controller/NotificationController.java
++++ b/src/main/java/com/smarttimetable/controller/NotificationController.java
+@@ -4,7 +4,14 @@ import com.smarttimetable.entity.StudentNotificationRegistration;
+ import com.smarttimetable.service.NotificationService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ import java.util.Map;
+diff --git a/src/main/java/com/smarttimetable/controller/SectionController.java b/src/main/java/com/smarttimetable/controller/SectionController.java
+index ec20353..8fbe1d1 100644
+--- a/src/main/java/com/smarttimetable/controller/SectionController.java
++++ b/src/main/java/com/smarttimetable/controller/SectionController.java
+@@ -5,7 +5,15 @@ import com.smarttimetable.service.SectionService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/StudentController.java b/src/main/java/com/smarttimetable/controller/StudentController.java
+index a6cbdc2..1ac8084 100644
+--- a/src/main/java/com/smarttimetable/controller/StudentController.java
++++ b/src/main/java/com/smarttimetable/controller/StudentController.java
+@@ -6,7 +6,16 @@ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+ import org.springframework.security.core.Authentication;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/SubjectController.java b/src/main/java/com/smarttimetable/controller/SubjectController.java
+index 0e07dea..e978c10 100644
+--- a/src/main/java/com/smarttimetable/controller/SubjectController.java
++++ b/src/main/java/com/smarttimetable/controller/SubjectController.java
+@@ -5,7 +5,15 @@ import com.smarttimetable.service.SubjectService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/TeacherController.java b/src/main/java/com/smarttimetable/controller/TeacherController.java
+index 05636df..c350ca3 100644
+--- a/src/main/java/com/smarttimetable/controller/TeacherController.java
++++ b/src/main/java/com/smarttimetable/controller/TeacherController.java
+@@ -5,7 +5,16 @@ import com.smarttimetable.service.TeacherService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/TimeSlotController.java b/src/main/java/com/smarttimetable/controller/TimeSlotController.java
+index d4581da..80b1c61 100644
+--- a/src/main/java/com/smarttimetable/controller/TimeSlotController.java
++++ b/src/main/java/com/smarttimetable/controller/TimeSlotController.java
+@@ -5,7 +5,15 @@ import com.smarttimetable.service.TimeSlotService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/controller/TimetableController.java b/src/main/java/com/smarttimetable/controller/TimetableController.java
+index d2496b2..5ae573f 100644
+--- a/src/main/java/com/smarttimetable/controller/TimetableController.java
++++ b/src/main/java/com/smarttimetable/controller/TimetableController.java
+@@ -18,7 +18,16 @@ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+ import org.springframework.security.core.Authentication;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.bind.annotation.RestController;
+ import com.smarttimetable.repository.UserRepository;
+ import com.smarttimetable.repository.StudentRepository;
+ import com.smarttimetable.entity.User;
+diff --git a/src/main/java/com/smarttimetable/controller/TimetableOperationsController.java b/src/main/java/com/smarttimetable/controller/TimetableOperationsController.java
+index 5ec2991..65fb704 100644
+--- a/src/main/java/com/smarttimetable/controller/TimetableOperationsController.java
++++ b/src/main/java/com/smarttimetable/controller/TimetableOperationsController.java
+@@ -4,7 +4,14 @@ import com.smarttimetable.entity.*;
+ import com.smarttimetable.service.TimetableOperationsService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.ResponseEntity;
+-import org.springframework.web.bind.annotation.*;
++import org.springframework.web.bind.annotation.CrossOrigin;
++import org.springframework.web.bind.annotation.DeleteMapping;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
+ 
+diff --git a/src/main/java/com/smarttimetable/service/DataInitializerService.java b/src/main/java/com/smarttimetable/service/DataInitializerService.java
+index 9c41966..cf4c8c3 100644
+--- a/src/main/java/com/smarttimetable/service/DataInitializerService.java
++++ b/src/main/java/com/smarttimetable/service/DataInitializerService.java
+@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.boot.CommandLineRunner;
+ import org.springframework.security.crypto.password.PasswordEncoder;
+ import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
+ 
+ import java.util.Arrays;
+ import java.util.List;
+@@ -59,25 +60,27 @@ public class DataInitializerService implements CommandLineRunner {
+     private PasswordEncoder passwordEncoder;
+ 
+     @Override
++    @Transactional
+     public void run(String... args) throws Exception {
+         if (userRepository.count() > 0) {
+             return; // Data already initialized
+         }
+ 
+-        System.out.println(">>> INITIALIZING SRI ESHWAR COLLEGE OF ENGINEERING TIME TABLE GENERATOR DEMO DATA...");
+-
+-        // 1. Create Users
+-        User adminUser = userRepository.save(new User("shiva25012007", passwordEncoder.encode("shiv2501"), Role.ROLE_ADMIN, "admin@sece.ac.in", true));
+-        User facultyUser1 = userRepository.save(new User("fkeerj012345", passwordEncoder.encode("keerj012345"), Role.ROLE_FACULTY, "faculty1@sece.ac.in", true));
+-        User facultyUser2 = userRepository.save(new User("fsarae012345", passwordEncoder.encode("sarae012345"), Role.ROLE_FACULTY, "faculty2@sece.ac.in", true));
+-        User facultyUser3 = userRepository.save(new User("fmurun012345", passwordEncoder.encode("murun012345"), Role.ROLE_FACULTY, "murugavelli@sece.ac.in", true));
+-        User facultyUser4 = userRepository.save(new User("fharis012345", passwordEncoder.encode("haris012345"), Role.ROLE_FACULTY, "harikarthick@sece.ac.in", true));
+-        User facultyUser5 = userRepository.save(new User("fkartm012345", passwordEncoder.encode("kartm012345"), Role.ROLE_FACULTY, "karthickraja@sece.ac.in", true));
+-        User facultyUser6 = userRepository.save(new User("fsaran012345", passwordEncoder.encode("saran012345"), Role.ROLE_FACULTY, "n.saranya@sece.ac.in", true));
+-        User facultyUser7 = userRepository.save(new User("fanant012345", passwordEncoder.encode("anant012345"), Role.ROLE_FACULTY, "s.ananthi@sece.ac.in", true));
+-        User facultyUser8 = userRepository.save(new User("fparth012345", passwordEncoder.encode("parth012345"), Role.ROLE_FACULTY, "v.parthipan@sece.ac.in", true));
+-        User facultyUser9 = userRepository.save(new User("fanand012345", passwordEncoder.encode("anand012345"), Role.ROLE_FACULTY, "a.anandaraj@sece.ac.in", true));
+-        User facultyUser10 = userRepository.save(new User("fsarfa012345", passwordEncoder.encode("sarfa012345"), Role.ROLE_FACULTY, "a.sarfaraz@sece.ac.in", true));
++        try {
++            System.out.println(">>> INITIALIZING SRI ESHWAR COLLEGE OF ENGINEERING TIME TABLE GENERATOR DEMO DATA...");
++
++            // 1. Create Users
++            User adminUser = userRepository.save(new User("shiva25012007", passwordEncoder.encode("shiv2501"), Role.ROLE_ADMIN, "admin@sece.ac.in", true));
++            User facultyUser1 = userRepository.save(new User("fkeerj012345", passwordEncoder.encode("keerj012345"), Role.ROLE_FACULTY, "faculty1@sece.ac.in", true));
++            User facultyUser2 = userRepository.save(new User("fsarae012345", passwordEncoder.encode("sarae012345"), Role.ROLE_FACULTY, "faculty2@sece.ac.in", true));
++            User facultyUser3 = userRepository.save(new User("fmurun012345", passwordEncoder.encode("murun012345"), Role.ROLE_FACULTY, "murugavelli@sece.ac.in", true));
++            User facultyUser4 = userRepository.save(new User("fharis012345", passwordEncoder.encode("haris012345"), Role.ROLE_FACULTY, "harikarthick@sece.ac.in", true));
++            User facultyUser5 = userRepository.save(new User("fkartm012345", passwordEncoder.encode("kartm012345"), Role.ROLE_FACULTY, "karthickraja@sece.ac.in", true));
++            User facultyUser6 = userRepository.save(new User("fsaran012345", passwordEncoder.encode("saran012345"), Role.ROLE_FACULTY, "n.saranya@sece.ac.in", true));
++            User facultyUser7 = userRepository.save(new User("fanant012345", passwordEncoder.encode("anant012345"), Role.ROLE_FACULTY, "s.ananthi@sece.ac.in", true));
++            User facultyUser8 = userRepository.save(new User("fparth012345", passwordEncoder.encode("parth012345"), Role.ROLE_FACULTY, "v.parthipan@sece.ac.in", true));
++            User facultyUser9 = userRepository.save(new User("fanand012345", passwordEncoder.encode("anand012345"), Role.ROLE_FACULTY, "a.anandaraj@sece.ac.in", true));
++            User facultyUser10 = userRepository.save(new User("fsarfa012345", passwordEncoder.encode("sarfa012345"), Role.ROLE_FACULTY, "a.sarfaraz@sece.ac.in", true));
+         User facultyUser11 = userRepository.save(new User("fsures012345", passwordEncoder.encode("sures012345"), Role.ROLE_FACULTY, "r.k.suresh@sece.ac.in", true));
+         userRepository.save(new User("smithp012345", passwordEncoder.encode("mithp012345"), Role.ROLE_STUDENT, "student@sece.ac.in", true));
+ 
+@@ -101,41 +104,40 @@ public class DataInitializerService implements CommandLineRunner {
+         // 5. Create Teachers
+         Teacher t1 = teacherRepository.save(new Teacher("EMP_CSE_01", "Karthick", "R", "r.karthick.personal@gmail.com", "r.karthick@sece.ac.in", "9876543210", "", "Design and Analysis of Algorithms", cseDept, facultyUser1));
+         t1.setDisplayName("Mr.R.Karthick, AP/CSE");
+-        teacherRepository.save(t1);
++
+         Teacher t2 = teacherRepository.save(new Teacher("EMP_CSE_02", "Saranya", "E", "saranya.e.personal@gmail.com", "e.saranya@sece.ac.in", "9876543211", "", "Database Management Systems", cseDept, facultyUser2));
+         t2.setDisplayName("Ms.E.Saranya, AP/CSE");
+-        teacherRepository.save(t2);
++
+         Teacher t3 = teacherRepository.save(new Teacher("EMP_MATH_01", "Murugavelli", "N", "muruga.personal@gmail.com", "murugavelli@sece.ac.in", "9876543212", "", "Discrete Mathematics", cseDept, facultyUser3));
+         t3.setDisplayName("Dr.N.Murugavelli, AP/Maths");
+-        teacherRepository.save(t3);
++
+         Teacher t4 = teacherRepository.save(new Teacher("EMP_CSE_03", "Harikarthick", "S.K.", "hari.personal@gmail.com", "harikarthick@sece.ac.in", "9876543213", "", "Software Engineering", cseDept, facultyUser4));
+         t4.setDisplayName("Dr.S.K.Harikarthick, ASP/CSE");
+-        teacherRepository.save(t4);
++
+         Teacher t5 = teacherRepository.save(new Teacher("EMP_CSE_04", "Karthickraja", "M", "karthickraja.personal@gmail.com", "karthickraja@sece.ac.in", "9876543214", "", "Java Programming", cseDept, facultyUser5));
+         t5.setDisplayName("Mr.M.Karthickraja, AP/CSE");
+-        teacherRepository.save(t5);
++
+         Teacher t6 = teacherRepository.save(new Teacher("EMP_CSE_05", "Saranya", "N", "n.saranya.personal@gmail.com", "n.saranya@sece.ac.in", "9876543215", "", "Artificial Intelligence", cseDept, facultyUser6));
+         t6.setDisplayName("Dr.N.Saranya, AP/CSE");
+-        teacherRepository.save(t6);
++
+         Teacher t7 = teacherRepository.save(new Teacher("EMP_CSE_06", "Ananthi", "S", "s.ananthi.personal@gmail.com", "s.ananthi@sece.ac.in", "9876543216", "", "Project Work", cseDept, facultyUser7));
+         t7.setDisplayName("Dr.S.Ananthi, AP/CSE");
+         t7.setClassAdvisorFor("II M.E. CSE");
+-        teacherRepository.save(t7);
++
+         Teacher t8 = teacherRepository.save(new Teacher("EMP_ECE_01", "Parthipan", "V", "v.parthipan.personal@gmail.com", "v.parthipan@sece.ac.in", "9876543217", "", "Internet of Things", eceDept, facultyUser8));
+         t8.setDisplayName("Mr.V.Parthipan, AP/ECE");
+-        teacherRepository.save(t8);
++
+         Teacher t9 = teacherRepository.save(new Teacher("EMP_CSE_07", "Anandaraj", "A", "a.anandaraj.personal@gmail.com", "a.anandaraj@sece.ac.in", "9876543218", "", "Data Visualization Techniques", cseDept, facultyUser9));
+         t9.setDisplayName("Dr.A.Anandaraj, AP/CSE");
+-        teacherRepository.save(t9);
++
+         Teacher t10 = teacherRepository.save(new Teacher("EMP_CSE_08", "Sarfaraz Ahmed", "A", "a.sarfaraz.personal@gmail.com", "a.sarfaraz@sece.ac.in", "9876543219", "", "Big Data Analytics", cseDept, facultyUser10));
+         t10.setDisplayName("Dr.A.Sarfaraz Ahmed, AP/CSE");
+-        teacherRepository.save(t10);
++
+         Teacher t11 = teacherRepository.save(new Teacher("EMP_MECH_01", "Suresh", "R.K.", "r.k.suresh.personal@gmail.com", "r.k.suresh@sece.ac.in", "9876543220", "", "Total Quality Management", cseDept, facultyUser11));
+         t11.setDisplayName("Dr.R.K.Suresh, Prof/MECH");
+-        teacherRepository.save(t11);
++
+         Teacher tPlacement = teacherRepository.save(new Teacher("EMP_PLACE_01", "Placement", "Team", "placement@gmail.com", "placement@sece.ac.in", "9876543299", "", "Advanced Logical Thinking", cseDept, null));
+         tPlacement.setDisplayName("Placement Team");
+-        teacherRepository.save(tPlacement);
+ 
+         // 6. Create Venues / Classrooms & Labs
+         Classroom sf04 = classroomRepository.save(new Classroom("SF 04", "Main Academic Block", 61, "THEORY"));
+@@ -410,7 +412,12 @@ public class DataInitializerService implements CommandLineRunner {
+         createTestStudent("studentc", "studentC", "C", "studentc@sece.ac.in", cseDept, cseCourse, secC);
+         createTestStudent("studentd", "studentD", "D", "studentd@sece.ac.in", cseDept, cseCourse, secD);
+ 
+-        System.out.println(">>> SRI ESHWAR COLLEGE TIME TABLE GENERATOR INITIALIZATION COMPLETED!");
++            System.out.println(">>> SRI ESHWAR COLLEGE TIME TABLE GENERATOR INITIALIZATION COMPLETED!");
++        } catch (Exception e) {
++            System.err.println(">>> ERROR DURING DATA INITIALIZATION: " + e.getMessage());
++            e.printStackTrace();
++            System.err.println(">>> Application is still running. Data initialization can be retried or done manually.");
++        }
+     }
+ 
+     private void addTT(String day, int slotIndex, String subjectName, Section section, String yr, Department dept) {
+@@ -428,7 +435,8 @@ public class DataInitializerService implements CommandLineRunner {
+ 
+     private void createTestStudent(String username, String firstName, String lastName, String email, Department dept, Course course, Section section) {
+         if (!userRepository.existsByUsername(username)) {
+-            User u = userRepository.save(new User(username, passwordEncoder.encode("student123"), Role.ROLE_STUDENT, email, true));
++            User u = new User(username, passwordEncoder.encode("student123"), Role.ROLE_STUDENT, email, true);
++            u = userRepository.save(u);
+             studentRepository.save(new Student(username.toUpperCase(), firstName, lastName, email, email, dept, course, section, 3, u));
+         }
+     }
+diff --git a/src/main/resources/application.properties b/src/main/resources/application.properties
+index 997e470..2ca043e 100644
+--- a/src/main/resources/application.properties
++++ b/src/main/resources/application.properties
+@@ -18,7 +18,7 @@ spring.h2.console.path=/h2-console
+ spring.jpa.hibernate.ddl-auto=update
+ spring.jpa.show-sql=false
+ spring.jpa.properties.hibernate.format_sql=true
+-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect
++spring.jpa.open-in-view=false
+ 
+ # JWT Configuration
+ jwt.secret=SmartTimetableSecretKeyForJWTAuthSuperSecureTokenLength32CharsOrMore
+@@ -27,4 +27,3 @@ jwt.expiration=86400000
+ # File Upload Limit
+ spring.servlet.multipart.max-file-size=10MB
+ spring.servlet.multipart.max-request-size=10MB
+-server.port=8081
+diff --git a/target/classes/application.properties b/target/classes/application.properties
+index 997e470..2ca043e 100644
+--- a/target/classes/application.properties
++++ b/target/classes/application.properties
+@@ -18,7 +18,7 @@ spring.h2.console.path=/h2-console
+ spring.jpa.hibernate.ddl-auto=update
+ spring.jpa.show-sql=false
+ spring.jpa.properties.hibernate.format_sql=true
+-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect
++spring.jpa.open-in-view=false
+ 
+ # JWT Configuration
+ jwt.secret=SmartTimetableSecretKeyForJWTAuthSuperSecureTokenLength32CharsOrMore
+@@ -27,4 +27,3 @@ jwt.expiration=86400000
+ # File Upload Limit
+ spring.servlet.multipart.max-file-size=10MB
+ spring.servlet.multipart.max-request-size=10MB
+-server.port=8081
+diff --git a/target/classes/com/smarttimetable/controller/AuthController.class b/target/classes/com/smarttimetable/controller/AuthController.class
+index acb9868..d5dc6e5 100644
+Binary files a/target/classes/com/smarttimetable/controller/AuthController.class and b/target/classes/com/smarttimetable/controller/AuthController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/ClassroomController.class b/target/classes/com/smarttimetable/controller/ClassroomController.class
+index 5698a5e..6101e0a 100644
+Binary files a/target/classes/com/smarttimetable/controller/ClassroomController.class and b/target/classes/com/smarttimetable/controller/ClassroomController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/DashboardController.class b/target/classes/com/smarttimetable/controller/DashboardController.class
+index a21cfc9..dcd9c86 100644
+Binary files a/target/classes/com/smarttimetable/controller/DashboardController.class and b/target/classes/com/smarttimetable/controller/DashboardController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/DepartmentController.class b/target/classes/com/smarttimetable/controller/DepartmentController.class
+index e21c657..6b75f5b 100644
+Binary files a/target/classes/com/smarttimetable/controller/DepartmentController.class and b/target/classes/com/smarttimetable/controller/DepartmentController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/FacultyAvailabilityController.class b/target/classes/com/smarttimetable/controller/FacultyAvailabilityController.class
+index 9b18185..1ba3a73 100644
+Binary files a/target/classes/com/smarttimetable/controller/FacultyAvailabilityController.class and b/target/classes/com/smarttimetable/controller/FacultyAvailabilityController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/LaboratoryController.class b/target/classes/com/smarttimetable/controller/LaboratoryController.class
+index 7895a11..e238908 100644
+Binary files a/target/classes/com/smarttimetable/controller/LaboratoryController.class and b/target/classes/com/smarttimetable/controller/LaboratoryController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/NotificationController.class b/target/classes/com/smarttimetable/controller/NotificationController.class
+index e93f93d..bb69029 100644
+Binary files a/target/classes/com/smarttimetable/controller/NotificationController.class and b/target/classes/com/smarttimetable/controller/NotificationController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/SectionController.class b/target/classes/com/smarttimetable/controller/SectionController.class
+index c3c3578..4caec0f 100644
+Binary files a/target/classes/com/smarttimetable/controller/SectionController.class and b/target/classes/com/smarttimetable/controller/SectionController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/StudentController.class b/target/classes/com/smarttimetable/controller/StudentController.class
+index 7658509..8d1a3b0 100644
+Binary files a/target/classes/com/smarttimetable/controller/StudentController.class and b/target/classes/com/smarttimetable/controller/StudentController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/SubjectController.class b/target/classes/com/smarttimetable/controller/SubjectController.class
+index e5dd313..515fe15 100644
+Binary files a/target/classes/com/smarttimetable/controller/SubjectController.class and b/target/classes/com/smarttimetable/controller/SubjectController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/TeacherController.class b/target/classes/com/smarttimetable/controller/TeacherController.class
+index 01bf81e..10d689e 100644
+Binary files a/target/classes/com/smarttimetable/controller/TeacherController.class and b/target/classes/com/smarttimetable/controller/TeacherController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/TimeSlotController.class b/target/classes/com/smarttimetable/controller/TimeSlotController.class
+index b199c94..7ae9e68 100644
+Binary files a/target/classes/com/smarttimetable/controller/TimeSlotController.class and b/target/classes/com/smarttimetable/controller/TimeSlotController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/TimetableController.class b/target/classes/com/smarttimetable/controller/TimetableController.class
+index fa22f0a..906a270 100644
+Binary files a/target/classes/com/smarttimetable/controller/TimetableController.class and b/target/classes/com/smarttimetable/controller/TimetableController.class differ
+diff --git a/target/classes/com/smarttimetable/controller/TimetableOperationsController.class b/target/classes/com/smarttimetable/controller/TimetableOperationsController.class
+index a81986f..0a4fb94 100644
+Binary files a/target/classes/com/smarttimetable/controller/TimetableOperationsController.class and b/target/classes/com/smarttimetable/controller/TimetableOperationsController.class differ
+diff --git a/target/classes/com/smarttimetable/security/SecurityConfig.class b/target/classes/com/smarttimetable/security/SecurityConfig.class
+index a92b839..26edcf0 100644
+Binary files a/target/classes/com/smarttimetable/security/SecurityConfig.class and b/target/classes/com/smarttimetable/security/SecurityConfig.class differ
+diff --git a/target/classes/com/smarttimetable/service/AuthService.class b/target/classes/com/smarttimetable/service/AuthService.class
+index 6cb4fee..5743921 100644
+Binary files a/target/classes/com/smarttimetable/service/AuthService.class and b/target/classes/com/smarttimetable/service/AuthService.class differ
+diff --git a/target/classes/com/smarttimetable/service/DataInitializerService.class b/target/classes/com/smarttimetable/service/DataInitializerService.class
+index da689f7..17ab807 100644
+Binary files a/target/classes/com/smarttimetable/service/DataInitializerService.class and b/target/classes/com/smarttimetable/service/DataInitializerService.class differ
+diff --git a/target/classes/com/smarttimetable/service/NotificationService.class b/target/classes/com/smarttimetable/service/NotificationService.class
+index fe75734..73da48b 100644
+Binary files a/target/classes/com/smarttimetable/service/NotificationService.class and b/target/classes/com/smarttimetable/service/NotificationService.class differ
+diff --git a/target/classes/com/smarttimetable/service/StudentService.class b/target/classes/com/smarttimetable/service/StudentService.class
+index 6f783fe..1224d69 100644
+Binary files a/target/classes/com/smarttimetable/service/StudentService.class and b/target/classes/com/smarttimetable/service/StudentService.class differ
+diff --git a/target/classes/com/smarttimetable/service/TimetableGeneratorService.class b/target/classes/com/smarttimetable/service/TimetableGeneratorService.class
+index 5eceb80..d4e05c1 100644
+Binary files a/target/classes/com/smarttimetable/service/TimetableGeneratorService.class and b/target/classes/com/smarttimetable/service/TimetableGeneratorService.class differ
+diff --git a/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst b/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+index 5dc7e92..afaf6e0 100644
+--- a/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
++++ b/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+@@ -1,10 +1,15 @@
++application-mysql.properties
++com\smarttimetable\repository\package-info.class
+ com\smarttimetable\controller\DepartmentController.class
+ com\smarttimetable\controller\TimetableController.class
++static\css\styles.css
+ com\smarttimetable\repository\PeriodNotificationRepository.class
+ com\smarttimetable\entity\Substitution.class
+ com\smarttimetable\entity\Student.class
+ com\smarttimetable\entity\User.class
++application.properties
+ com\smarttimetable\repository\TimetableOverrideRepository.class
++static\js\app.js
+ com\smarttimetable\repository\SubjectRepository.class
+ com\smarttimetable\controller\SectionController.class
+ com\smarttimetable\entity\SubjectType.class
+@@ -14,6 +19,7 @@ com\smarttimetable\entity\TimeSlot.class
+ com\smarttimetable\repository\TimeSlotRepository.class
+ com\smarttimetable\service\SubjectService.class
+ com\smarttimetable\controller\StudentController.class
++schema.sql
+ com\smarttimetable\dto\LoginRequest.class
+ com\smarttimetable\repository\CourseRepository.class
+ com\smarttimetable\repository\StudentRepository.class
+@@ -25,14 +31,18 @@ com\smarttimetable\service\TimetableOperationsService.class
+ com\smarttimetable\repository\CustomVenueRepository.class
+ com\smarttimetable\dto\LoginResponse.class
+ com\smarttimetable\entity\StudentNotificationRegistration.class
++com\smarttimetable\package-info.class
+ com\smarttimetable\controller\NotificationController.class
+ com\smarttimetable\controller\FacultyAvailabilityController.class
++static\js\theme.js
+ com\smarttimetable\repository\DepartmentRepository.class
+ com\smarttimetable\exception\TimetableGenerationException.class
++static\admin-dashboard.html
+ com\smarttimetable\repository\SubstitutionRepository.class
+ com\smarttimetable\entity\Subject.class
+ com\smarttimetable\entity\Laboratory.class
+ com\smarttimetable\service\FacultyAvailabilityService.class
++com\smarttimetable\security\package-info.class
+ com\smarttimetable\entity\TimetableEntry.class
+ com\smarttimetable\service\TimeSlotService.class
+ com\smarttimetable\entity\FacultyAvailability.class
+@@ -42,6 +52,7 @@ com\smarttimetable\controller\LaboratoryController.class
+ com\smarttimetable\dto\DashboardStatsDto.class
+ com\smarttimetable\dto\TimetableResponse.class
+ com\smarttimetable\entity\Course.class
++static\js\frontend_app.js
+ com\smarttimetable\dto\TimetableEntryDto.class
+ com\smarttimetable\controller\TeacherController.class
+ com\smarttimetable\repository\StudentNotificationRepository.class
+@@ -55,36 +66,47 @@ com\smarttimetable\repository\CoverageRequestRepository.class
+ com\smarttimetable\security\CustomUserDetailsService.class
+ com\smarttimetable\repository\FacultyAvailabilityRepository.class
+ com\smarttimetable\service\TeacherService.class
++static\js\charts.js
+ com\smarttimetable\controller\SubjectController.class
+ com\smarttimetable\service\NotificationService.class
+ com\smarttimetable\entity\CustomVenue.class
+ com\smarttimetable\repository\ClassroomRepository.class
++static\js\reports.js
+ com\smarttimetable\repository\SectionRepository.class
+ com\smarttimetable\service\DashboardService.class
++com\smarttimetable\dto\package-info.class
+ com\smarttimetable\dto\TimetableGenerateRequest.class
+ com\smarttimetable\service\ClassroomService.class
++com\smarttimetable\service\package-info.class
+ com\smarttimetable\entity\Section.class
+ com\smarttimetable\controller\TimetableOperationsController.class
++static\faculty-dashboard.html
+ com\smarttimetable\repository\LaboratoryRepository.class
+ com\smarttimetable\entity\Classroom.class
+ com\smarttimetable\entity\CoverageRequest.class
++com\smarttimetable\entity\package-info.class
+ com\smarttimetable\dto\ConflictDetailDto.class
+ com\smarttimetable\entity\PeriodNotification.class
+ com\smarttimetable\controller\WebViewController.class
+ com\smarttimetable\service\LaboratoryService.class
+ com\smarttimetable\entity\Teacher.class
++com\smarttimetable\exception\package-info.class
+ com\smarttimetable\security\SecurityConfig.class
+ com\smarttimetable\controller\AuthController.class
+ com\smarttimetable\entity\TimetableOverride.class
+ com\smarttimetable\service\ConflictService.class
++com\smarttimetable\controller\package-info.class
+ com\smarttimetable\service\DataInitializerService.class
+ com\smarttimetable\repository\CustomSubjectRepository.class
+ com\smarttimetable\service\AuthService.class
+ com\smarttimetable\service\StudentService.class
++static\js\timetable.js
++static\student-dashboard.html
+ com\smarttimetable\entity\Department.class
+ com\smarttimetable\exception\GlobalExceptionHandler.class
+ com\smarttimetable\service\SectionService.class
+ com\smarttimetable\entity\AcademicYear.class
++static\login.html
+ com\smarttimetable\controller\ClassroomController.class
+ com\smarttimetable\SmartTimetableApplication.class
+ com\smarttimetable\repository\TimetableRepository.class
+diff --git a/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst b/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
+index fd9c1b6..b99c708 100644
+--- a/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
++++ b/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
+@@ -1,89 +1,97 @@
+ D:\Java_project\src\main\java\com\smarttimetable\service\TimetableGeneratorService.java
+ D:\Java_project\src\main\java\com\smarttimetable\dto\TimetableResponse.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\Classroom.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\CustomVenue.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\CoverageRequest.java
+ D:\Java_project\src\main\java\com\smarttimetable\controller\TimetableController.java
+-D:\Java_project\src\main\java\com\smarttimetable\dto\DashboardStatsDto.java
+-D:\Java_project\src\main\java\com\smarttimetable\controller\StudentController.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\FacultyAvailabilityRepository.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\CustomSubject.java
+-D:\Java_project\src\main\java\com\smarttimetable\service\StudentService.java
+-D:\Java_project\src\main\java\com\smarttimetable\dto\LoginRequest.java
+-D:\Java_project\src\main\java\com\smarttimetable\service\LaboratoryService.java
+-D:\Java_project\src\main\java\com\smarttimetable\service\TimetableOperationsService.java
+-D:\Java_project\src\main\java\com\smarttimetable\repository\AcademicYearRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\service\DataInitializerService.java
+-D:\Java_project\src\main\java\com\smarttimetable\SmartTimetableApplication.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\Subject.java
+ D:\Java_project\src\main\java\com\smarttimetable\exception\GlobalExceptionHandler.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\Teacher.java
+-D:\Java_project\src\main\java\com\smarttimetable\repository\LaboratoryRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\security\JwtUtil.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\StudentNotificationRegistration.java
++D:\Java_project\src\main\java\com\smarttimetable\controller\package-info.java
+ D:\Java_project\src\main\java\com\smarttimetable\controller\DashboardController.java
+-D:\Java_project\src\main\java\com\smarttimetable\service\TeacherService.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\Substitution.java
+-D:\Java_project\src\main\java\com\smarttimetable\dto\TimetableGenerateRequest.java
+-D:\Java_project\src\main\java\com\smarttimetable\repository\StudentRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\controller\WebViewController.java
+-D:\Java_project\src\main\java\com\smarttimetable\service\TimeSlotService.java
+ D:\Java_project\src\main\java\com\smarttimetable\service\DepartmentService.java
+-D:\Java_project\src\main\java\com\smarttimetable\controller\ClassroomController.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\DepartmentRepository.java
+-D:\Java_project\src\main\java\com\smarttimetable\repository\UserRepository.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\TimeSlot.java
+-D:\Java_project\src\main\java\com\smarttimetable\repository\CustomVenueRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\dto\ConflictDetailDto.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\SectionRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\FacultyAvailability.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\TimetableOverride.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\PeriodNotification.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\User.java
+ D:\Java_project\src\main\java\com\smarttimetable\service\AuthService.java
+ D:\Java_project\src\main\java\com\smarttimetable\service\DashboardService.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\Role.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\ClassroomRepository.java
+-D:\Java_project\src\main\java\com\smarttimetable\security\JwtFilter.java
+ D:\Java_project\src\main\java\com\smarttimetable\controller\NotificationController.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\SubjectType.java
+-D:\Java_project\src\main\java\com\smarttimetable\repository\CustomSubjectRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\Course.java
++D:\Java_project\src\main\java\com\smarttimetable\package-info.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\CoverageRequestRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\service\SectionService.java
+-D:\Java_project\src\main\java\com\smarttimetable\controller\SectionController.java
+ D:\Java_project\src\main\java\com\smarttimetable\dto\ConflictReportDto.java
++D:\Java_project\src\main\java\com\smarttimetable\service\package-info.java
+ D:\Java_project\src\main\java\com\smarttimetable\controller\TimetableOperationsController.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\TimetableOverrideRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\controller\SubjectController.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\Laboratory.java
++D:\Java_project\src\main\java\com\smarttimetable\dto\package-info.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\TeacherRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\service\ClassroomService.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\TimetableEntry.java
++D:\Java_project\src\main\java\com\smarttimetable\security\CustomUserDetailsService.java
++D:\Java_project\src\main\java\com\smarttimetable\exception\package-info.java
++D:\Java_project\src\main\java\com\smarttimetable\service\SubjectService.java
++D:\Java_project\src\main\java\com\smarttimetable\controller\DepartmentController.java
++D:\Java_project\src\main\java\com\smarttimetable\controller\TeacherController.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\SubjectRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\Section.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\package-info.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\Classroom.java
++D:\Java_project\src\main\java\com\smarttimetable\dto\DashboardStatsDto.java
++D:\Java_project\src\main\java\com\smarttimetable\controller\StudentController.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\CustomSubject.java
++D:\Java_project\src\main\java\com\smarttimetable\service\StudentService.java
++D:\Java_project\src\main\java\com\smarttimetable\dto\LoginRequest.java
++D:\Java_project\src\main\java\com\smarttimetable\service\LaboratoryService.java
++D:\Java_project\src\main\java\com\smarttimetable\service\TimetableOperationsService.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\AcademicYearRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\SmartTimetableApplication.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\LaboratoryRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\StudentNotificationRegistration.java
++D:\Java_project\src\main\java\com\smarttimetable\service\TeacherService.java
++D:\Java_project\src\main\java\com\smarttimetable\dto\TimetableGenerateRequest.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\StudentRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\service\TimeSlotService.java
++D:\Java_project\src\main\java\com\smarttimetable\controller\ClassroomController.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\UserRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\TimeSlot.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\CustomVenueRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\PeriodNotification.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\User.java
++D:\Java_project\src\main\java\com\smarttimetable\security\JwtFilter.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\SubjectType.java
++D:\Java_project\src\main\java\com\smarttimetable\repository\CustomSubjectRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\controller\SectionController.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\Department.java
+ D:\Java_project\src\main\java\com\smarttimetable\service\ConflictService.java
+ D:\Java_project\src\main\java\com\smarttimetable\controller\AuthController.java
+-D:\Java_project\src\main\java\com\smarttimetable\repository\TimetableOverrideRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\exception\TimetableGenerationException.java
+-D:\Java_project\src\main\java\com\smarttimetable\controller\SubjectController.java
+ D:\Java_project\src\main\java\com\smarttimetable\exception\ResourceNotFoundException.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\Laboratory.java
+ D:\Java_project\src\main\java\com\smarttimetable\security\SecurityConfig.java
+-D:\Java_project\src\main\java\com\smarttimetable\repository\TeacherRepository.java
+-D:\Java_project\src\main\java\com\smarttimetable\service\ClassroomService.java
+ D:\Java_project\src\main\java\com\smarttimetable\dto\LoginResponse.java
++D:\Java_project\src\main\java\com\smarttimetable\entity\package-info.java
+ D:\Java_project\src\main\java\com\smarttimetable\controller\LaboratoryController.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\TimetableEntry.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\TimeSlotRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\controller\FacultyAvailabilityController.java
+ D:\Java_project\src\main\java\com\smarttimetable\controller\TimeSlotController.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\PeriodNotificationRepository.java
+-D:\Java_project\src\main\java\com\smarttimetable\security\CustomUserDetailsService.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\StudentNotificationRepository.java
++D:\Java_project\src\main\java\com\smarttimetable\security\package-info.java
+ D:\Java_project\src\main\java\com\smarttimetable\dto\TimetableEntryDto.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\SubstitutionRepository.java
+-D:\Java_project\src\main\java\com\smarttimetable\service\SubjectService.java
+-D:\Java_project\src\main\java\com\smarttimetable\controller\DepartmentController.java
+-D:\Java_project\src\main\java\com\smarttimetable\controller\TeacherController.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\Student.java
+-D:\Java_project\src\main\java\com\smarttimetable\repository\SubjectRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\TimetableRepository.java
+ D:\Java_project\src\main\java\com\smarttimetable\service\NotificationService.java
+ D:\Java_project\src\main\java\com\smarttimetable\repository\CourseRepository.java
+-D:\Java_project\src\main\java\com\smarttimetable\entity\Section.java
+ D:\Java_project\src\main\java\com\smarttimetable\entity\AcademicYear.java
+ D:\Java_project\src\main\java\com\smarttimetable\service\FacultyAvailabilityService.java

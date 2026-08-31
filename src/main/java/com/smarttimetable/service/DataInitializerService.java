@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
@@ -59,27 +60,29 @@ public class DataInitializerService implements CommandLineRunner {
     private PasswordEncoder passwordEncoder;
 
     @Override
+    @Transactional
     public void run(String... args) throws Exception {
         if (userRepository.count() > 0) {
             return; // Data already initialized
         }
 
-        System.out.println(">>> INITIALIZING SRI ESHWAR COLLEGE OF ENGINEERING TIME TABLE GENERATOR DEMO DATA...");
+        try {
+            System.out.println(">>> INITIALIZING SRI ESHWAR COLLEGE OF ENGINEERING TIME TABLE GENERATOR DEMO DATA...");
 
-        // 1. Create Users
-        User adminUser = userRepository.save(new User("shiva25012007", passwordEncoder.encode("shiv2501"), Role.ROLE_ADMIN, "admin@sece.ac.in", true));
-        User facultyUser1 = userRepository.save(new User("fkeerj012345", passwordEncoder.encode("keerj012345"), Role.ROLE_FACULTY, "faculty1@sece.ac.in", true));
-        User facultyUser2 = userRepository.save(new User("fsarae012345", passwordEncoder.encode("sarae012345"), Role.ROLE_FACULTY, "faculty2@sece.ac.in", true));
-        User facultyUser3 = userRepository.save(new User("fmurun012345", passwordEncoder.encode("murun012345"), Role.ROLE_FACULTY, "murugavelli@sece.ac.in", true));
-        User facultyUser4 = userRepository.save(new User("fharis012345", passwordEncoder.encode("haris012345"), Role.ROLE_FACULTY, "harikarthick@sece.ac.in", true));
-        User facultyUser5 = userRepository.save(new User("fkartm012345", passwordEncoder.encode("kartm012345"), Role.ROLE_FACULTY, "karthickraja@sece.ac.in", true));
-        User facultyUser6 = userRepository.save(new User("fsaran012345", passwordEncoder.encode("saran012345"), Role.ROLE_FACULTY, "n.saranya@sece.ac.in", true));
-        User facultyUser7 = userRepository.save(new User("fanant012345", passwordEncoder.encode("anant012345"), Role.ROLE_FACULTY, "s.ananthi@sece.ac.in", true));
-        User facultyUser8 = userRepository.save(new User("fparth012345", passwordEncoder.encode("parth012345"), Role.ROLE_FACULTY, "v.parthipan@sece.ac.in", true));
-        User facultyUser9 = userRepository.save(new User("fanand012345", passwordEncoder.encode("anand012345"), Role.ROLE_FACULTY, "a.anandaraj@sece.ac.in", true));
-        User facultyUser10 = userRepository.save(new User("fsarfa012345", passwordEncoder.encode("sarfa012345"), Role.ROLE_FACULTY, "a.sarfaraz@sece.ac.in", true));
-        User facultyUser11 = userRepository.save(new User("fsures012345", passwordEncoder.encode("sures012345"), Role.ROLE_FACULTY, "r.k.suresh@sece.ac.in", true));
-        userRepository.save(new User("smithp012345", passwordEncoder.encode("mithp012345"), Role.ROLE_STUDENT, "student@sece.ac.in", true));
+            // 1. Create Users
+            User adminUser = userRepository.save(new User("shiva25012007", passwordEncoder.encode("shiv2501"), "shiv2501", Role.ROLE_ADMIN, "admin@sece.ac.in", true));
+            User facultyUser1 = userRepository.save(new User("fkeerj012345", passwordEncoder.encode("keerj012345"), "keerj012345", Role.ROLE_FACULTY, "faculty1@sece.ac.in", true));
+            User facultyUser2 = userRepository.save(new User("fsarae012345", passwordEncoder.encode("sarae012345"), "sarae012345", Role.ROLE_FACULTY, "faculty2@sece.ac.in", true));
+            User facultyUser3 = userRepository.save(new User("fmurun012345", passwordEncoder.encode("murun012345"), "murun012345", Role.ROLE_FACULTY, "murugavelli@sece.ac.in", true));
+            User facultyUser4 = userRepository.save(new User("fharis012345", passwordEncoder.encode("haris012345"), "haris012345", Role.ROLE_FACULTY, "harikarthick@sece.ac.in", true));
+            User facultyUser5 = userRepository.save(new User("fkartm012345", passwordEncoder.encode("kartm012345"), "kartm012345", Role.ROLE_FACULTY, "karthickraja@sece.ac.in", true));
+            User facultyUser6 = userRepository.save(new User("fsaran012345", passwordEncoder.encode("saran012345"), "saran012345", Role.ROLE_FACULTY, "n.saranya@sece.ac.in", true));
+            User facultyUser7 = userRepository.save(new User("fanant012345", passwordEncoder.encode("anant012345"), "anant012345", Role.ROLE_FACULTY, "s.ananthi@sece.ac.in", true));
+            User facultyUser8 = userRepository.save(new User("fparth012345", passwordEncoder.encode("parth012345"), "parth012345", Role.ROLE_FACULTY, "v.parthipan@sece.ac.in", true));
+            User facultyUser9 = userRepository.save(new User("fanand012345", passwordEncoder.encode("anand012345"), "anand012345", Role.ROLE_FACULTY, "a.anandaraj@sece.ac.in", true));
+            User facultyUser10 = userRepository.save(new User("fsarfa012345", passwordEncoder.encode("sarfa012345"), "sarfa012345", Role.ROLE_FACULTY, "a.sarfaraz@sece.ac.in", true));
+        User facultyUser11 = userRepository.save(new User("fsures012345", passwordEncoder.encode("sures012345"), "sures012345", Role.ROLE_FACULTY, "r.k.suresh@sece.ac.in", true));
+        userRepository.save(new User("smithp012345", passwordEncoder.encode("mithp012345"), "mithp012345", Role.ROLE_STUDENT, "student@sece.ac.in", true));
 
         // 2. Create Academic Year
         AcademicYear acYear = academicYearRepository.save(new AcademicYear("2026-2027", true));
@@ -101,41 +104,40 @@ public class DataInitializerService implements CommandLineRunner {
         // 5. Create Teachers
         Teacher t1 = teacherRepository.save(new Teacher("EMP_CSE_01", "Karthick", "R", "r.karthick.personal@gmail.com", "r.karthick@sece.ac.in", "9876543210", "", "Design and Analysis of Algorithms", cseDept, facultyUser1));
         t1.setDisplayName("Mr.R.Karthick, AP/CSE");
-        teacherRepository.save(t1);
+
         Teacher t2 = teacherRepository.save(new Teacher("EMP_CSE_02", "Saranya", "E", "saranya.e.personal@gmail.com", "e.saranya@sece.ac.in", "9876543211", "", "Database Management Systems", cseDept, facultyUser2));
         t2.setDisplayName("Ms.E.Saranya, AP/CSE");
-        teacherRepository.save(t2);
+
         Teacher t3 = teacherRepository.save(new Teacher("EMP_MATH_01", "Murugavelli", "N", "muruga.personal@gmail.com", "murugavelli@sece.ac.in", "9876543212", "", "Discrete Mathematics", cseDept, facultyUser3));
         t3.setDisplayName("Dr.N.Murugavelli, AP/Maths");
-        teacherRepository.save(t3);
+
         Teacher t4 = teacherRepository.save(new Teacher("EMP_CSE_03", "Harikarthick", "S.K.", "hari.personal@gmail.com", "harikarthick@sece.ac.in", "9876543213", "", "Software Engineering", cseDept, facultyUser4));
         t4.setDisplayName("Dr.S.K.Harikarthick, ASP/CSE");
-        teacherRepository.save(t4);
+
         Teacher t5 = teacherRepository.save(new Teacher("EMP_CSE_04", "Karthickraja", "M", "karthickraja.personal@gmail.com", "karthickraja@sece.ac.in", "9876543214", "", "Java Programming", cseDept, facultyUser5));
         t5.setDisplayName("Mr.M.Karthickraja, AP/CSE");
-        teacherRepository.save(t5);
+
         Teacher t6 = teacherRepository.save(new Teacher("EMP_CSE_05", "Saranya", "N", "n.saranya.personal@gmail.com", "n.saranya@sece.ac.in", "9876543215", "", "Artificial Intelligence", cseDept, facultyUser6));
         t6.setDisplayName("Dr.N.Saranya, AP/CSE");
-        teacherRepository.save(t6);
+
         Teacher t7 = teacherRepository.save(new Teacher("EMP_CSE_06", "Ananthi", "S", "s.ananthi.personal@gmail.com", "s.ananthi@sece.ac.in", "9876543216", "", "Project Work", cseDept, facultyUser7));
         t7.setDisplayName("Dr.S.Ananthi, AP/CSE");
         t7.setClassAdvisorFor("II M.E. CSE");
-        teacherRepository.save(t7);
+
         Teacher t8 = teacherRepository.save(new Teacher("EMP_ECE_01", "Parthipan", "V", "v.parthipan.personal@gmail.com", "v.parthipan@sece.ac.in", "9876543217", "", "Internet of Things", eceDept, facultyUser8));
         t8.setDisplayName("Mr.V.Parthipan, AP/ECE");
-        teacherRepository.save(t8);
+
         Teacher t9 = teacherRepository.save(new Teacher("EMP_CSE_07", "Anandaraj", "A", "a.anandaraj.personal@gmail.com", "a.anandaraj@sece.ac.in", "9876543218", "", "Data Visualization Techniques", cseDept, facultyUser9));
         t9.setDisplayName("Dr.A.Anandaraj, AP/CSE");
-        teacherRepository.save(t9);
+
         Teacher t10 = teacherRepository.save(new Teacher("EMP_CSE_08", "Sarfaraz Ahmed", "A", "a.sarfaraz.personal@gmail.com", "a.sarfaraz@sece.ac.in", "9876543219", "", "Big Data Analytics", cseDept, facultyUser10));
         t10.setDisplayName("Dr.A.Sarfaraz Ahmed, AP/CSE");
-        teacherRepository.save(t10);
+
         Teacher t11 = teacherRepository.save(new Teacher("EMP_MECH_01", "Suresh", "R.K.", "r.k.suresh.personal@gmail.com", "r.k.suresh@sece.ac.in", "9876543220", "", "Total Quality Management", cseDept, facultyUser11));
         t11.setDisplayName("Dr.R.K.Suresh, Prof/MECH");
-        teacherRepository.save(t11);
+
         Teacher tPlacement = teacherRepository.save(new Teacher("EMP_PLACE_01", "Placement", "Team", "placement@gmail.com", "placement@sece.ac.in", "9876543299", "", "Advanced Logical Thinking", cseDept, null));
         tPlacement.setDisplayName("Placement Team");
-        teacherRepository.save(tPlacement);
 
         // 6. Create Venues / Classrooms & Labs
         Classroom sf04 = classroomRepository.save(new Classroom("SF 04", "Main Academic Block", 61, "THEORY"));
@@ -410,7 +412,12 @@ public class DataInitializerService implements CommandLineRunner {
         createTestStudent("studentc", "studentC", "C", "studentc@sece.ac.in", cseDept, cseCourse, secC);
         createTestStudent("studentd", "studentD", "D", "studentd@sece.ac.in", cseDept, cseCourse, secD);
 
-        System.out.println(">>> SRI ESHWAR COLLEGE TIME TABLE GENERATOR INITIALIZATION COMPLETED!");
+            System.out.println(">>> SRI ESHWAR COLLEGE TIME TABLE GENERATOR INITIALIZATION COMPLETED!");
+        } catch (Exception e) {
+            System.err.println(">>> ERROR DURING DATA INITIALIZATION: " + e.getMessage());
+            e.printStackTrace();
+            System.err.println(">>> Application is still running. Data initialization can be retried or done manually.");
+        }
     }
 
     private void addTT(String day, int slotIndex, String subjectName, Section section, String yr, Department dept) {
@@ -428,8 +435,10 @@ public class DataInitializerService implements CommandLineRunner {
 
     private void createTestStudent(String username, String firstName, String lastName, String email, Department dept, Course course, Section section) {
         if (!userRepository.existsByUsername(username)) {
-            User u = userRepository.save(new User(username, passwordEncoder.encode("student123"), Role.ROLE_STUDENT, email, true));
+            User u = new User(username, passwordEncoder.encode("student123"), "student123", Role.ROLE_STUDENT, email, true);
+            u = userRepository.save(u);
             studentRepository.save(new Student(username.toUpperCase(), firstName, lastName, email, email, dept, course, section, 3, u));
         }
     }
 }
+

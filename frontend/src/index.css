@@ -356,6 +356,36 @@
             color: #e2e8f0;
         }
 
+        /* Light Theme Overrides for Ref Table */
+        body[data-theme="light"] .ref-table th {
+            background: #f1f5f9;
+            color: #334155;
+            border-bottom: 1px solid #cbd5e1;
+        }
+        
+        body[data-theme="light"] .ref-table td {
+            color: #0f172a;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        /* Light Theme: Student Faculty Availability Table */
+        body[data-theme="light"] #studentFacultyAvailabilityArea {
+            --student-avail-text: #0f172a;
+            background: #ffffff;
+        }
+        body[data-theme="light"] #studentFacultyAvailabilityArea .panel-title {
+            color: #0f172a;
+        }
+        body[data-theme="light"] #studentFacultyAvailabilityBody tr td {
+            color: #0f172a !important;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        /* Dark Theme: Student Faculty Availability Table */
+        body:not([data-theme="light"]) #studentFacultyAvailabilityArea {
+            --student-avail-text: #e2e8f0;
+        }
+
         /* Notification Toast Container */
         .toast-container {
             position: fixed;
@@ -451,8 +481,50 @@
         body.student-view #studentDayNotificationBtn {
             display: inline-flex !important;
         }
-    . t t - f u l l s c r e e n - m o d a l  
-   p o s i t i o n :   f i x e d   ! i m p o r t a n t ;   t o p :   0   ! i m p o r t a n t ;   l e f t :   0   ! i m p o r t a n t ;   w i d t h :   1 0 0 v w   ! i m p o r t a n t ;   h e i g h t :   1 0 0 v h   ! i m p o r t a n t ;    
- b a c k g r o u n d :   r g b a ( 1 5 ,   2 3 ,   4 2 ,   0 . 9 5 )   ! i m p o r t a n t ;   b a c k d r o p - f i l t e r :   b l u r ( 1 0 p x )   ! i m p o r t a n t ;   z - i n d e x :   1 0 0 0 0   ! i m p o r t a n t ;    
- o v e r f l o w - y :   a u t o   ! i m p o r t a n t ;   p a d d i n g :   4 0 p x   5 %   ! i m p o r t a n t ;    
- 
+    .tt-fullscreen-modal {
+        position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+        background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px) !important; z-index: 10000 !important;
+        overflow-y: auto !important; padding: 40px 5% !important;
+    }
+ 
+@keyframes scroll-right-to-left {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100%); }
+}
+
+.marquee-rtl-container {
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.marquee-rtl-content {
+  display: inline-block;
+  white-space: nowrap;
+  animation: scroll-right-to-left 40s linear infinite;
+  min-width: 100%;
+}
+
+@keyframes scroll-left-to-right {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100vw); }
+}
+
+.marquee-l2r-container {
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.marquee-l2r-content {
+  display: inline-block;
+  white-space: nowrap;
+  animation: scroll-right-to-left 35s linear infinite;
+  min-width: 100%;
+  padding-left: 40px;
+}
+
+/* Hide ticker by default via CSS — JS overrides with element.style.display = 'block' */
+#announcementTickerContainer {
+  display: none;
+}

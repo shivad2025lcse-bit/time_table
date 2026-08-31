@@ -16,6 +16,9 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "raw_password")
+    private String rawPassword;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
@@ -31,6 +34,16 @@ public class User {
     public User(String username, String password, Role role, String email, boolean active) {
         this.username = username;
         this.password = password;
+        this.rawPassword = password; // fallback, will be overwritten by services
+        this.role = role;
+        this.email = email;
+        this.active = active;
+    }
+
+    public User(String username, String password, String rawPassword, Role role, String email, boolean active) {
+        this.username = username;
+        this.password = password;
+        this.rawPassword = rawPassword;
         this.role = role;
         this.email = email;
         this.active = active;
@@ -44,6 +57,9 @@ public class User {
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+
+    public String getRawPassword() { return rawPassword; }
+    public void setRawPassword(String rawPassword) { this.rawPassword = rawPassword; }
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
