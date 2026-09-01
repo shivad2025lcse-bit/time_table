@@ -55,12 +55,6 @@ public class Section {
         this.sectionIdentifier = sectionIdentifier;
     }
 
-    public Section(String sectionName, Course course, Integer semester, Integer studentCount) {
-        this.sectionName = sectionName;
-        this.course = course;
-        this.semester = semester;
-        this.studentCount = studentCount;
-    }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

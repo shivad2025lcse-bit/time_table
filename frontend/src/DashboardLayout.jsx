@@ -20,7 +20,7 @@ export default function DashboardLayout() {
         }
         window.__seceLegacyScriptsLoaded = true;
 
-        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js", "/js/charts.js", "/js/reports.js"];
+        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js", "/js/charts.js", "/js/reports.js", "/js/quiz.js"];
         scripts.forEach(src => {
             const script = document.createElement("script");
             script.src = src + '?v=' + new Date().getTime();
@@ -249,6 +249,14 @@ export default function DashboardLayout() {
                                 </button>
 
                                 <button id="studentDayNotificationBtn" className={`btn btn-sm btn-outline-info align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
+
+                                <button id="facultyQuizBtn" className={`btn btn-sm btn-outline-danger align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openFacultyQuizModal && window.openFacultyQuizModal()}>
+                                    <i className="fa-solid fa-clipboard-question"></i> Manage Quizzes
+                                </button>
+                                
+                                <button id="studentQuizBtn" className={`btn btn-sm btn-outline-danger align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openStudentQuizModal && window.openStudentQuizModal()}>
+                                    <i className="fa-solid fa-pen-to-square"></i> Take Quiz
+                                </button>
 
 
                                 {(!isAdmin && !isStudent) && (
