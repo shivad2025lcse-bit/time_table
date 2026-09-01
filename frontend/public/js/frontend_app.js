@@ -2011,51 +2011,7 @@ function switchRole(role, silent = false) {
         if (ayEditIcon) ayEditIcon.classList.add('d-none');
     }
 
-    // Ensure contentEditable is false for the spans
-    const batchTextHeader = document.getElementById('batchTextHeader');
-    const batchTextHeaderStudents = document.getElementById('batchTextHeaderStudents');
-    const semTextHeader = document.getElementById('semTextHeader');
-    const ayTextHeader = document.getElementById('ayTextHeader');
-
-    if (batchTextHeader) {
-        batchTextHeader.contentEditable = false;
-        const customBatch = localStorage.getItem('sece_global_custom_batch');
-        if (customBatch) batchTextHeader.innerText = customBatch;
-    }
-
-    if (batchTextHeaderStudents) {
-        const customBatch = localStorage.getItem('sece_global_custom_batch');
-        if (customBatch) batchTextHeaderStudents.innerText = customBatch;
-    }
-
-    if (semTextHeader) {
-        semTextHeader.contentEditable = false;
-        const customSem = localStorage.getItem('sece_global_custom_sem');
-        if (customSem) semTextHeader.innerText = customSem;
-    }
-
-    const semTextHeaderStudents = document.getElementById('semTextHeaderStudents');
-    if (semTextHeaderStudents) {
-        const customSem = localStorage.getItem('sece_global_custom_sem');
-        if (customSem) semTextHeaderStudents.innerText = customSem;
-    }
-
-    if (ayTextHeader) {
-        ayTextHeader.contentEditable = false;
-        if (ayTextHeader.tagName === 'INPUT') {
-            const customAy = localStorage.getItem('sece_global_custom_ay');
-            if (customAy) ayTextHeader.value = customAy;
-        } else {
-            const customAy = localStorage.getItem('sece_global_custom_ay');
-            if (customAy) ayTextHeader.innerText = customAy;
-        }
-    }
-
-    const ayTextHeaderStudents = document.getElementById('ayTextHeaderStudents');
-    if (ayTextHeaderStudents) {
-        const customAy = localStorage.getItem('sece_global_custom_ay');
-        if (customAy) ayTextHeaderStudents.innerText = customAy;
-    }
+    window.updateBannerHeaders(targetSec);
 
     // Standard dashboard updates
     if (role === 'STUDENT') {
@@ -2277,38 +2233,7 @@ function onFilterChange() {
         }
     }
 
-    const customBatch = localStorage.getItem('sece_global_custom_batch');
-    if (customBatch) {
-        document.getElementById('batchTextHeader').innerText = customBatch;
-        const sh = document.getElementById('batchTextHeaderStudents');
-        if (sh) sh.innerText = customBatch;
-    } else {
-        document.getElementById('batchTextHeader').innerText = '2024 - 2028';
-        const sh = document.getElementById('batchTextHeaderStudents');
-        if (sh) sh.innerText = '2024 - 2028';
-    }
-
-    const customSem = localStorage.getItem('sece_global_custom_sem');
-    if (customSem) {
-        document.getElementById('semTextHeader').innerText = customSem;
-        const sh = document.getElementById('semTextHeaderStudents');
-        if (sh) sh.innerText = customSem;
-    } else {
-        document.getElementById('semTextHeader').innerText = 'II Year / III Semester';
-        const sh = document.getElementById('semTextHeaderStudents');
-        if (sh) sh.innerText = 'II Year / III Semester';
-    }
-
-    const customAy = localStorage.getItem('sece_global_custom_ay');
-    if (customAy) {
-        document.getElementById('ayTextHeader').innerText = customAy;
-        const sh = document.getElementById('ayTextHeaderStudents');
-        if (sh) sh.innerText = customAy;
-    } else {
-        document.getElementById('ayTextHeader').innerText = '2026 - 2027';
-        const sh = document.getElementById('ayTextHeaderStudents');
-        if (sh) sh.innerText = '2026 - 2027';
-    }
+    window.updateBannerHeaders(currentSection);
 
     const placeholder = document.getElementById('adminTTPlaceholder');
     const ttArea = document.getElementById('timetableCaptureArea');
@@ -4372,6 +4297,7 @@ window.submitManageStudentForm = async function (e) {
     const courseId = document.getElementById('msCourse').value;
     const secId = document.getElementById('msSection').value;
     const semester = document.getElementById('msSemester').value;
+    const residentType = document.getElementById('msResidentType').value;
 
     const alertBox = document.getElementById('manageStudentsAlert');
     alertBox.classList.remove('d-none', 'alert-success', 'alert-danger');
@@ -4399,6 +4325,7 @@ window.submitManageStudentForm = async function (e) {
         phone: phone,
         parentPhone1: parentPhone1,
         parentPhone2: parentPhone2 || null,
+        residentType: residentType,
         semester: parseInt(semester),
         department: { name: deptId },
         course: { name: actualCourseId },
@@ -4549,6 +4476,72 @@ window.purgeExpiredPeriodNotifications = purgeExpiredPeriodNotifications;
 window.renderPeriodNotifications = renderPeriodNotifications;
 window.createFacultyChangeNotification = createFacultyChangeNotification;
 window.showToast = showToast;
+
+window.updateBannerHeaders = function(targetSec) {
+    let metaBatch = null;
+    let metaSemStr = null;
+    let metaAyStr = null;
+    
+    if (targetSec) {
+        try {
+            const ttStr = localStorage.getItem('sece_tt_built_' + targetSec);
+            if (ttStr) {
+                const ttData = JSON.parse(ttStr);
+                if (ttData && ttData.metadata) {
+                    const b = parseInt(ttData.metadata.batch);
+                    if (!isNaN(b)) {
+                        metaBatch = `${b} - ${b + 4}`;
+                        
+                        const y = parseInt(ttData.metadata.year);
+                        const s = parseInt(ttData.metadata.semester);
+                        
+                        if (!isNaN(y) && !isNaN(s)) {
+                            const roman = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
+                            metaSemStr = `${roman[y] || y} Year / ${roman[s] || s} Semester`;
+                            
+                            const ayStart = b + y - 1;
+                            metaAyStr = `${ayStart} - ${ayStart + 1}`;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Error reading timetable metadata", e);
+        }
+    }
+
+    const batchTextHeader = document.getElementById('batchTextHeader');
+    const batchTextHeaderStudents = document.getElementById('batchTextHeaderStudents');
+    const semTextHeader = document.getElementById('semTextHeader');
+    const semTextHeaderStudents = document.getElementById('semTextHeaderStudents');
+    const ayTextHeader = document.getElementById('ayTextHeader');
+    const ayTextHeaderStudents = document.getElementById('ayTextHeaderStudents');
+
+    function setHeader(el, metaValue, globalKey, defaultVal) {
+        if (!el) return;
+        el.contentEditable = false;
+        if (metaValue) {
+            if (el.tagName === 'INPUT') el.value = metaValue;
+            else el.innerText = metaValue;
+        } else {
+            const customVal = localStorage.getItem(globalKey);
+            if (customVal) {
+                if (el.tagName === 'INPUT') el.value = customVal;
+                else el.innerText = customVal;
+            } else if (defaultVal) {
+                if (el.tagName === 'INPUT') el.value = defaultVal;
+                else el.innerText = defaultVal;
+            }
+        }
+    }
+
+    setHeader(batchTextHeader, metaBatch, 'sece_global_custom_batch', '2024 - 2028');
+    setHeader(batchTextHeaderStudents, metaBatch, 'sece_global_custom_batch', '2024 - 2028');
+    setHeader(semTextHeader, metaSemStr, 'sece_global_custom_sem', 'II Year / III Semester');
+    setHeader(semTextHeaderStudents, metaSemStr, 'sece_global_custom_sem', 'II Year / III Semester');
+    setHeader(ayTextHeader, metaAyStr, 'sece_global_custom_ay', '2026 - 2027');
+    setHeader(ayTextHeaderStudents, metaAyStr, 'sece_global_custom_ay', '2026 - 2027');
+};
 
 window.saveBatchSemEdit = function () {
     const batchInput = document.getElementById('modalBatchInputStandalone') || document.getElementById('modalBatchInput');
@@ -4754,7 +4747,7 @@ window.searchUserCredentials = async function() {
     // Faculty
     const facultyTbody = document.getElementById('credFacultyList');
     if (facultyTbody) {
-        facultyTbody.innerHTML = '<tr><td colSpan="5" class="text-center text-muted py-4">Loading faculty...</td></tr>';
+        facultyTbody.innerHTML = '<tr><td colSpan="4" class="text-center text-muted py-4">Loading faculty...</td></tr>';
         let facultyList = [];
         try {
             const res = await fetchFn('/api/teachers');
@@ -4767,7 +4760,7 @@ window.searchUserCredentials = async function() {
         ) : facultyList;
         
         if (filtered.length === 0) {
-            facultyTbody.innerHTML = '<tr><td colSpan="5" class="text-center text-muted py-4">No faculty found.</td></tr>';
+            facultyTbody.innerHTML = '<tr><td colSpan="4" class="text-center text-muted py-4">No faculty found.</td></tr>';
         } else {
             facultyTbody.innerHTML = filtered.map(f => {
                 const fullName = getFacultyFullName(f);
@@ -4779,7 +4772,33 @@ window.searchUserCredentials = async function() {
                 return `<tr>
                     <td>${fullName}</td>
                     <td><span class="badge bg-primary">${deptDisplay}</span></td>
-                    <td><span class="badge bg-secondary">${f.designation || '-'}</span></td>
+                    <td><code class="text-warning">${username}</code></td>
+                    <td><code class="text-info">${password}</code></td>
+                </tr>`;
+            }).join('');
+        }
+    }
+
+    // Advisor
+    const advisorTbody = document.getElementById('credAdvisorList');
+    if (advisorTbody) {
+        let advisors = (window.staffDirectory || []).filter(s => s.classAdvisorFor);
+        if (query) {
+            advisors = advisors.filter(a => 
+                (a.displayName || a.name || '').toLowerCase().includes(query) ||
+                (a.classAdvisorFor || '').toLowerCase().includes(query)
+            );
+        }
+        
+        if (advisors.length === 0) {
+            advisorTbody.innerHTML = '<tr><td colSpan="4" class="text-center text-muted py-4">No Class Advisors found.</td></tr>';
+        } else {
+            advisorTbody.innerHTML = advisors.map(a => {
+                const username = buildClassAdvisorUsername(a.name);
+                const password = getClassAdvisorPassword(username);
+                return `<tr>
+                    <td>${a.displayName || a.name}</td>
+                    <td><span class="badge bg-success">${a.classAdvisorFor}</span></td>
                     <td><code class="text-warning">${username}</code></td>
                     <td><code class="text-info">${password}</code></td>
                 </tr>`;
@@ -5151,6 +5170,11 @@ window.saveTimetableBuilder = function() {
     const data = {
         advisor: document.getElementById('ttBuildAdvisor').value.trim(),
         tutors: document.getElementById('ttBuildTutors').value.trim(),
+        metadata: {
+            batch: window.currentTimetableBatch || '2024',
+            year: window.currentTimetableYear || '2',
+            semester: window.currentTimetableSemester || '3'
+        },
         grid: {}
     };
     days.forEach(day => {

@@ -215,41 +215,40 @@ export default function DashboardLayout() {
                                     <i className="fa-solid fa-chalkboard-user"></i> Add Faculty
                                 </button>
 
-                                <button id="manageAnnouncementsBtn" className="btn btn-sm btn-outline-success d-flex align-items-center gap-1 d-none"
+                                <button id="manageAnnouncementsBtn" className={`btn btn-sm btn-outline-success align-items-center gap-1 ${isAdmin || isFaculty ? 'd-flex' : 'd-none'}`}
                                     type="button" data-bs-toggle="modal" data-bs-target="#manageAnnouncementsModal" onClick={() => window.renderManageAnnouncementsList && window.renderManageAnnouncementsList()}>
                                     <i className="fa-solid fa-bullhorn"></i> Manage Announcements
                                 </button>
 
-                                <button id="adminViewFacultyBtn" className="btn btn-sm btn-outline-info align-items-center gap-1 d-none" type="button" data-bs-toggle="modal" data-bs-target="#adminViewFacultyModal">
+                                <button id="adminViewFacultyBtn" className={`btn btn-sm btn-outline-info align-items-center gap-1 ${isAdmin ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#adminViewFacultyModal">
                                     <i className="fa-solid fa-address-card"></i> View Full Faculty Details
                                 </button>
 
 
-                                <button id="studentProfileBtn" className="btn btn-sm btn-outline-success align-items-center gap-1 d-none" type="button" onClick={() => window.openStudentProfileModal()} >
+                                <button id="studentProfileBtn" className={`btn btn-sm btn-outline-success align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openStudentProfileModal()} >
                                     <i className="fa-solid fa-id-card"></i> My Student Details
                                 </button>
 
-                                <button id="manageSectionsBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()}>
+                                <button id="manageSectionsBtn" className={`btn btn-sm btn-outline-warning align-items-center gap-1 style-btn ${isAdmin || isFaculty ? 'd-flex' : 'd-none'}`} data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()}>
                                     <i className="fa-solid fa-folder-tree"></i> <span id="manageSectionsBtnText">Manage Sections</span>
                                 </button>
-                                <button id="manageRosterBtn" className="btn btn-sm btn-indigo d-flex align-items-center gap-1  style-btn" style={{ background: "var(--sece-indigo)" }} data-bs-toggle="modal" data-bs-target="#manageRosterModal">
+                                <button id="manageRosterBtn" className={`btn btn-sm btn-indigo align-items-center gap-1 style-btn ${isAdmin || isFaculty ? 'd-flex' : 'd-none'}`} style={{ background: "var(--sece-indigo)" }} data-bs-toggle="modal" data-bs-target="#manageRosterModal">
                                     <i className="fa-solid fa-users-gear"></i> <span id="manageRosterBtnText">Manage Students Roster</span>
                                 </button>
-                                {!isAdmin && (
-                                    <button id="addStudentDirectBtn" className="btn btn-sm btn-success d-none align-items-center gap-1 style-btn" type="button" onClick={() => window.openAddStudentDirectly()} >
-                                        <i className="fa-solid fa-user-plus"></i> <span id="addStudentDirectBtnText">Add New Student</span>
-                                    </button>
-                                )}
+                                
+                                <button id="addStudentDirectBtn" className={`btn btn-sm btn-success align-items-center gap-1 style-btn ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openAddStudentDirectly()} >
+                                    <i className="fa-solid fa-user-plus"></i> <span id="addStudentDirectBtnText">Add New Student</span>
+                                </button>
 
-                                <button id="classAdvisorBtn" className="btn btn-sm btn-outline-warning d-none align-items-center gap-1" type="button" data-bs-toggle="modal" data-bs-target="#classAdvisorLoginModal">
+                                <button id="classAdvisorBtn" className={`btn btn-sm btn-outline-warning align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#classAdvisorLoginModal">
                                     <i className="fa-solid fa-user-tie"></i> Class Advisor View
                                 </button>
 
-                                <button id="facultyDetailsBtn" className="btn btn-sm btn-outline-primary d-none align-items-center gap-1" type="button" data-bs-toggle="modal" data-bs-target="#facultyDetailsModal">
+                                <button id="facultyDetailsBtn" className={`btn btn-sm btn-outline-primary align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#facultyDetailsModal">
                                     <i className="fa-solid fa-chalkboard-user"></i> Faculty Details
                                 </button>
 
-                                <button id="studentDayNotificationBtn" className="btn btn-sm btn-outline-info align-items-center gap-1 d-none" type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
+                                <button id="studentDayNotificationBtn" className={`btn btn-sm btn-outline-info align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
 
 
                                 {(!isAdmin && !isStudent) && (
