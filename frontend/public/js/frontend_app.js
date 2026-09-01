@@ -152,7 +152,7 @@ async function handleRoleLogin(e) {
 
         if (res.ok) {
             const data = await res.json();
-            // Backend login success — store token and user info
+            // Backend login success â€” store token and user info
             localStorage.setItem('jwt_token', data.token);
             localStorage.setItem('user_info', JSON.stringify(data));
             localStorage.setItem('sece_logged_in_user', username);
@@ -183,7 +183,7 @@ async function handleRoleLogin(e) {
             }
             return;
         }
-        // Backend returned 401/403 — fall through to local validation below
+        // Backend returned 401/403 â€” fall through to local validation below
     } catch (networkErr) {
         console.warn('Backend unreachable, falling back to local auth', networkErr);
     }
@@ -383,9 +383,20 @@ function restoreLoginSession() {
 
 
 // =========================
-// PERSISTENT STUDENT ROSTER
+// Storage Keys
 // =========================
 const STUDENT_STORAGE_KEY = 'sece_students_roster_v1';
+const TIMETABLE_STORAGE_KEY = 'sece_timetable_edits_v1';
+const SECTIONS_STORAGE_KEY = 'sece_sections_v2';
+const RESOURCES_STORAGE_KEY = 'sece_admin_resources_v1';
+const STAFF_STORAGE_KEY = 'sece_staff_directory_v1';
+const SUBSTITUTION_STORAGE_KEY = 'sece_substitutions_v1';
+const COVERAGE_REQUESTS_KEY = 'sece_coverage_requests_v1';
+const LEAVE_STATE_KEY_PREFIX = 'sece_on_leave_';
+
+// =========================
+// PERSISTENT STUDENT ROSTER
+// =========================
 
 function loadSavedStudents() {
     try {
@@ -514,7 +525,6 @@ const DEFAULT_TIMETABLE_DATA = {
 // =========================
 // PERSISTENT TIMETABLE EDITS
 // =========================
-const TIMETABLE_STORAGE_KEY = 'sece_timetable_edits_v1';
 
 function loadSavedTimetable() {
     const merged = JSON.parse(JSON.stringify(DEFAULT_TIMETABLE_DATA));
@@ -603,7 +613,7 @@ const courseReferenceList = [
     { short: 'DVT', code: 'P23CS513 Data Visualization Techniques', faculty: 'Dr.A.Anandaraj, AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
     { short: 'BDA', code: 'P23CS521 Big Data Analytics', faculty: 'Dr.A.Sarfaraz Ahmed,AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
     { short: 'TQM', code: 'P23CS507 Total Quality Management', faculty: 'Dr.R.K.Suresh, Prof/MECH', venue: '1CloudHub', cat: 'OE', credits: 3, hrs: '3' },
-    { short: 'PW', code: 'P23CS602 Project Work â€“ Phase I', faculty: 'Dr.S.Ananthi, AP/CSE', venue: '1CloudHub', cat: 'PW', credits: 6, hrs: '14+7*' },
+    { short: 'PW', code: 'P23CS602 Project Work Ã¢â‚¬â€œ Phase I', faculty: 'Dr.S.Ananthi, AP/CSE', venue: '1CloudHub', cat: 'PW', credits: 6, hrs: '14+7*' },
     { short: 'LIB', code: 'Library Hour', faculty: '-', venue: 'Library', cat: '-', credits: '-', hrs: '1*' },
     { short: 'TWM', code: 'Tutor Ward Meeting', faculty: 'Dr.S.Ananthi, AP/CSE', venue: '1CloudHub', cat: '-', credits: '-', hrs: '1' }
 ];
@@ -611,11 +621,6 @@ const courseReferenceList = [
 // Sample Students Roster Data
 let studentsRoster = loadSavedStudents();
 
-// Active timetable data = default schedule + any saved edits from Admin/Faculty
-let timetableData = loadSavedTimetable();
-
-const SECTIONS_STORAGE_KEY = 'sece_sections_v2';
-const RESOURCES_STORAGE_KEY = 'sece_admin_resources_v1';
 const DEFAULT_SECTIONS = [
     { dept: 'CSE', name: 'II CSE C', classroom: 'SF 04', capacity: 61 },
     { dept: 'CSE', name: 'II CSE A', classroom: 'SF 02', capacity: 60 },
@@ -623,6 +628,7 @@ const DEFAULT_SECTIONS = [
     { dept: 'IT', name: 'II IT A', classroom: 'IT 101', capacity: 60 },
     { dept: 'AIDS', name: 'II AI&DS A', classroom: 'AI 201', capacity: 60 }
 ];
+
 function loadSections() {
     try {
         const saved = JSON.parse(localStorage.getItem(SECTIONS_STORAGE_KEY));
@@ -631,6 +637,9 @@ function loadSections() {
 }
 function saveSections() { localStorage.setItem(SECTIONS_STORAGE_KEY, JSON.stringify(activeSections)); }
 let activeSections = loadSections();
+
+// Active timetable data = default schedule + any saved edits from Admin/Faculty
+let timetableData = loadSavedTimetable();
 
 // Remove legacy Admin credentials from the old version.
 localStorage.removeItem('sece_password_shiv');
@@ -696,8 +705,6 @@ setTimeout(() => {
 // =========================
 // STAFF AVAILABILITY & PERIOD SUBSTITUTION
 // =========================
-const STAFF_STORAGE_KEY = 'sece_staff_directory_v1';
-const SUBSTITUTION_STORAGE_KEY = 'sece_substitutions_v1';
 
 const DEFAULT_STAFF_DIRECTORY = [
     { name: 'Dr.S.K.Harikarthick', dept: 'CSE', status: 'Available' },
@@ -712,9 +719,6 @@ const DEFAULT_STAFF_DIRECTORY = [
     { name: 'Ms.R.Rajeswari', dept: 'AI&DS', status: 'Available' },
     { name: 'Keerthika J', displayName: 'Ms.J.Keerthika', dept: 'CSE', status: 'Available', classAdvisorFor: 'II CSE C' }
 ];
-
-const COVERAGE_REQUESTS_KEY = 'sece_coverage_requests_v1';
-const LEAVE_STATE_KEY_PREFIX = 'sece_on_leave_';
 
 // Returns the localStorage key tracking whether a given staff member is on leave today
 function leaveStateKey(staffName) {
@@ -783,7 +787,7 @@ function substitutionKey(dateStr, section, day, pIdx) {
 }
 
 // Only returns a substitution if "day" is today's actual weekday AND the stored
-// date is today's exact date â€” so it naturally stops applying tomorrow, and next
+// date is today's exact date Ã¢â‚¬â€ so it naturally stops applying tomorrow, and next
 // week's occurrence of the same weekday is unaffected.
 function getSubstitutionFor(section, day, pIdx) {
     if (day !== getTodayDayName()) return null;
@@ -803,17 +807,23 @@ function toggleSubstitutionUI() {
 
 function renderStaffAvailability() {
     const tbody = document.getElementById('staffAvailabilityBody');
-    if (!tbody) return;
+    const studentTbody = document.getElementById('studentFacultyAvailabilityBody');
+    if (!tbody && !studentTbody) return;
+    
     try {
         const canManage = canManageSubstitutions();
         const dateStr = todayDateStr();
-        tbody.innerHTML = '';
+        
+        if (tbody) tbody.innerHTML = '';
+        if (studentTbody) studentTbody.innerHTML = '';
+        
         if (!staffDirectory || staffDirectory.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-danger">DEBUG: staffDirectory is empty or undefined!</td></tr>';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="text-danger">DEBUG: staffDirectory is empty or undefined!</td></tr>';
+            if (studentTbody) studentTbody.innerHTML = '<tr><td colspan="3" class="text-danger">DEBUG: staffDirectory is empty or undefined!</td></tr>';
             return;
         }
+        
         staffDirectory.forEach((staff, idx) => {
-            const tr = document.createElement('tr');
             const dayKey = 'sece_staff_availability_' + dateStr;
             const daily = JSON.parse(localStorage.getItem(dayKey) || '{}');
             const isAvailable = daily[staff.name] !== false;
@@ -828,20 +838,34 @@ function renderStaffAvailability() {
                 statusBadge = '<span class="badge bg-secondary">Unavailable</span>';
             }
 
-            tr.innerHTML = `
-                <td>${staff.displayName || staff.name}</td>
-                <td>${staff.dept}</td>
-                <td>${statusBadge}</td>
-                <td class="text-center">
-                    ${canManage ? `<button class="btn btn-sm ${isAvailable ? 'btn-outline-danger' : 'btn-outline-success'} py-0" onclick="toggleStaffAvailability(${idx})">
-                        ${isAvailable ? 'Mark Unavailable' : 'Mark Available'}
-                    </button>` : '<span class="text-muted small">View only</span>'}
-                </td>
-            `;
-            tbody.appendChild(tr);
+            if (tbody) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${staff.displayName || staff.name}</td>
+                    <td>${staff.dept}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-center">
+                        ${canManage ? `<button class="btn btn-sm ${isAvailable ? 'btn-outline-danger' : 'btn-outline-success'} py-0" onclick="toggleStaffAvailability(${idx})">
+                            ${isAvailable ? 'Mark Unavailable' : 'Mark Available'}
+                        </button>` : '<span class="text-muted small">View only</span>'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+            
+            if (studentTbody) {
+                const tr2 = document.createElement('tr');
+                tr2.innerHTML = `
+                    <td class="align-middle">${staff.displayName || staff.name}</td>
+                    <td class="align-middle">${staff.dept}</td>
+                    <td class="align-middle">${statusBadge}</td>
+                `;
+                studentTbody.appendChild(tr2);
+            }
         });
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-danger">DEBUG ERROR: ${e.message}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-danger">DEBUG ERROR: ${e.message}</td></tr>`;
+        if (studentTbody) studentTbody.innerHTML = `<tr><td colspan="3" class="text-danger">DEBUG ERROR: ${e.message}</td></tr>`;
     }
 }
 
@@ -879,7 +903,7 @@ function populateSubPeriodOptions() {
     dayData.forEach((p, idx) => {
         const opt = document.createElement('option');
         opt.value = idx;
-        opt.text = `Period ${idx + 1} â€” ${p.sub} (${p.faculty})`;
+        opt.text = `Period ${idx + 1} Ã¢â‚¬â€ ${p.sub} (${p.faculty})`;
         select.appendChild(opt);
     });
     onSubPeriodChange();
@@ -911,7 +935,7 @@ async function handleArrangeSubstitution(e) {
     }
     const todayName = getTodayDayName();
     if (todayName === 'Sunday') {
-        alert('No classes scheduled on Sunday â€” nothing to substitute.');
+        alert('No classes scheduled on Sunday Ã¢â‚¬â€ nothing to substitute.');
         return;
     }
     const pIdx = parseInt(document.getElementById('subPeriodSelect').value);
@@ -990,7 +1014,7 @@ function renderTodaysSubstitutions() {
 
     list.innerHTML = relevant.map(([key, s]) => `
         <li class="list-group-item bg-dark text-white d-flex justify-content-between align-items-center small">
-            <span>Period ${s.pIdx + 1}: <strong>${s.substituteFaculty}</strong> covering for ${s.originalFaculty}${s.reason ? ' â€” ' + s.reason : ''}</span>
+            <span>Period ${s.pIdx + 1}: <strong>${s.substituteFaculty}</strong> covering for ${s.originalFaculty}${s.reason ? ' Ã¢â‚¬â€ ' + s.reason : ''}</span>
             ${canManageSubstitutions() ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="cancelSubstitution('${key}')">Cancel</button>` : ''}
         </li>
     `).join('');
@@ -1158,9 +1182,9 @@ async function markStaffOnLeave(name, reason) {
         period: p.pIdx + 1,
         section: p.section,
         originalFaculty: name,
-        staff: 'â€” (Coverage Needed)',
-        subject: reason + ' â€” Period open for substitution.',
-        reason: reason + ' â€” Period open for substitution.',
+        staff: 'Ã¢â‚¬â€ (Coverage Needed)',
+        subject: reason + ' Ã¢â‚¬â€ Period open for substitution.',
+        reason: reason + ' Ã¢â‚¬â€ Period open for substitution.',
         source: 'leave'
     })));
 
@@ -1171,7 +1195,7 @@ async function markStaffOnLeave(name, reason) {
 
     showToast('Marked as On Leave',
         periods.length
-            ? `${name} is on leave today. ${periods.length} period(s) flagged for coverage â€” other staff have been notified.`
+            ? `${name} is on leave today. ${periods.length} period(s) flagged for coverage Ã¢â‚¬â€ other staff have been notified.`
             : `${name} is marked on leave today (no periods scheduled).`
     );
 }
@@ -1396,7 +1420,7 @@ function renderCoverageRequests() {
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                 <div>
                     ${isMyLeave ? '<span class="badge bg-warning text-dark me-1">You</span>' : ''}
-                    <strong>${r.absentStaff}</strong> is on leave â€” Period ${r.pIdx + 1} (${r.subject}), ${r.section}, ${r.venue}.
+                    <strong>${r.absentStaff}</strong> is on leave Ã¢â‚¬â€ Period ${r.pIdx + 1} (${r.subject}), ${r.section}, ${r.venue}.
                     ${r.reason ? '<br><span class="text-muted">Reason: ' + r.reason + '</span>' : ''}
                 </div>
                 <div class="text-end">${statusBadge}<br>${actions}${cancelBtn}</div>
@@ -1419,7 +1443,7 @@ window.addEventListener('storage', (e) => {
             const oldReq = oldData[key];
             const newReq = newData[key];
             if (!oldReq && newReq && newReq.status === 'OPEN') {
-                showToast('Staff Leave Alert', `${newReq.absentStaff} is on leave today â€” Period ${newReq.pIdx + 1} (${newReq.subject}), ${newReq.section} needs coverage.`);
+                showToast('Staff Leave Alert', `${newReq.absentStaff} is on leave today Ã¢â‚¬â€ Period ${newReq.pIdx + 1} (${newReq.subject}), ${newReq.section} needs coverage.`);
             } else if (oldReq && newReq && oldReq.status !== newReq.status) {
                 if (newReq.status === 'REQUESTED' && newReq.absentStaff === myName) {
                     showToast('Coverage Request Received', `${newReq.requestedBy} wants to cover your Period ${newReq.pIdx + 1} (${newReq.subject}) today. Please accept or decline.`);
@@ -1608,7 +1632,7 @@ function createCell(day, pIdx, pData) {
             <span class="slot-badge">${pData.sub}</span>
             <span class="slot-subtext">${sub.substituteFaculty}</span>
             <span class="slot-venue">${pData.venue}</span>
-            <span class="substituted-badge">Substitute â€” Today Only</span>
+            <span class="substituted-badge">Substitute Ã¢â‚¬â€ Today Only</span>
             ${isEditable ? '<button class="btn btn-outline-warning btn-sm mt-2 py-0 px-2" style="font-size: 0.75rem; border-radius: 4px;" onclick="openEditPeriodModal(\'' + day + '\', ' + pIdx + ', ' + JSON.stringify(pData).replace(/"/g, '&quot;') + ')"><i class="fa-solid fa-pen-to-square me-1"></i>Edit</button>' : ''}
         `;
     } else {
@@ -2585,9 +2609,21 @@ function removeStudent(idx) {
 // Add / Remove Section
 function populateSectionSelects() {
     const deptSelect = document.getElementById('deptSelect');
-    if (deptSelect && deptSelect.value === '' && typeof currentDept !== 'undefined' && currentDept) {
-        const exists = Array.from(deptSelect.options).some(o => o.value === currentDept);
-        if (exists) deptSelect.value = currentDept;
+    if (deptSelect) {
+        const uniqueDepts = [...new Set(activeSections.map(s => s.dept))]
+            .filter(d => d && d !== 'Select Department...' && d.trim() !== '')
+            .sort();
+        
+        let deptHTML = '<option value="">Select Dept...</option>';
+        uniqueDepts.forEach(d => {
+            deptHTML += `<option value="${d}">${d}</option>`;
+        });
+        deptSelect.innerHTML = deptHTML;
+        
+        if (typeof currentDept !== 'undefined' && currentDept) {
+            const exists = uniqueDepts.includes(currentDept);
+            if (exists) deptSelect.value = currentDept;
+        }
     }
     const deptVal = deptSelect ? deptSelect.value : null;
 
@@ -2715,7 +2751,7 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
     const subtitle = document.getElementById('classAdvisorViewSubtitle');
     if (!body || !subtitle) return;
 
-    subtitle.innerText = `${faculty.displayName || faculty.name} — Class Advisor for ${section}`;
+    subtitle.innerText = `${faculty.displayName || faculty.name} â€” Class Advisor for ${section}`;
     body.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-info" role="status"></div></div>';
 
     try {
@@ -3245,13 +3281,13 @@ function renderAdminResourcesUI() {
     }
     if (venueList) {
         venueList.innerHTML = adminResources.venues.length ? adminResources.venues.map((v, i) =>
-            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? '— Block ' + v.block : ''}${v.capacity ? ' — Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
+            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? 'â€” Block ' + v.block : ''}${v.capacity ? ' â€” Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
         ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No custom venues.</div>';
     }
     if (classList) {
         classList.innerHTML = activeSections.length ? activeSections.map((s, i) =>
             `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
-                <span><strong>${s.name}</strong> <small class="text-muted">(${s.dept}) — ${s.classroom}${s.block ? ' — Block ' + s.block : ''}</small></span>
+                <span><strong>${s.name}</strong> <small class="text-muted">(${s.dept}) â€” ${s.classroom}${s.block ? ' â€” Block ' + s.block : ''}</small></span>
                 <button class="btn btn-sm btn-outline-danger" onclick="removeSection(${i})">Remove</button>
             </div>`
         ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No classes.</div>';
@@ -3575,7 +3611,7 @@ function handleNotificationRegister(e) {
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
 
-    showToast('Registration Saved!', `${name} will get alerts at ${email} & ${phone}. Saved — visible next time you log in.`);
+    showToast('Registration Saved!', `${name} will get alerts at ${email} & ${phone}. Saved â€” visible next time you log in.`);
 }
 
 // Render the "My Notifications" status panel + bell button label
@@ -3599,7 +3635,7 @@ function renderNotificationStatus() {
         if (record.prefs?.wednesdayALT) activePrefs.push('Wednesday ALT reminder');
         panel.className = 'alert alert-success py-2 px-3 border-0 rounded-3 mb-3 shadow-sm small';
         panel.innerHTML = `<i class="fa-solid fa-bell-on me-2"></i>
-            <strong>Notifications ON</strong> for ${record.name} — ${record.email} / ${record.phone}.
+            <strong>Notifications ON</strong> for ${record.name} â€” ${record.email} / ${record.phone}.
             ${activePrefs.length ? 'Subscribed: ' + activePrefs.join(', ') + '.' : ''}
             <a href="#" class="ms-2" onclick="event.preventDefault(); openNotificationModal();">Update</a>`;
     } else {
@@ -3730,7 +3766,7 @@ function exportTimetableCSV() {
 }
 
 // =============================================
-// PERIOD NOTIFICATIONS — Backend API Storage
+// PERIOD NOTIFICATIONS â€” Backend API Storage
 // Data is persisted to the database so ALL
 // users (students, faculty, admin) see updates.
 // =============================================
@@ -5191,3 +5227,18 @@ window.shareViaWebAPI = function() {
 
 
 window.saveMyTimetable = function() { alert('Timetable saved successfully!'); const m = bootstrap.Modal.getInstance(document.getElementById('myTimetableModal')); if(m) m.hide(); };
+
+window.deptChanged = function(dept) {
+    currentDept = dept;
+    localStorage.setItem('sece_last_viewed_dept', dept);
+    populateSectionSelects();
+    currentSection = '';
+    localStorage.removeItem('sece_last_viewed_section');
+    renderTimetableGrid();
+};
+
+window.sectionChanged = function(sec) {
+    currentSection = sec;
+    localStorage.setItem('sece_last_viewed_section', sec);
+    renderTimetableGrid();
+};
