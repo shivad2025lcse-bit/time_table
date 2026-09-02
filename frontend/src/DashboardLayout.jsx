@@ -433,29 +433,31 @@ export default function DashboardLayout() {
                             </div>
 
 
-                            <div className="glass-panel" id="referenceTableArea">
-                                <div className="panel-header">
-                                    <h3 className="panel-title"><i className="fa-solid fa-book-bookmark text-warning"></i> Course & Faculty Incharge Reference Table</h3>
-                                    <span className="badge bg-secondary">Total Credits: 23</span>
+                            {!isFaculty && (
+                                <div className="glass-panel" id="referenceTableArea">
+                                    <div className="panel-header">
+                                        <h3 className="panel-title"><i className="fa-solid fa-book-bookmark text-warning"></i> Course & Faculty Incharge Reference Table</h3>
+                                        <span className="badge bg-secondary">Total Credits: 23</span>
+                                    </div>
+                                    <div className="table-responsive p-2">
+                                        <table className="ref-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Short Name</th>
+                                                    <th>Course Code & Title</th>
+                                                    <th>Faculty Incharge</th>
+                                                    <th>Venue</th>
+                                                    <th>Category</th>
+                                                    <th>Credits</th>
+                                                    <th>No. of Hrs</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="courseRefBody">
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                                <div className="table-responsive p-2">
-                                    <table className="ref-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Short Name</th>
-                                                <th>Course Code & Title</th>
-                                                <th>Faculty Incharge</th>
-                                                <th>Venue</th>
-                                                <th>Category</th>
-                                                <th>Credits</th>
-                                                <th>No. of Hrs</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="courseRefBody">
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                            )}
 
                             <div className="glass-panel mt-3" id="studentFacultyAvailabilityArea">
                                     <div className="panel-header">
@@ -560,6 +562,66 @@ export default function DashboardLayout() {
             </div>
 
 
+
+            {/* ===== User Credentials Modal (Admin Only) ===== */}
+            <div className="modal fade" id="viewCredentialsModal" tabIndex="-1">
+                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-success fw-bold">
+                                <i className="fa-solid fa-key me-2"></i> User Credentials
+                            </h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body">
+                            {/* Search bar */}
+                            <div className="input-group mb-3">
+                                <span className="input-group-text bg-dark text-muted border-secondary">
+                                    <i className="fa-solid fa-magnifying-glass"></i>
+                                </span>
+                                <input id="credSearchInput" type="text" className="form-control bg-dark text-white border-secondary"
+                                    placeholder="Search by username, name or section..."
+                                    onInput={() => window.filterCredentials && window.filterCredentials()} />
+                                <button className="btn btn-primary" onClick={() => window.filterCredentials && window.filterCredentials()}>Search</button>
+                            </div>
+                            {/* Role Tabs */}
+                            <ul className="nav nav-tabs border-secondary mb-3" id="credTabs">
+                                <li className="nav-item">
+                                    <button className="nav-link active text-white" id="credTabStudents" onClick={() => window.switchCredTab && window.switchCredTab('STUDENT')}>Students</button>
+                                </li>
+                                <li className="nav-item">
+                                    <button className="nav-link text-info" id="credTabFaculty" onClick={() => window.switchCredTab && window.switchCredTab('FACULTY')}>Faculty</button>
+                                </li>
+                                <li className="nav-item">
+                                    <button className="nav-link text-warning" id="credTabAdvisor" onClick={() => window.switchCredTab && window.switchCredTab('CLASS_ADVISOR')}>Advisor</button>
+                                </li>
+                            </ul>
+                            {/* Table */}
+                            <div className="table-responsive">
+                                <table className="table table-dark table-striped table-hover align-middle small">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Register No / Username</th>
+                                            <th>Name</th>
+                                            <th>Section / Dept</th>
+                                            <th>Password</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="credentialsTableBody">
+                                        <tr><td colSpan="6" className="text-center text-muted">Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="small text-muted mt-2 mb-0">
+                                <i className="fa-solid fa-lock me-1"></i>
+                                This section is visible to Admin only. Passwords shown are the plain-text credentials used during registration.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div className="modal fade" id="editPeriodModal" tabIndex="-1">
                 <div className="modal-dialog modal-dialog-centered">
@@ -1213,11 +1275,14 @@ export default function DashboardLayout() {
                                 Only the Admin account can add or remove subjects, classes and venues. Changes are saved in this browser.
                             </div>
                             <ul className="nav nav-tabs border-secondary mb-3">
-                                <li className="nav-item"><button className="nav-link active text-info" data-bs-toggle="tab" data-bs-target="#resourceSubjects">Subjects</button></li>
+                                <li className="nav-item"><button className="nav-link active text-info" data-bs-toggle="tab" data-bs-target="#resourceSubjectsView">View Subjects</button></li>
+                                <li className="nav-item"><button className="nav-link text-success" data-bs-toggle="tab" data-bs-target="#resourceSubjectsAdd">Add Subject</button></li>
                             </ul>
                             <div className="tab-content">
-                                <div className="tab-pane fade show active" id="resourceSubjects">
-
+                                <div className="tab-pane fade show active" id="resourceSubjectsView">
+                                    <div className="table-responsive"><table className="table table-dark table-striped table-sm"><thead><tr><th>Subject Code</th><th>Subject Name</th><th>Faculty incharge</th><th>Venue</th><th>Action</th></tr></thead><tbody id="adminSubjectsList"></tbody></table></div>
+                                </div>
+                                <div className="tab-pane fade" id="resourceSubjectsAdd">
                                     <form id="addSubjectForm" onSubmit={(event) => window.handleAddSubject(event)} className="row g-2 mb-3">
                                         <div className="col-md-3">
                                             <label className="form-label small mb-1">Subject Code</label>
@@ -1243,7 +1308,6 @@ export default function DashboardLayout() {
                                             <button className="btn btn-sm btn-info" type="submit"><i className="fa-solid fa-plus me-1"></i>Add Subject</button>
                                         </div>
                                     </form>
-                                    <div className="table-responsive"><table className="table table-dark table-striped table-sm"><thead><tr><th>Subject Code</th><th>Subject Name</th><th>Faculty incharge</th><th>Venue</th><th>Action</th></tr></thead><tbody id="adminSubjectsList"></tbody></table></div>
                                 </div>
                             </div>
                         </div>
@@ -1313,32 +1377,42 @@ export default function DashboardLayout() {
                             </div>
                         </div>
                         <div className="modal-body">
-                            <form id="adminVenueForm" onSubmit={(event) => window.handleAddVenue(event)} className="row g-2 mb-3">
-                                <div className="col-md-4">
-                                    <label className="form-label small mb-1">Venue Name</label>
-                                    <input id="newVenueName" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Venue name" required />
+                            <ul className="nav nav-tabs border-secondary mb-3">
+                                <li className="nav-item"><button className="nav-link active text-success" data-bs-toggle="tab" data-bs-target="#resourceVenuesView">View Venues</button></li>
+                                <li className="nav-item"><button className="nav-link text-info" data-bs-toggle="tab" data-bs-target="#resourceVenuesAdd">Add Venue</button></li>
+                            </ul>
+                            <div className="tab-content">
+                                <div className="tab-pane fade show active" id="resourceVenuesView">
+                                    <div className="list-group" id="adminVenuesList"></div>
                                 </div>
-                                <div className="col-md-3">
-                                    <label className="form-label small mb-1">Type</label>
-                                    <input id="newVenueType" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Type (Class/Lab)" />
+                                <div className="tab-pane fade" id="resourceVenuesAdd">
+                                    <form id="adminVenueForm" onSubmit={(event) => window.handleAddVenue(event)} className="row g-2 mb-3">
+                                        <div className="col-md-4">
+                                            <label className="form-label small mb-1">Venue Name</label>
+                                            <input id="newVenueName" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Venue name" required />
+                                        </div>
+                                        <div className="col-md-3">
+                                            <label className="form-label small mb-1">Type</label>
+                                            <input id="newVenueType" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Type (Class/Lab)" />
+                                        </div>
+                                        <div className="col-md-2">
+                                            <label className="form-label small mb-1">Block</label>
+                                            <input id="newVenueBlock" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Block" />
+                                        </div>
+                                        <div className="col-md-1">
+                                            <label className="form-label small mb-1">Capacity</label>
+                                            <input id="newVenueCapacity" type="number" min="1" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Cap." />
+                                        </div>
+                                        <div className="col-md-12 mt-2 d-flex justify-content-end gap-2">
+                                            <input type="file" id="importAdminVenueExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importAdminVenueExcel && window.importAdminVenueExcel(e)} />
+                                            <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importAdminVenueExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
+                                                <i className="fa-solid fa-file-excel me-1"></i> Import Excel
+                                            </button>
+                                            <button className="btn btn-sm btn-success" type="submit"><i className="fa-solid fa-plus me-1"></i>Add Venue</button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <div className="col-md-2">
-                                    <label className="form-label small mb-1">Block</label>
-                                    <input id="newVenueBlock" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Block" />
-                                </div>
-                                <div className="col-md-1">
-                                    <label className="form-label small mb-1">Capacity</label>
-                                    <input id="newVenueCapacity" type="number" min="1" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Cap." />
-                                </div>
-                                <div className="col-md-12 mt-2 d-flex justify-content-end gap-2">
-                                    <input type="file" id="importAdminVenueExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importAdminVenueExcel && window.importAdminVenueExcel(e)} />
-                                    <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importAdminVenueExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
-                                        <i className="fa-solid fa-file-excel me-1"></i> Import Excel
-                                    </button>
-                                    <button className="btn btn-sm btn-success" type="submit"><i className="fa-solid fa-plus me-1"></i>Add Venue</button>
-                                </div>
-                            </form>
-                            <div className="list-group" id="adminVenuesList"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1604,7 +1678,7 @@ export default function DashboardLayout() {
             </div>
 
                         {/* Edit Student Modal */}
-            <div className="modal fade" id="editStudentModal" tabIndex="-1">
+            <div className="modal fade" id="editStudentModal" tabIndex="-1" style={{ zIndex: 1060 }}>
                 <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                     <div className="modal-content bg-dark text-white border-secondary">
                         <div className="modal-header border-secondary d-flex justify-content-between align-items-center">
@@ -1802,6 +1876,7 @@ export default function DashboardLayout() {
                                             <th>Class</th>
                                             <th>Section</th>
                                             <th>Sem</th>
+                                            <th>Resident</th>
                                             <th className="text-center">Action</th>
                                         </tr>
                                     </thead>
@@ -1847,6 +1922,65 @@ export default function DashboardLayout() {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Edit Faculty Modal */}
+            <div className="modal fade" id="editFacultyModal" tabIndex="-1" style={{ zIndex: 1060 }}>
+                <div className="modal-dialog modal-lg modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-user-pen me-2"></i> Edit Faculty</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body">
+                            <input type="hidden" id="editFacultyId" />
+                            <div className="row g-3">
+                                <div className="col-md-6">
+                                    <label className="form-label small">Employee ID</label>
+                                    <input id="editFacultyEmpId" className="form-control bg-dark text-white border-secondary" placeholder="Employee ID" />
+                                </div>
+                                <div className="col-md-6">
+                                    <label className="form-label small">First Name</label>
+                                    <input id="editFacultyFirstName" className="form-control bg-dark text-white border-secondary" placeholder="First Name" />
+                                </div>
+                                <div className="col-md-6">
+                                    <label className="form-label small">Last Name</label>
+                                    <input id="editFacultyLastName" className="form-control bg-dark text-white border-secondary" placeholder="Last Name" />
+                                </div>
+                                <div className="col-md-6">
+                                    <label className="form-label small">Department</label>
+                                    <input id="editFacultyDept" className="form-control bg-dark text-white border-secondary" placeholder="Department" />
+                                </div>
+                                <div className="col-md-6">
+                                    <label className="form-label small">Subject Handling</label>
+                                    <input id="editFacultySubject" className="form-control bg-dark text-white border-secondary" placeholder="Subject Handling" />
+                                </div>
+                                <div className="col-md-6">
+                                    <label className="form-label small">Personal Email</label>
+                                    <input id="editFacultyPersonalEmail" type="email" className="form-control bg-dark text-white border-secondary" placeholder="Personal Email" />
+                                </div>
+                                <div className="col-md-6">
+                                    <label className="form-label small">College Email</label>
+                                    <input id="editFacultyCollegeEmail" type="email" className="form-control bg-dark text-white border-secondary" placeholder="College Email" />
+                                </div>
+                                <div className="col-md-6">
+                                    <label className="form-label small">Mobile 1</label>
+                                    <input id="editFacultyPhone1" className="form-control bg-dark text-white border-secondary" placeholder="Mobile 1" />
+                                </div>
+                                <div className="col-md-6">
+                                    <label className="form-label small">Mobile 2</label>
+                                    <input id="editFacultyPhone2" className="form-control bg-dark text-white border-secondary" placeholder="Mobile 2" />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="modal-footer border-secondary">
+                            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" className="btn btn-info" onClick={() => window.saveEditFaculty && window.saveEditFaculty()}>
+                                <i className="fa-solid fa-floppy-disk me-2"></i>Save Changes
+                            </button>
                         </div>
                     </div>
                 </div>

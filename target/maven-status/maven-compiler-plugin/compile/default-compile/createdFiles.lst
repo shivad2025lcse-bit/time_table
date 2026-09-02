@@ -4,6 +4,7 @@ com\smarttimetable\controller\TimetableController.class
 com\smarttimetable\repository\PeriodNotificationRepository.class
 com\smarttimetable\entity\Substitution.class
 com\smarttimetable\entity\Student.class
+com\smarttimetable\repository\TopicPerformanceRepository.class
 com\smarttimetable\entity\User.class
 com\smarttimetable\repository\TimetableOverrideRepository.class
 com\smarttimetable\repository\SubjectRepository.class
@@ -21,6 +22,7 @@ com\smarttimetable\dto\LoginRequest.class
 com\smarttimetable\repository\CourseRepository.class
 com\smarttimetable\repository\StudentRepository.class
 com\smarttimetable\service\TimetableGeneratorService.class
+com\smarttimetable\entity\TopicPerformance.class
 com\smarttimetable\service\DepartmentService.class
 com\smarttimetable\repository\AcademicYearRepository.class
 com\smarttimetable\controller\TimeSlotController.class
@@ -81,9 +83,11 @@ com\smarttimetable\service\AiEvaluationService.class
 com\smarttimetable\service\ClassroomService.class
 com\smarttimetable\service\package-info.class
 com\smarttimetable\entity\Section.class
+com\smarttimetable\entity\LearningResource.class
 com\smarttimetable\dto\QuizCreateRequest$QuestionDto.class
 com\smarttimetable\controller\TimetableOperationsController.class
 com\smarttimetable\repository\LaboratoryRepository.class
+com\smarttimetable\repository\LearningResourceRepository.class
 com\smarttimetable\entity\Classroom.class
 com\smarttimetable\entity\CoverageRequest.class
 com\smarttimetable\entity\package-info.class
@@ -106,6 +110,7 @@ com\smarttimetable\service\StudentService.class
 com\smarttimetable\entity\Department.class
 com\smarttimetable\exception\GlobalExceptionHandler.class
 com\smarttimetable\entity\Quiz.class
+com\smarttimetable\service\AiQuizGeneratorService.class
 com\smarttimetable\service\SectionService.class
 com\smarttimetable\entity\AcademicYear.class
 com\smarttimetable\controller\ClassroomController.class

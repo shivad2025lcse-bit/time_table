@@ -9,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
 public class QuizService {
     @Autowired
@@ -29,17 +32,31 @@ public class QuizService {
     private StudentRepository studentRepository;
 
     @Transactional
-    public Quiz createQuiz(Long sectionId, Long teacherId, String title, List<QuizQuestion> questions) {
+    public Quiz createQuiz(Long sectionId, Long teacherId, com.smarttimetable.dto.QuizCreateRequest request) {
         Section section = sectionRepository.findById(sectionId).orElseThrow(() -> new RuntimeException("Section not found"));
         Teacher teacher = teacherRepository.findById(teacherId).orElseThrow(() -> new RuntimeException("Teacher not found"));
         
         Quiz quiz = new Quiz();
-        quiz.setTitle(title);
+        quiz.setTitle(request.title);
+        quiz.setSubjectName(request.subjectName);
+        quiz.setTopic(request.topic);
+        quiz.setDifficulty(request.difficulty);
+        if (request.durationMinutes != null) quiz.setDurationMinutes(request.durationMinutes);
+        if (request.passingPercentage != null) quiz.setPassingPercentage(request.passingPercentage);
         quiz.setSection(section);
         quiz.setTeacher(teacher);
         quiz = quizRepository.save(quiz);
         
-        for (QuizQuestion q : questions) {
+        for (com.smarttimetable.dto.QuizCreateRequest.QuestionDto dto : request.questions) {
+            QuizQuestion q = new QuizQuestion();
+            q.setQuestionText(dto.questionText);
+            q.setType(dto.type);
+            q.setOptions(dto.options);
+            q.setCorrectAnswer(dto.correctAnswer);
+            q.setMarks(dto.marks != null ? dto.marks : 10);
+            q.setTopicConcept(dto.topicConcept);
+            q.setExplanation(dto.explanation);
+            q.setDifficulty(dto.difficulty);
             q.setQuiz(quiz);
             questionRepository.save(q);
         }
@@ -116,5 +133,12 @@ public class QuizService {
         return submissionRepository.findByQuizId(quizId)
             .stream().filter(s -> s.getPercentage() != null && s.getPercentage() < 50.0)
             .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteQuiz(Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+            .orElseThrow(() -> new RuntimeException("Quiz not found with id: " + quizId));
+        quizRepository.delete(quiz); // cascades to questions, submissions, answers
     }
 }

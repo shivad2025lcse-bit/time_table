@@ -52,6 +52,7 @@ D:\Java_project\src\main\java\com\smarttimetable\service\SubjectService.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\DepartmentController.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\TeacherController.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\SubjectRepository.java
+D:\Java_project\src\main\java\com\smarttimetable\entity\TopicPerformance.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Section.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\package-info.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Classroom.java
@@ -61,6 +62,8 @@ D:\Java_project\src\main\java\com\smarttimetable\controller\StudentController.ja
 D:\Java_project\src\main\java\com\smarttimetable\entity\CustomSubject.java
 D:\Java_project\src\main\java\com\smarttimetable\service\StudentService.java
 D:\Java_project\src\main\java\com\smarttimetable\dto\LoginRequest.java
+D:\Java_project\src\main\java\com\smarttimetable\service\AiQuizGeneratorService.java
+D:\Java_project\src\main\java\com\smarttimetable\repository\LearningResourceRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\service\LaboratoryService.java
 D:\Java_project\src\main\java\com\smarttimetable\service\TimetableOperationsService.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\AcademicYearRepository.java
@@ -84,6 +87,7 @@ D:\Java_project\src\main\java\com\smarttimetable\entity\SubjectType.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\CustomSubjectRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\QuizController.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\SectionController.java
+D:\Java_project\src\main\java\com\smarttimetable\repository\TopicPerformanceRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Department.java
 D:\Java_project\src\main\java\com\smarttimetable\service\ConflictService.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\AuthController.java
@@ -98,6 +102,7 @@ D:\Java_project\src\main\java\com\smarttimetable\repository\TimeSlotRepository.j
 D:\Java_project\src\main\java\com\smarttimetable\controller\FacultyAvailabilityController.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\TimeSlotController.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\PeriodNotificationRepository.java
+D:\Java_project\src\main\java\com\smarttimetable\entity\LearningResource.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\StudentNotificationRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\security\package-info.java
 D:\Java_project\src\main\java\com\smarttimetable\dto\QuizCreateRequest.java

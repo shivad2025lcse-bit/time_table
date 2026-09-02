@@ -9,8 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.smarttimetable.service.AiQuizGeneratorService;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/quizzes")
@@ -22,21 +24,29 @@ public class QuizController {
     @Autowired
     private QuizQuestionRepository questionRepository;
 
+    @Autowired
+    private AiQuizGeneratorService aiQuizGeneratorService;
+
     @PostMapping
     public ResponseEntity<?> createQuiz(@RequestBody QuizCreateRequest request) {
         try {
-            List<QuizQuestion> questions = new ArrayList<>();
-            for (QuizCreateRequest.QuestionDto dto : request.questions) {
-                QuizQuestion q = new QuizQuestion();
-                q.setQuestionText(dto.questionText);
-                q.setType(dto.type);
-                q.setOptions(dto.options);
-                q.setCorrectAnswer(dto.correctAnswer);
-                q.setMarks(dto.marks != null ? dto.marks : 10);
-                questions.add(q);
-            }
-            Quiz quiz = quizService.createQuiz(request.sectionId, request.teacherId, request.title, questions);
+            Quiz quiz = quizService.createQuiz(request.sectionId, request.teacherId, request);
             return ResponseEntity.ok(quiz);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/generate")
+    public ResponseEntity<?> generateQuestions(@RequestBody Map<String, Object> request) {
+        try {
+            String topic = (String) request.get("topic");
+            String notes = (String) request.get("notes");
+            String difficulty = (String) request.getOrDefault("difficulty", "Medium");
+            int count = Integer.parseInt(request.getOrDefault("count", "5").toString());
+
+            List<QuizQuestion> questions = aiQuizGeneratorService.generateQuestions(topic, notes, difficulty, count);
+            return ResponseEntity.ok(questions);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -79,5 +89,15 @@ public class QuizController {
     @GetMapping("/{quizId}/results/weak")
     public ResponseEntity<List<QuizSubmission>> getWeakStudents(@PathVariable Long quizId) {
         return ResponseEntity.ok(quizService.getWeakStudentsForQuiz(quizId));
+    }
+
+    @DeleteMapping("/{quizId}")
+    public ResponseEntity<?> deleteQuiz(@PathVariable Long quizId) {
+        try {
+            quizService.deleteQuiz(quizId);
+            return ResponseEntity.ok("Quiz deleted successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
     }
 }

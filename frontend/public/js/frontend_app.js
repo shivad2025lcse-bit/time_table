@@ -608,7 +608,7 @@ function saveTimetableEdit(section, day, pIdx, slotData) {
 }
 
 // Course Incharge Reference List
-const courseReferenceList = [
+let courseReferenceList = JSON.parse(localStorage.getItem('modified_courseReferenceList')) || [
     { short: 'IoT', code: 'P23CS408 Internet of Things', faculty: 'Mr.V.Parthipan, AP/ECE', venue: '1CloudHub', cat: 'PC', credits: 3, hrs: '4' },
     { short: 'DVT', code: 'P23CS513 Data Visualization Techniques', faculty: 'Dr.A.Anandaraj, AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
     { short: 'BDA', code: 'P23CS521 Big Data Analytics', faculty: 'Dr.A.Sarfaraz Ahmed,AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
@@ -3200,14 +3200,56 @@ function renderAdminResourcesUI() {
     const venueList = document.getElementById('adminVenuesList');
     const classList = document.getElementById('adminClassesList');
     if (subList) {
-        subList.innerHTML = adminResources.subjects.length ? adminResources.subjects.map((s, i) =>
-            `<tr><td>${s.code}</td><td>${s.title}</td><td>${s.faculty}</td><td>${s.venue || '-'}</td><td><button class="btn btn-sm btn-outline-danger" onclick="removeAdminSubject(${i})">Remove</button></td></tr>`
-        ).join('') : '<tr><td colspan="5" class="text-muted text-center">No custom subjects.</td></tr>';
+        const allSubjects = [...courseReferenceList];
+        
+        subList.innerHTML = allSubjects.length ? allSubjects.map((s, i) => {
+            const parts = s.code.split(' ');
+            const displayCode = parts[0];
+            const displayTitle = parts.slice(1).join(' ');
+            const safeCode = encodeURIComponent(s.code);
+            return `<tr>
+                <td>${displayCode}</td>
+                <td>${displayTitle}</td>
+                <td>${s.faculty}</td>
+                <td>${s.venue || '-'}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-info me-1" onclick="editAdminSubjectByIdx(${i})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAdminSubjectByIdx(${i})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>`;
+        }).join('') : '<tr><td colspan="5" class="text-muted text-center">No subjects found.</td></tr>';
     }
+    
     if (venueList) {
-        venueList.innerHTML = adminResources.venues.length ? adminResources.venues.map((v, i) =>
-            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? 'â€” Block ' + v.block : ''}${v.capacity ? ' â€” Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
-        ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No custom venues.</div>';
+        const builtInVenues = new Set();
+        courseReferenceList.forEach(c => {
+            if (c.venue && c.venue !== 'Not Assigned' && !adminResources.venues.some(v => (v.name || v) === c.venue)) {
+                builtInVenues.add(c.venue);
+            }
+        });
+        
+        let venueHtml = '';
+        builtInVenues.forEach((v, bIdx) => {
+            venueHtml += `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
+                <span><strong>${v}</strong> <small class="text-muted">Built-in</small></span>
+                <div>
+                    <button class="btn btn-sm btn-outline-info me-1" onclick="editAdminBuiltinVenue('${v.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAdminBuiltinVenue('${v.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>`;
+        });
+        
+        venueHtml += adminResources.venues.map((v, i) =>
+            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
+                <span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? '— Block ' + v.block : ''}${v.capacity ? ' — Capacity ' + v.capacity : ''}</small></span>
+                <div>
+                    <button class="btn btn-sm btn-outline-info me-1" onclick="editAdminCustomVenue(${i})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAdminCustomVenue(${i})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>`
+        ).join('');
+        
+        venueList.innerHTML = venueHtml || '<div class="list-group-item bg-dark text-muted border-secondary">No venues found.</div>';
     }
     if (classList) {
         classList.innerHTML = activeSections.length ? activeSections.map((s, i) =>
@@ -3304,6 +3346,118 @@ function importAdminSubjectExcel(event) {
     reader.readAsBinaryString(file);
     event.target.value = '';
 }
+
+// ============================================================
+// ADMIN SUBJECT & VENUE EDIT / DELETE HANDLERS
+// ============================================================
+
+window.editAdminSubjectByIdx = function(idx) {
+    const s = courseReferenceList[idx];
+    if (!s) return;
+    const parts = s.code.split(' ');
+    const oldCode = parts[0];
+    const oldTitle = parts.slice(1).join(' ');
+
+    const newCode = prompt('Edit Subject Code:', oldCode);
+    if (newCode === null) return;
+    const newTitle = prompt('Edit Subject Name:', oldTitle);
+    if (newTitle === null) return;
+    const newFaculty = prompt('Edit Faculty Incharge:', s.faculty);
+    if (newFaculty === null) return;
+    const newVenue = prompt('Edit Venue:', s.venue || '');
+    if (newVenue === null) return;
+
+    // Update courseReferenceList entry
+    s.code = newCode.trim() + ' ' + newTitle.trim();
+    s.faculty = newFaculty.trim();
+    s.venue = newVenue.trim();
+    localStorage.setItem('modified_courseReferenceList', JSON.stringify(courseReferenceList));
+
+    // Also update adminResources.subjects if there's a custom entry
+    const cs = adminResources.subjects.find(c => c.short === s.short || c.code === oldCode);
+    if (cs) {
+        cs.code = newCode.trim();
+        cs.title = newTitle.trim();
+        cs.faculty = newFaculty.trim();
+        cs.venue = newVenue.trim();
+        saveAdminResources();
+    }
+
+    renderAdminResourcesUI();
+    if (typeof renderCourseRefTable === 'function') renderCourseRefTable();
+};
+
+window.deleteAdminSubjectByIdx = function(idx) {
+    const s = courseReferenceList[idx];
+    if (!s) return;
+    if (!confirm('Delete "' + s.code + '"? This cannot be undone.')) return;
+
+    const parts = s.code.split(' ');
+    const oldCode = parts[0];
+
+    // Remove from courseReferenceList
+    courseReferenceList.splice(idx, 1);
+    localStorage.setItem('modified_courseReferenceList', JSON.stringify(courseReferenceList));
+
+    // Remove from adminResources.subjects if present
+    adminResources.subjects = adminResources.subjects.filter(c => c.code !== oldCode && c.short !== s.short);
+    saveAdminResources();
+
+    renderAdminResourcesUI();
+    if (typeof renderCourseRefTable === 'function') renderCourseRefTable();
+};
+
+window.editAdminBuiltinVenue = function(venueName) {
+    const newName = prompt('Edit Venue Name:', venueName);
+    if (newName === null || !newName.trim()) return;
+    courseReferenceList.forEach(c => {
+        if (c.venue === venueName) c.venue = newName.trim();
+    });
+    localStorage.setItem('modified_courseReferenceList', JSON.stringify(courseReferenceList));
+    renderAdminResourcesUI();
+};
+
+window.deleteAdminBuiltinVenue = function(venueName) {
+    if (!confirm('Remove built-in venue "' + venueName + '"? Subjects using it will be set to "Not Assigned".')) return;
+    courseReferenceList.forEach(c => {
+        if (c.venue === venueName) c.venue = 'Not Assigned';
+    });
+    localStorage.setItem('modified_courseReferenceList', JSON.stringify(courseReferenceList));
+    renderAdminResourcesUI();
+};
+
+window.editAdminCustomVenue = function(idx) {
+    const v = adminResources.venues[idx];
+    if (!v) return;
+    const oldName = v.name || v;
+
+    const newName = prompt('Edit Venue Name:', oldName);
+    if (newName === null || !newName.trim()) return;
+
+    if (typeof v === 'string') {
+        adminResources.venues[idx] = newName.trim();
+    } else {
+        v.name = newName.trim();
+        const newType = prompt('Edit Type (Class/Lab):', v.type || '');
+        if (newType !== null) v.type = newType.trim();
+        const newBlock = prompt('Edit Block:', v.block || '');
+        if (newBlock !== null) v.block = newBlock.trim();
+        const newCap = prompt('Edit Capacity:', v.capacity || '');
+        if (newCap !== null) v.capacity = newCap.trim();
+    }
+    saveAdminResources();
+    renderAdminResourcesUI();
+};
+
+window.deleteAdminCustomVenue = function(idx) {
+    const v = adminResources.venues[idx];
+    if (!v) return;
+    if (!confirm('Delete venue "' + (v.name || v) + '"?')) return;
+    adminResources.venues.splice(idx, 1);
+    saveAdminResources();
+    renderAdminResourcesUI();
+};
+
 
 function removeAdminSubject(idx) {
     if (!adminOnly()) return;
@@ -4164,6 +4318,7 @@ async function loadRecentStudents() {
                     <td><small>${classDisplay}</small></td>
                     <td><span class="badge bg-secondary">${secDisplay}</span></td>
                     <td class="text-center">${s.semester || semDisplay}</td>
+                    <td><small>${s.residentType || '-'}</small></td>
                     <td class="text-center">
                         <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editPersistentStudent(${s.id || `'${roll}'`})" title="Edit student"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id || `'${roll}'`})" title="Delete student"><i class="fa-solid fa-trash"></i></button>
@@ -4190,7 +4345,9 @@ window.loadAdminFullFaculty = async function () {
             const renderRows = () => {
                 const displayData = data.length > 0 ? data : (window.staffDirectory || []);
                 if (displayData.length === 0) return '<tr><td colspan="9" class="text-center text-muted">No faculty records found.</td></tr>';
-                return displayData.map(t => `
+                // Store data globally so Edit can access full object by index
+                window._adminFacultyData = displayData;
+                return displayData.map((t, idx) => `
                     <tr>
                         <td>${t.employeeId || '-'}</td>
                         <td>${((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-'}</td>
@@ -4200,7 +4357,14 @@ window.loadAdminFullFaculty = async function () {
                         <td>${t.collegeEmail || '-'}</td>
                         <td>${t.phone1 || t.phone || '-'}</td>
                         <td>${t.phone2 || '-'}</td>
-                        <td><button class="btn btn-sm btn-outline-danger" onclick="deletePersistentFaculty(${t.id || `'${t.name}'`})"><i class="fa-solid fa-trash"></i></button></td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-outline-info me-1" title="Edit Faculty"
+                                onclick="openEditFaculty(${idx})"
+                            ><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" title="Delete Faculty"
+                                onclick="deletePersistentFaculty(${t.id || idx})"
+                            ><i class="fa-solid fa-trash"></i></button>
+                        </td>
                     </tr>
                 `).join('');
             };
@@ -4209,6 +4373,68 @@ window.loadAdminFullFaculty = async function () {
         }
     } catch (err) {
         if (adminBody) adminBody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Error loading faculty details.</td></tr>';
+    }
+};
+
+window.openEditFaculty = function(idxOrObj) {
+    let t;
+    if (typeof idxOrObj === 'number') {
+        t = (window._adminFacultyData || [])[idxOrObj];
+    } else {
+        t = idxOrObj;
+    }
+    if (!t) return;
+    document.getElementById('editFacultyId').value = t.id || '';
+    document.getElementById('editFacultyEmpId').value = t.employeeId || '';
+    document.getElementById('editFacultyFirstName').value = t.firstName || '';
+    document.getElementById('editFacultyLastName').value = t.lastName || '';
+    document.getElementById('editFacultyDept').value = (t.department && t.department.name) ? t.department.name : (t.dept || '');
+    document.getElementById('editFacultySubject').value = t.subjectHandling || '';
+    document.getElementById('editFacultyPersonalEmail').value = t.personalEmail || t.email || '';
+    document.getElementById('editFacultyCollegeEmail').value = t.collegeEmail || '';
+    document.getElementById('editFacultyPhone1').value = t.phone1 || t.phone || '';
+    document.getElementById('editFacultyPhone2').value = t.phone2 || '';
+    // Close the view modal and open edit modal
+    const viewModal = bootstrap.Modal.getInstance(document.getElementById('adminViewFacultyModal'));
+    if (viewModal) viewModal.hide();
+    setTimeout(() => {
+        const editModal = new bootstrap.Modal(document.getElementById('editFacultyModal'));
+        editModal.show();
+    }, 400);
+};
+
+window.saveEditFaculty = async function() {
+    const id = document.getElementById('editFacultyId').value;
+    if (!id) { alert('No faculty selected.'); return; }
+
+    const payload = {
+        employeeId: document.getElementById('editFacultyEmpId').value.trim(),
+        firstName: document.getElementById('editFacultyFirstName').value.trim(),
+        lastName: document.getElementById('editFacultyLastName').value.trim(),
+        subjectHandling: document.getElementById('editFacultySubject').value.trim(),
+        personalEmail: document.getElementById('editFacultyPersonalEmail').value.trim(),
+        collegeEmail: document.getElementById('editFacultyCollegeEmail').value.trim(),
+        phone1: document.getElementById('editFacultyPhone1').value.trim(),
+        phone2: document.getElementById('editFacultyPhone2').value.trim(),
+    };
+
+    try {
+        const res = await apiFetch(`/api/teachers/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('editFacultyModal'))?.hide();
+            showToast('Faculty Updated', `${payload.firstName} ${payload.lastName} updated successfully.`);
+            loadAdminFullFaculty();
+        } else {
+            const errText = await res.text();
+            alert('Failed to update faculty: ' + errText);
+        }
+    } catch(err) {
+        console.error(err);
+        alert('Error updating faculty. Check console for details.');
     }
 };
 
@@ -5030,6 +5256,15 @@ window.editPersistentStudent = function(id) {
     
     const modalEl = document.getElementById('editStudentModal');
     if (modalEl) {
+        // Prevent body from losing modal-open class when edit modal closes
+        const ensureScroll = function() {
+            modalEl.removeEventListener('hidden.bs.modal', ensureScroll);
+            if (document.getElementById('manageStudentsModal').classList.contains('show')) {
+                document.body.classList.add('modal-open');
+            }
+        };
+        modalEl.addEventListener('hidden.bs.modal', ensureScroll);
+        
         const modal = new bootstrap.Modal(modalEl);
         modal.show();
     }
@@ -5265,4 +5500,181 @@ window.sectionChanged = function(sec) {
     currentSection = sec;
     localStorage.setItem('sece_last_viewed_section', sec);
     renderTimetableGrid();
+};
+
+// ============================================================
+// ADMIN: USER CREDENTIALS MANAGEMENT
+// ============================================================
+
+window.currentCredRole = 'STUDENT';
+window.allCredData = [];
+
+window.renderCredentialsList = function() {
+    window.switchCredTab(window.currentCredRole);
+};
+
+window.switchCredTab = function(role) {
+    window.currentCredRole = role;
+    
+    // Update active tab UI
+    const tabs = ['STUDENT', 'FACULTY', 'CLASS_ADVISOR'];
+    const ids = ['credTabStudents', 'credTabFaculty', 'credTabAdvisor'];
+    
+    tabs.forEach((t, i) => {
+        const btn = document.getElementById(ids[i]);
+        if (btn) {
+            if (t === role) {
+                btn.classList.add('active', 'text-white');
+                btn.classList.remove('text-info', 'text-warning');
+                if (t === 'FACULTY') btn.classList.add('bg-info');
+                else if (t === 'CLASS_ADVISOR') btn.classList.add('bg-warning', 'text-dark');
+                else btn.classList.add('bg-primary');
+            } else {
+                btn.classList.remove('active', 'text-white', 'bg-primary', 'bg-info', 'bg-warning', 'text-dark');
+                if (t === 'FACULTY') btn.classList.add('text-info');
+                else if (t === 'CLASS_ADVISOR') btn.classList.add('text-warning');
+                else btn.classList.add('text-primary');
+            }
+        }
+    });
+    
+    // Fetch and render
+    const tbody = document.getElementById('credentialsTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-muted">Loading credentials...</td></tr>';
+    
+    apiFetch(`/api/admin/credentials?role=${role}`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+            window.allCredData = data;
+            document.getElementById('credSearchInput').value = '';
+            window.filterCredentials();
+        })
+        .catch(err => {
+            console.error(err);
+            if (tbody) tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-danger">Error loading credentials.</td></tr>';
+        });
+};
+
+window.filterCredentials = function() {
+    const query = (document.getElementById('credSearchInput').value || '').toLowerCase();
+    const tbody = document.getElementById('credentialsTableBody');
+    if (!tbody) return;
+    
+    const filtered = window.allCredData.filter(u => 
+        (u.username && u.username.toLowerCase().includes(query)) ||
+        (u.email && u.email.toLowerCase().includes(query))
+    );
+    
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-muted">No matching credentials found.</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = filtered.map((u, i) => `
+        <tr>
+            <td class="text-muted">${i + 1}</td>
+            <td><code class="text-warning fw-bold">${u.username}</code></td>
+            <td><strong>${u.email ? u.email.split('@')[0].toUpperCase() : 'User'}</strong></td>
+            <td><small class="text-muted">${u.role}</small></td>
+            <td>
+                <div class="input-group input-group-sm" style="max-width: 200px;">
+                    <input type="text" class="form-control bg-dark text-white border-secondary border-end-0" value="${u.rawPassword}" readonly id="pwd_${i}">
+                    <button class="btn btn-outline-secondary border-start-0" type="button" onclick="const p = document.getElementById('pwd_${i}'); p.type = p.type === 'password' ? 'text' : 'password';" title="Toggle Visibility">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('${u.rawPassword}'); showToast('Copied', 'Password copied to clipboard');" title="Copy Password">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                </div>
+            </td>
+            <td>
+                ${u.active === 'true' || u.active === true 
+                    ? '<span class="badge bg-success">Active</span>' 
+                    : '<span class="badge bg-danger">Disabled</span>'}
+            </td>
+        </tr>
+    `).join('');
+    
+    // Default masks passwords
+    filtered.forEach((_, i) => {
+        const p = document.getElementById(`pwd_${i}`);
+        if(p) p.type = 'password';
+    });
+};
+
+// ============================================================
+// ADMIN: ENROLLED FACULTY DETAILS MANAGEMENT
+// ============================================================
+
+window.renderAdminFacultyDetails = async function() {
+    const tbody = document.getElementById('adminFacultyDetailsBody');
+    if (!tbody) return;
+    
+    try {
+        const res = await apiFetch('/api/teachers');
+        if (res.ok) {
+            const data = await res.json();
+            window._adminFacultyData = data;
+            
+            const renderRows = (list) => {
+                if (!list || list.length === 0) return '<tr><td colSpan="8" class="text-center text-muted py-4">No faculty enrolled yet.</td></tr>';
+                return list.map((t, idx) => `
+                    <tr>
+                        <td><strong>${((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-'}</strong></td>
+                        <td>${t.department ? t.department.name : (t.department || t.dept || '-')}</td>
+                        <td>${t.subjectHandling || '-'}</td>
+                        <td>${t.personalEmail || t.email || '-'}</td>
+                        <td>${t.collegeEmail || '-'}</td>
+                        <td>${t.phone1 || t.phone || '-'}</td>
+                        <td>${t.phone2 || '-'}</td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-outline-info me-1" title="Edit Faculty" onclick="window.openEditFaculty(${idx})"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" title="Delete Faculty" onclick="window.deletePersistentFaculty(${t.id || idx})"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+            };
+            
+            tbody.innerHTML = renderRows(data);
+        }
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-danger py-4">Error loading faculty details.</td></tr>';
+    }
+};
+
+window.searchAdminFacultyDetails = function() {
+    const query = (document.getElementById('adminFacultySearchInput').value || '').toLowerCase();
+    const tbody = document.getElementById('adminFacultyDetailsBody');
+    if (!tbody || !window._adminFacultyData) return;
+    
+    const filtered = window._adminFacultyData.filter(t => {
+        const name = (((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '').toLowerCase();
+        const dept = (t.department ? t.department.name : (t.department || t.dept || '')).toLowerCase();
+        return name.includes(query) || dept.includes(query);
+    });
+    
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">No matching faculty found.</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = filtered.map(t => {
+        const originalIdx = window._adminFacultyData.indexOf(t);
+        return `
+            <tr>
+                <td><strong>${((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-'}</strong></td>
+                <td>${t.department ? t.department.name : (t.department || t.dept || '-')}</td>
+                <td>${t.subjectHandling || '-'}</td>
+                <td>${t.personalEmail || t.email || '-'}</td>
+                <td>${t.collegeEmail || '-'}</td>
+                <td>${t.phone1 || t.phone || '-'}</td>
+                <td>${t.phone2 || '-'}</td>
+                <td class="text-nowrap">
+                    <button class="btn btn-sm btn-outline-info me-1" title="Edit Faculty" onclick="window.openEditFaculty(${originalIdx})"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" title="Delete Faculty" onclick="window.deletePersistentFaculty(${t.id || originalIdx})"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 };
