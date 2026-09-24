@@ -665,6 +665,8 @@ setTimeout(() => {
     renderAdminResourcesUI();
     updateForgotPasswordHint();
     restoreLoginSession();
+    // Populate faculty personal TT panel on load
+    if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
 
     renderNotificationStatus();
     toggleSubstitutionUI();
@@ -3315,20 +3317,107 @@ function renderAdminResourcesUI() {
     const subList = document.getElementById('adminSubjectsList');
     const venueList = document.getElementById('adminVenuesList');
     const classList = document.getElementById('adminClassesList');
+
     if (subList) {
-        subList.innerHTML = adminResources.subjects.length ? adminResources.subjects.map((s, i) =>
-            `<tr><td>${s.code}</td><td>${s.title}</td><td>${s.faculty}</td><td>${s.venue || '-'}</td><td><button class="btn btn-sm btn-outline-danger" onclick="removeAdminSubject(${i})">Remove</button></td></tr>`
-        ).join('') : '<tr><td colspan="5" class="text-muted text-center">No custom subjects.</td></tr>';
+        // All built-in TT subjects (editable via override, deletable)
+        const builtInDefaults = [
+            { code: 'SE',        title: 'Software Engineering',                     faculty: 'Dr.S.K.Harikarthick',                        venue: 'SF 04' },
+            { code: 'JAVA',      title: 'Java Programming',                         faculty: 'Mr.M.Karthickraja',                          venue: 'SF 04' },
+            { code: 'AIML',      title: 'Artificial Intelligence & ML',             faculty: 'Dr.N.Saranya',                               venue: 'SF 04' },
+            { code: 'DM',        title: 'Discrete Mathematics',                     faculty: 'Dr.N.Murugavelli',                           venue: 'SF 04' },
+            { code: 'DAA',       title: 'Design & Analysis of Algorithms',          faculty: 'Mr.R.Karthick',                              venue: 'SF 04' },
+            { code: 'DBMS',      title: 'Database Management Systems',              faculty: 'Ms.E.Saranya',                               venue: 'SF 04' },
+            { code: 'UHV',       title: 'Universal Human Values',                   faculty: 'Dr.M.P.Sindhu',                              venue: 'SF 04' },
+            { code: 'COE',       title: 'Center of Excellence',                     faculty: 'Domain Experts',                             venue: 'COE Lab' },
+            { code: 'SS',        title: 'Soft Skills',                              faculty: 'Placement Team',                             venue: 'SF 04' },
+            { code: 'ALT',       title: 'Advanced Logical Thinking',                faculty: 'Placement Team',                             venue: 'SF 05' },
+            { code: 'LIB',       title: 'Library Hour',                             faculty: '-',                                          venue: 'Library' },
+            { code: 'TWM',       title: 'Tutor Ward Meeting',                       faculty: 'Class Advisor',                              venue: 'SF 04' },
+            { code: 'AIML LAB',  title: 'AIML Laboratory',                          faculty: 'Dr.N.Saranya / Dr.M.Praveen',                venue: 'Intel AI Lab' },
+            { code: 'JAVA LAB',  title: 'Java Programming Laboratory',              faculty: 'Mr.M.Karthickraja / Mr.B.Saravanan',         venue: 'Full Stack Lab' },
+            { code: 'SE LAB',    title: 'Software Engineering Laboratory',          faculty: 'Dr.S.K.Harikarthick / Mr.P.Arunprakash',     venue: 'Intel AI Lab' },
+            { code: 'DAA LAB',   title: 'Design & Analysis Lab',                    faculty: 'Mr.R.Karthick / Ms.Rajeswari',               venue: 'Full Stack Lab' },
+            { code: 'DBMS LAB',  title: 'Database Management Lab',                  faculty: 'Ms.E.Saranya / Dr.K.Suresh kumar',           venue: 'Cloud & DevOps Lab' },
+        ];
+
+        // Merge courseReferenceList
+        courseReferenceList.forEach(c => {
+            const code = c.short || (c.code || '').split(' ')[0];
+            if (!builtInDefaults.some(b => b.code.toUpperCase() === code.toUpperCase())) {
+                builtInDefaults.push({ code, title: c.code || '', faculty: c.faculty || '-', venue: c.venue || '-' });
+            }
+        });
+
+        // Load any built-in overrides saved by admin
+        let builtInOverrides = {};
+        let hiddenBuiltIns = [];
+        try {
+            builtInOverrides = JSON.parse(localStorage.getItem('sece_builtin_subject_overrides') || '{}');
+            hiddenBuiltIns = JSON.parse(localStorage.getItem('sece_hidden_builtin_subjects') || '[]');
+        } catch(e) {}
+
+        // Custom rows (fully editable + removable)
+        const customRows = adminResources.subjects.map((s, i) =>
+            `<tr style="background:rgba(13,202,240,0.08)">
+                <td><span class="badge bg-info text-dark">${s.code}</span></td>
+                <td class="fw-bold">${s.title}</td>
+                <td class="small">${s.faculty || '-'}</td>
+                <td class="small text-success">${s.venue || '-'}</td>
+                <td class="text-center">
+                    <div class="d-flex gap-1 justify-content-center">
+                        <span class="badge bg-success" style="font-size:0.65rem">Custom</span>
+                        <button class="btn btn-sm btn-outline-warning py-0 px-1" onclick="editAdminSubject('custom',${i})" title="Edit Subject">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deleteAdminSubject('custom',${i})" title="Delete Subject">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>`
+        ).join('');
+
+        // Built-in rows (editable with override, deletable/hideable)
+        const builtInRows = builtInDefaults
+            .filter(s => !hiddenBuiltIns.includes(s.code))
+            .map((s, i) => {
+                const ov = builtInOverrides[s.code] || {};
+                const code    = ov.code    || s.code;
+                const title   = ov.title   || s.title;
+                const faculty = ov.faculty || s.faculty;
+                const venue   = ov.venue   || s.venue;
+                const isEdited = !!builtInOverrides[s.code];
+                return `<tr>
+                    <td><span class="badge ${isEdited ? 'bg-warning text-dark' : 'bg-secondary'}">${code}</span></td>
+                    <td>${title}${isEdited ? ' <span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">Edited</span>' : ''}</td>
+                    <td class="text-muted small">${faculty}</td>
+                    <td class="text-muted small">${venue}</td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <button class="btn btn-sm btn-outline-warning py-0 px-1" onclick="editAdminSubject('builtin','${s.code}')" title="Edit Subject">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deleteAdminSubject('builtin','${s.code}')" title="Hide Subject">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+        subList.innerHTML = (customRows + builtInRows) ||
+            '<tr><td colspan="5" class="text-muted text-center py-3">No subjects found.</td></tr>';
     }
+
     if (venueList) {
         venueList.innerHTML = adminResources.venues.length ? adminResources.venues.map((v, i) =>
-            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? 'â€” Block ' + v.block : ''}${v.capacity ? ' â€” Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
+            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? '– Block ' + v.block : ''}${v.capacity ? ' – Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
         ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No custom venues.</div>';
     }
     if (classList) {
         classList.innerHTML = activeSections.length ? activeSections.map((s, i) =>
             `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
-                <span><strong>${s.name}</strong> <small class="text-muted">(${s.dept}) â€” ${s.classroom}${s.block ? ' â€” Block ' + s.block : ''}</small></span>
+                <span><strong>${s.name}</strong> <small class="text-muted">(${s.dept}) – ${s.classroom}${s.block ? ' – Block ' + s.block : ''}</small></span>
                 <button class="btn btn-sm btn-outline-danger" onclick="removeSection(${i})">Remove</button>
             </div>`
         ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No classes.</div>';
@@ -3362,6 +3451,175 @@ function handleAddSubject(e) {
     document.getElementById('addSubjectForm').reset();
     showToast('Subject Added', `${short} - ${title} is now available in Edit Period.`);
 }
+
+
+window.editAdminSubject = function(type, id) {
+    if (!adminOnly()) return;
+    
+    // Find the subject
+    let subject = null;
+    let originalCode = null;
+    if (type === 'custom') {
+        subject = adminResources.subjects[id];
+        originalCode = subject.code;
+    } else {
+        originalCode = id;
+        let overrides = {};
+        try { overrides = JSON.parse(localStorage.getItem('sece_builtin_subject_overrides') || '{}'); } catch(e){}
+        subject = overrides[id];
+        if (!subject) {
+            // Need to find it from built-in defaults if not overridden yet. We can grab it from courseReferenceList
+            subject = courseReferenceList.find(c => c.short === id || (c.code || '').startsWith(id));
+            if (!subject) {
+                // Hardcoded fallback for known built-ins if not in courseReferenceList
+                const known = {
+                    'SE': { code: 'SE', title: 'Software Engineering', faculty: 'Dr.S.K.Harikarthick', venue: 'SF 04' },
+                    'JAVA': { code: 'JAVA', title: 'Java Programming', faculty: 'Mr.M.Karthickraja', venue: 'SF 04' },
+                    'AIML': { code: 'AIML', title: 'Artificial Intelligence & ML', faculty: 'Dr.N.Saranya', venue: 'SF 04' },
+                    'DM': { code: 'DM', title: 'Discrete Mathematics', faculty: 'Dr.N.Murugavelli', venue: 'SF 04' },
+                    'DAA': { code: 'DAA', title: 'Design & Analysis of Algorithms', faculty: 'Mr.R.Karthick', venue: 'SF 04' },
+                    'DBMS': { code: 'DBMS', title: 'Database Management Systems', faculty: 'Ms.E.Saranya', venue: 'SF 04' },
+                    'UHV': { code: 'UHV', title: 'Universal Human Values', faculty: 'Dr.M.P.Sindhu', venue: 'SF 04' },
+                    'COE': { code: 'COE', title: 'Center of Excellence', faculty: 'Domain Experts', venue: 'COE Lab' },
+                    'SS': { code: 'SS', title: 'Soft Skills', faculty: 'Placement Team', venue: 'SF 04' },
+                    'ALT': { code: 'ALT', title: 'Advanced Logical Thinking', faculty: 'Placement Team', venue: 'SF 05' },
+                    'LIB': { code: 'LIB', title: 'Library Hour', faculty: '-', venue: 'Library' },
+                    'TWM': { code: 'TWM', title: 'Tutor Ward Meeting', faculty: 'Class Advisor', venue: 'SF 04' },
+                    'AIML LAB': { code: 'AIML LAB', title: 'AIML Laboratory', faculty: 'Dr.N.Saranya / Dr.M.Praveen', venue: 'Intel AI Lab' },
+                    'JAVA LAB': { code: 'JAVA LAB', title: 'Java Programming Laboratory', faculty: 'Mr.M.Karthickraja / Mr.B.Saravanan', venue: 'Full Stack Lab' },
+                    'SE LAB': { code: 'SE LAB', title: 'Software Engineering Laboratory', faculty: 'Dr.S.K.Harikarthick / Mr.P.Arunprakash', venue: 'Intel AI Lab' },
+                    'DAA LAB': { code: 'DAA LAB', title: 'Design & Analysis Lab', faculty: 'Mr.R.Karthick / Ms.Rajeswari', venue: 'Full Stack Lab' },
+                    'DBMS LAB': { code: 'DBMS LAB', title: 'Database Management Lab', faculty: 'Ms.E.Saranya / Dr.K.Suresh kumar', venue: 'Cloud & DevOps Lab' }
+                };
+                subject = known[id] || { code: id, title: id, faculty: '-', venue: '-' };
+            } else {
+                subject = { code: originalCode, title: subject.code, faculty: subject.faculty, venue: subject.venue };
+            }
+        }
+    }
+    
+    if (!subject) return;
+
+    let modal = document.getElementById('editSubjectModalDynamic');
+    if (!modal) {
+        document.body.insertAdjacentHTML('beforeend', `
+            <div class="modal fade" id="editSubjectModalDynamic" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content bg-dark text-white border-secondary">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title text-info"><i class="fa-solid fa-pen me-2"></i> Edit Subject</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="dynamicEditSubjectForm">
+                                <input type="hidden" id="editSubjectOriginalCode">
+                                <input type="hidden" id="editSubjectType">
+                                <input type="hidden" id="editSubjectCustomIndex">
+                                <div class="mb-2">
+                                    <label class="form-label small">Subject Code (Cannot change for Built-in)</label>
+                                    <input type="text" id="editSubjectCode" class="form-control form-control-sm bg-dark text-white border-secondary" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small">Subject Name</label>
+                                    <input type="text" id="editSubjectTitle" class="form-control form-control-sm bg-dark text-white border-secondary" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small">Faculty incharge</label>
+                                    <input type="text" id="editSubjectFaculty" class="form-control form-control-sm bg-dark text-white border-secondary" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small">Venue</label>
+                                    <input type="text" id="editSubjectVenue" class="form-control form-control-sm bg-dark text-white border-secondary">
+                                </div>
+                                <div class="text-end">
+                                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-sm btn-success">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        document.getElementById('dynamicEditSubjectForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const origCode = document.getElementById('editSubjectOriginalCode').value;
+            const t = document.getElementById('editSubjectType').value;
+            const customIdx = document.getElementById('editSubjectCustomIndex').value;
+            
+            const code = document.getElementById('editSubjectCode').value.trim().toUpperCase();
+            const title = document.getElementById('editSubjectTitle').value.trim();
+            const faculty = document.getElementById('editSubjectFaculty').value.trim();
+            const venue = document.getElementById('editSubjectVenue').value.trim();
+            
+            if (t === 'custom') {
+                adminResources.subjects[customIdx] = { ...adminResources.subjects[customIdx], code, short: code, title, faculty, venue };
+                saveAdminResources();
+                // Also update courseReferenceList
+                const refIdx = courseReferenceList.findIndex(c => c.short === origCode);
+                if(refIdx >= 0) {
+                    courseReferenceList[refIdx] = { ...courseReferenceList[refIdx], short: code, code: `${code} ${title}`, faculty, venue };
+                }
+            } else {
+                let overrides = {};
+                try { overrides = JSON.parse(localStorage.getItem('sece_builtin_subject_overrides') || '{}'); } catch(e){}
+                overrides[origCode] = { code, title, faculty, venue };
+                localStorage.setItem('sece_builtin_subject_overrides', JSON.stringify(overrides));
+            }
+            
+            bootstrap.Modal.getInstance(document.getElementById('editSubjectModalDynamic')).hide();
+            renderAdminResourcesUI();
+            renderCourseRefTable();
+            populateEditSubjectSelect();
+            if(window.renderFacultyPersonalTT) window.renderFacultyPersonalTT();
+            showToast('Subject Updated', `${code} has been updated.`);
+        });
+    }
+    
+    document.getElementById('editSubjectOriginalCode').value = originalCode;
+    document.getElementById('editSubjectType').value = type;
+    document.getElementById('editSubjectCustomIndex').value = id; 
+    
+    const codeInput = document.getElementById('editSubjectCode');
+    codeInput.value = subject.code || originalCode;
+    codeInput.disabled = (type === 'builtin'); 
+    
+    document.getElementById('editSubjectTitle').value = subject.title || '';
+    document.getElementById('editSubjectFaculty').value = subject.faculty || '';
+    document.getElementById('editSubjectVenue').value = subject.venue || '';
+    
+    new bootstrap.Modal(document.getElementById('editSubjectModalDynamic')).show();
+};
+
+window.deleteAdminSubject = function(type, id) {
+    if (!adminOnly()) return;
+    
+    if (type === 'custom') {
+        if (!confirm('Are you sure you want to delete this custom subject?')) return;
+        const removed = adminResources.subjects.splice(id, 1)[0];
+        saveAdminResources();
+        
+        // Remove from course reference list
+        const ci = courseReferenceList.findIndex(c => c.short === removed.short);
+        if (ci >= 0) courseReferenceList.splice(ci, 1);
+        
+        renderAdminResourcesUI();
+        renderCourseRefTable();
+        populateEditSubjectSelect();
+        showToast('Subject Deleted', `Custom subject removed.`);
+    } else {
+        if (!confirm('Are you sure you want to hide this built-in subject? It will not appear in the View Subjects list but will still function in the timetable.')) return;
+        let hidden = [];
+        try { hidden = JSON.parse(localStorage.getItem('sece_hidden_builtin_subjects') || '[]'); } catch(e){}
+        if (!hidden.includes(id)) {
+            hidden.push(id);
+            localStorage.setItem('sece_hidden_builtin_subjects', JSON.stringify(hidden));
+        }
+        renderAdminResourcesUI();
+        showToast('Subject Hidden', `Built-in subject hidden from list.`);
+    }
+};
 
 function importAdminSubjectExcel(event) {
     if (!adminOnly()) return;
@@ -3432,6 +3690,7 @@ function removeAdminSubject(idx) {
     populateEditSubjectSelect();
     showToast('Subject Removed', `${removed.short} was removed from custom resources.`);
 }
+
 
 function handleAdminAddClass(e) {
     e.preventDefault();
@@ -4569,6 +4828,9 @@ window.renderAdminResourcesUI = renderAdminResourcesUI;
 window.handleAddSubject = handleAddSubject;
 window.importAdminSubjectExcel = importAdminSubjectExcel;
 window.removeAdminSubject = removeAdminSubject;
+window.editAdminSubject = window.editAdminSubject;
+window.saveEditSubject = window.saveEditSubject;
+window.deleteAdminSubject = window.deleteAdminSubject;
 window.handleAdminAddClass = handleAdminAddClass;
 window.handleAddVenue = handleAddVenue;
 window.importAdminVenueExcel = importAdminVenueExcel;
@@ -4786,29 +5048,155 @@ function renderEnrolledStudentsRoster() {
 }
 window.renderEnrolledStudentsRoster = renderEnrolledStudentsRoster;
 
+// Helper: get the localStorage key for the logged-in faculty's personal TT
+function _getFacultyTTKey() {
+    const uname = String(localStorage.getItem('sece_logged_in_user') || 'faculty').toLowerCase();
+    return 'faculty_personal_tt_' + uname;
+}
+
 window.renderMyTimetable = function() {
     const tbody = document.getElementById('myTimetableBody');
     if (!tbody) return;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    // Load saved data from localStorage
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch(e) {}
+
+    // Restore saved time header values into modal header inputs
+    const headers = saved._headers || {};
+    const headerMap = {
+        P1:    { id: 'myTtP1',    def: '08.40 - 09.40' },
+        P2:    { id: 'myTtP2',    def: '09.40 - 10.40' },
+        P3:    { id: 'myTtP3',    def: '11.00 - 12.00' },
+        Tea:   { id: 'myTtTea',   def: '12.00 - 12.15' },
+        P4:    { id: 'myTtP4',    def: '12.15 - 01.15' },
+        P5:    { id: 'myTtP5',    def: '01.15 - 02.00' },
+        Lunch: { id: 'myTtLunch', def: '02.00 - 02.40' },
+        Act:   { id: 'myTtAct',   def: '02.40 - 03.30' },
+        P6:    { id: 'myTtP6',    def: '03.30 - 04.20' },
+        P7:    { id: 'myTtP7',    def: '04.20 - 05.10' },
+    };
+    Object.entries(headerMap).forEach(([key, { id, def }]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = headers[key] || def;
+    });
+
     let html = '';
     days.forEach(day => {
+        const d = saved[day] || {};
+        const esc = v => String(v || '').replace(/"/g, '&quot;');
         html += `
         <tr>
             <td class="align-middle text-white fw-bold">${day}</td>
-            <td><input type="text" id="myTt_${day}_P1" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
-            <td><input type="text" id="myTt_${day}_P2" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
-            <td><input type="text" id="myTt_${day}_P3" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td><input type="text" id="myTt_${day}_P1" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P1)}" /></td>
+            <td><input type="text" id="myTt_${day}_P2" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P2)}" /></td>
+            <td><input type="text" id="myTt_${day}_P3" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P3)}" /></td>
             <td class="align-middle text-muted small text-center">TEA</td>
-            <td><input type="text" id="myTt_${day}_P4" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
-            <td><input type="text" id="myTt_${day}_P5" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td><input type="text" id="myTt_${day}_P4" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P4)}" /></td>
+            <td><input type="text" id="myTt_${day}_P5" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P5)}" /></td>
             <td class="align-middle text-muted small text-center">LUNCH</td>
-            <td><input type="text" id="myTt_${day}_ACT" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
-            <td><input type="text" id="myTt_${day}_P6" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
-            <td><input type="text" id="myTt_${day}_P7" class="form-control form-control-sm bg-dark text-white border-secondary text-center" /></td>
+            <td><input type="text" id="myTt_${day}_ACT" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.ACT)}" /></td>
+            <td><input type="text" id="myTt_${day}_P6" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P6)}" /></td>
+            <td><input type="text" id="myTt_${day}_P7" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P7)}" /></td>
         </tr>
         `;
     });
     tbody.innerHTML = html;
+};
+
+// Render the saved faculty personal TT as a read-only panel in the faculty dashboard
+window.renderFacultyPersonalTT = function() {
+    const container = document.getElementById('facultyPersonalTTPanel');
+    if (!container) return;
+
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch(e) {}
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const periods = [
+        { key: 'P1', label: '1' },
+        { key: 'P2', label: '2' },
+        { key: 'P3', label: '3' },
+        { key: 'TEA', label: 'TEA', isBreak: true },
+        { key: 'P4', label: '4' },
+        { key: 'P5', label: '5' },
+        { key: 'LUNCH', label: 'LUNCH', isBreak: true },
+        { key: 'ACT', label: 'ACT' },
+        { key: 'P6', label: '6' },
+        { key: 'P7', label: '7' },
+    ];
+    const headers = saved._headers || {};
+    const periodTimes = {
+        P1:  headers.P1    || '08.40-09.40',
+        P2:  headers.P2    || '09.40-10.40',
+        P3:  headers.P3    || '11.00-12.00',
+        P4:  headers.P4    || '12.15-01.15',
+        P5:  headers.P5    || '01.15-02.00',
+        ACT: headers.Act   || '02.40-03.30',
+        P6:  headers.P6    || '03.30-04.20',
+        P7:  headers.P7    || '04.20-05.10',
+    };
+
+    const hasData = days.some(d => {
+        const day = saved[d];
+        return day && Object.values(day).some(v => v && v.trim());
+    });
+
+    if (!hasData) {
+        container.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="fa-solid fa-calendar-xmark fs-2 mb-2 d-block opacity-50"></i>
+                <p class="mb-1">No personal timetable saved yet.</p>
+                <small>Click <strong class="text-info">YOUR TIMETABLE</strong> in the top bar to feed your schedule.</small>
+            </div>`;
+        return;
+    }
+
+    let thead = '<tr><th style="width:70px" class="text-muted">Day</th>';
+    periods.forEach(p => {
+        if (p.isBreak) {
+            thead += `<th class="text-warning text-center" style="font-size:0.65rem;padding:2px 4px">${p.label}</th>`;
+        } else {
+            thead += `<th class="text-center" style="min-width:65px">${p.label}<br><small class="text-muted" style="font-size:0.6rem">${periodTimes[p.key] || ''}</small></th>`;
+        }
+    });
+    thead += '</tr>';
+
+    let tbody = '';
+    days.forEach(day => {
+        const d = saved[day] || {};
+        tbody += `<tr><td class="fw-bold text-white-50 small">${day.slice(0,3)}</td>`;
+        periods.forEach(p => {
+            if (p.isBreak) {
+                tbody += `<td class="text-warning text-center small bg-dark" style="padding:2px 4px">${p.label}</td>`;
+            } else {
+                const val = d[p.key] || '';
+                const parts = val.split(',').map(s => s.trim());
+                const subj = parts[0] || '';
+                const cls  = parts[1] || '';
+                const venue = parts[2] || '';
+                if (subj) {
+                    tbody += `<td class="text-center p-1" style="font-size:0.72rem">
+                        <div class="fw-bold text-info" style="line-height:1.2">${subj}</div>
+                        ${cls   ? `<div class="text-warning" style="font-size:0.6rem">${cls}</div>`   : ''}
+                        ${venue ? `<div class="text-success" style="font-size:0.6rem">${venue}</div>` : ''}
+                    </td>`;
+                } else {
+                    tbody += `<td class="text-center text-muted" style="font-size:0.65rem">FREE</td>`;
+                }
+            }
+        });
+        tbody += '</tr>';
+    });
+
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-dark table-bordered border-secondary table-sm mb-0 align-middle" style="font-size:0.78rem">
+                <thead class="table-active">${thead}</thead>
+                <tbody>${tbody}</tbody>
+            </table>
+        </div>`;
 };
 
 window.searchUserCredentials = async function() {
@@ -5376,7 +5764,50 @@ window.shareViaWebAPI = function() {
 };
 
 
-window.saveMyTimetable = function() { alert('Timetable saved successfully!'); const m = bootstrap.Modal.getInstance(document.getElementById('myTimetableModal')); if(m) m.hide(); };
+window.saveMyTimetable = function() {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const periods = ['P1', 'P2', 'P3', 'P4', 'P5', 'ACT', 'P6', 'P7'];
+
+    const data = {};
+
+    // Save time headers
+    data._headers = {
+        P1:    (document.getElementById('myTtP1')    || {}).value || '08.40 - 09.40',
+        P2:    (document.getElementById('myTtP2')    || {}).value || '09.40 - 10.40',
+        P3:    (document.getElementById('myTtP3')    || {}).value || '11.00 - 12.00',
+        Tea:   (document.getElementById('myTtTea')   || {}).value || '12.00 - 12.15',
+        P4:    (document.getElementById('myTtP4')    || {}).value || '12.15 - 01.15',
+        P5:    (document.getElementById('myTtP5')    || {}).value || '01.15 - 02.00',
+        Lunch: (document.getElementById('myTtLunch') || {}).value || '02.00 - 02.40',
+        Act:   (document.getElementById('myTtAct')   || {}).value || '02.40 - 03.30',
+        P6:    (document.getElementById('myTtP6')    || {}).value || '03.30 - 04.20',
+        P7:    (document.getElementById('myTtP7')    || {}).value || '04.20 - 05.10',
+    };
+
+    // Save each day's period data
+    days.forEach(day => {
+        data[day] = {};
+        periods.forEach(p => {
+            const el = document.getElementById(`myTt_${day}_${p}`);
+            data[day][p] = el ? el.value.trim() : '';
+        });
+    });
+
+    localStorage.setItem(_getFacultyTTKey(), JSON.stringify(data));
+
+    // Refresh the dashboard panel
+    if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+
+    // Show success toast/alert and close modal
+    const toastFn = typeof showToast === 'function' ? showToast : null;
+    if (toastFn) {
+        toastFn('Saved!', 'Your personal timetable has been saved successfully.', 'success');
+    } else {
+        alert('Timetable saved successfully!');
+    }
+    const m = bootstrap.Modal.getInstance(document.getElementById('myTimetableModal'));
+    if (m) m.hide();
+};
 
 window.deptChanged = function(dept) {
     currentDept = dept;

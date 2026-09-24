@@ -266,7 +266,7 @@ export default function DashboardLayout() {
                                 )}
 
                                 {(!isAdmin && !isStudent) && (
-                                    <button id="myTimetableBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => window.renderMyTimetable && window.renderMyTimetable()}>
+                                    <button id="myTimetableBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => { window.renderMyTimetable && window.renderMyTimetable(); }}>
                                         <i className="fa-solid fa-calendar-user"></i> YOUR TIMETABLE
                                     </button>
                                 )}
@@ -427,6 +427,7 @@ export default function DashboardLayout() {
                                 <strong>Please select a Department and Section from the dropdowns above to view and edit its timetable.</strong>
                             </div>
 
+                            {!isFaculty && (
                             <div id="ttPopupOverlayWrapper" className="tt-popup-wrapper">
                                 <button id="closeTtPopupBtn" className="btn btn-danger btn-sm d-none" style={{ position: 'fixed', top: '20px', right: '30px', zIndex: 10001, borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }} onClick={() => window.closeTtPopup?.()}><i className="fa-solid fa-xmark"></i></button>
 
@@ -511,6 +512,32 @@ export default function DashboardLayout() {
                                     </div>
                                 </div>
                         </div>
+                            )}
+                            {isFaculty && (
+                                <div className="glass-panel mt-3" id="facultyPersonalTTArea">
+                                    <div className="panel-header d-flex align-items-center justify-content-between">
+                                        <h3 className="panel-title">
+                                            <i className="fa-solid fa-calendar-user text-info me-2"></i>
+                                            My Personal Timetable
+                                        </h3>
+                                        <button
+                                            className="btn btn-sm btn-outline-info d-flex align-items-center gap-1"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#myTimetableModal"
+                                            onClick={() => { window.renderMyTimetable && window.renderMyTimetable(); }}
+                                        >
+                                            <i className="fa-solid fa-pen-to-square"></i> Edit
+                                        </button>
+                                    </div>
+                                    <div className="p-2" id="facultyPersonalTTPanel">
+                                        <div className="text-center py-4 text-muted">
+                                            <i className="fa-solid fa-spinner fa-spin fs-3 mb-2 d-block"></i>
+                                            <small>Loading your timetable...</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
 
                         {isAdmin && (
                         <div className="mt-4 px-2" id="adminControlPanelContainer">

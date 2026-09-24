@@ -73,6 +73,7 @@ D:\Java_project\src\main\java\com\smarttimetable\service\TimetableOperationsServ
 D:\Java_project\src\main\java\com\smarttimetable\repository\AcademicYearRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\SmartTimetableApplication.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\LaboratoryRepository.java
+D:\Java_project\src\main\java\com\smarttimetable\CheckDb.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\StudentNotificationRegistration.java
 D:\Java_project\src\main\java\com\smarttimetable\service\TeacherService.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\StudentDashboardController.java
