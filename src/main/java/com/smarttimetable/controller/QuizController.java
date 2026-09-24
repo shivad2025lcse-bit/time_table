@@ -116,4 +116,10 @@ public class QuizController {
             .<ResponseEntity<?>>map(ResponseEntity::ok)
             .orElse(ResponseEntity.noContent().build());
     }
+
+    // Student: view entire quiz history with answers
+    @GetMapping("/student/{studentId}/history")
+    public ResponseEntity<List<QuizSubmission>> getStudentQuizHistory(@PathVariable Long studentId) {
+        return ResponseEntity.ok(quizService.getStudentQuizHistory(studentId));
+    }
 }

@@ -189,4 +189,8 @@ public class QuizService {
     public java.util.Optional<QuizSubmission> getSubmissionForStudent(Long quizId, Long studentId) {
         return submissionRepository.findByQuizIdAndStudentId(quizId, studentId);
     }
+
+    public List<QuizSubmission> getStudentQuizHistory(Long studentId) {
+        return submissionRepository.findByStudentId(studentId);
+    }
 }

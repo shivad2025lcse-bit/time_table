@@ -315,8 +315,35 @@ function injectQuizModals() {
     </div>
 
     <!-- ============================================================ -->
-    <!--  FACULTY: AI Generator Modal (REMOVED)                       -->
+    <!--  STUDENT: Quiz History Modal                                 -->
     <!-- ============================================================ -->
+    <div class="modal fade" id="studentQuizHistoryModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content cc-modal-content">
+                <div class="modal-header cc-modal-header border-0">
+                    <h5 class="modal-title fw-bold">
+                        <i class="fa-solid fa-clock-rotate-left text-info me-2"></i>
+                        My Quiz History
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4" style="background-color: #120326;">
+                    <div id="sqHistoryListContainer">
+                        <div id="sqHistoryList" class="list-group mb-3">
+                            <div class="text-center py-4 text-muted">Loading history...</div>
+                        </div>
+                    </div>
+                    
+                    <div id="sqHistoryDetailContainer" style="display:none;">
+                        <button class="btn btn-sm btn-outline-secondary mb-3" onclick="document.getElementById('sqHistoryDetailContainer').style.display='none'; document.getElementById('sqHistoryListContainer').style.display='block';">
+                            <i class="fa-solid fa-arrow-left"></i> Back to History
+                        </button>
+                        <div id="sqHistoryDetailContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     `;
     const wrapper = document.createElement('div');
     wrapper.innerHTML = html;
@@ -922,3 +949,109 @@ function _showSuccess(msg) {
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 4000);
 }
+
+
+// ── Student Quiz History ──────────────────────────────────────────────────────
+window.openStudentQuizHistoryModal = async () => {
+    document.getElementById('sqHistoryDetailContainer').style.display = 'none';
+    document.getElementById('sqHistoryListContainer').style.display = 'block';
+    const listEl = document.getElementById('sqHistoryList');
+    listEl.innerHTML = '<div class="text-center py-4 text-muted">Loading history...</div>';
+    
+    new bootstrap.Modal(document.getElementById('studentQuizHistoryModal')).show();
+
+    const info = await _resolveStudentInfo();
+    if (!info) {
+        listEl.innerHTML = '<div class="alert alert-danger">Could not resolve student ID.</div>';
+        return;
+    }
+
+    try {
+        const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
+        const res = await fetchFn(`/api/quizzes/student/${info.studentId}/history`);
+        if (!res.ok) throw new Error('Failed to fetch history');
+        const history = await res.json();
+        
+        if (!history || history.length === 0) {
+            listEl.innerHTML = '<div class="text-center py-4 text-muted">No quiz history found.</div>';
+            return;
+        }
+
+        listEl.innerHTML = '';
+        history.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+        history.forEach(sub => {
+            const quizTitle = sub.quiz ? sub.quiz.title : 'Unknown Quiz';
+            const subject = sub.quiz ? sub.quiz.subjectName : '';
+            const dt = new Date(sub.submittedAt).toLocaleString();
+            
+            let badgeColor = 'bg-danger';
+            if (sub.percentage >= 75) badgeColor = 'bg-success';
+            else if (sub.percentage >= 50) badgeColor = 'bg-warning text-dark';
+
+            const btn = document.createElement('button');
+            btn.className = 'list-group-item list-group-item-action bg-dark text-white border-secondary mb-2 rounded';
+            btn.innerHTML = `
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1 text-info fw-bold">${quizTitle} <small class="text-muted ms-2">${subject}</small></h6>
+                        <small class="text-muted"><i class="fa-solid fa-calendar me-1"></i> ${dt}</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge ${badgeColor} fs-6">${sub.totalScore} / ${sub.quiz ? sub.quiz.totalMarks : '-'}</span>
+                        <div class="small mt-1">${sub.percentage ? sub.percentage.toFixed(1) : '0'}%</div>
+                    </div>
+                </div>
+            `;
+            btn.onclick = () => showQuizHistoryDetails(sub);
+            listEl.appendChild(btn);
+        });
+    } catch (e) {
+        console.error(e);
+        listEl.innerHTML = '<div class="alert alert-danger">Error loading quiz history.</div>';
+    }
+};
+
+window.showQuizHistoryDetails = (sub) => {
+    document.getElementById('sqHistoryListContainer').style.display = 'none';
+    const detailEl = document.getElementById('sqHistoryDetailContent');
+    
+    let html = `
+        <h5 class="text-info fw-bold mb-1">${sub.quiz ? sub.quiz.title : 'Quiz'}</h5>
+        <div class="mb-3 text-muted small">Submitted: ${new Date(sub.submittedAt).toLocaleString()}</div>
+        <div class="card bg-dark border-secondary mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div><strong>Score:</strong> ${sub.totalScore} / ${sub.quiz ? sub.quiz.totalMarks : '-'}</div>
+                    <div><strong>Percentage:</strong> ${sub.percentage ? sub.percentage.toFixed(1) : '0'}%</div>
+                </div>
+                ${sub.aiWeaknessAnalysis ? `<hr class="border-secondary"><div class="text-warning small"><strong>AI Feedback:</strong><br/>${sub.aiWeaknessAnalysis.replace(/\n/g, '<br/>')}</div>` : ''}
+            </div>
+        </div>
+        <h6 class="fw-bold mb-3 border-bottom border-secondary pb-2">Questions & Answers</h6>
+    `;
+
+    if (!sub.answers || sub.answers.length === 0) {
+        html += `<div class="text-muted small">No detailed answers available.</div>`;
+    } else {
+        sub.answers.forEach((ans, idx) => {
+            const q = ans.question;
+            const isCorrect = ans.isCorrect;
+            
+            let colorClass = isCorrect ? 'text-success' : 'text-danger';
+            let icon = isCorrect ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>';
+
+            html += `
+                <div class="mb-4 p-3 border border-secondary rounded" style="background:#1e1e1e;">
+                    <div class="fw-bold mb-2">Q${idx + 1}. ${q ? q.questionText : 'Unknown Question'}</div>
+                    <div class="small mb-1"><span class="text-muted">Your Answer:</span> <span class="${colorClass} fw-bold">${ans.answerText || '-'}</span> ${icon}</div>
+                    ${!isCorrect && q && q.correctAnswer ? `<div class="small"><span class="text-muted">Correct Answer:</span> <span class="text-success fw-bold">${q.correctAnswer}</span></div>` : ''}
+                    <div class="small text-muted mt-2 text-end">Marks: ${ans.marksAwarded || 0} / ${q ? q.marks : '-'}</div>
+                </div>
+            `;
+        });
+    }
+
+    detailEl.innerHTML = html;
+    document.getElementById('sqHistoryDetailContainer').style.display = 'block';
+};

@@ -257,6 +257,10 @@ export default function DashboardLayout() {
                                 <button id="studentQuizBtn" className={`btn btn-sm btn-outline-danger align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openStudentQuizModal && window.openStudentQuizModal()}>
                                     <i className="fa-solid fa-pen-to-square"></i> Take Quiz
                                 </button>
+                                
+                                <button id="studentQuizHistoryBtn" className={`btn btn-sm btn-outline-info align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openStudentQuizHistoryModal && window.openStudentQuizHistoryModal()}>
+                                    <i className="fa-solid fa-clock-rotate-left"></i> Quiz History
+                                </button>
 
 
                                 {(!isAdmin && !isStudent) && (

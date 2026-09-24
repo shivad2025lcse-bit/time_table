@@ -3,6 +3,7 @@ package com.smarttimetable.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "quiz_submissions")
@@ -37,6 +38,10 @@ public class QuizSubmission {
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt = LocalDateTime.now();
 
+    @OneToMany(mappedBy = "submission", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @JsonIgnoreProperties("submission")
+    private List<StudentAnswer> answers;
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -64,4 +69,7 @@ public class QuizSubmission {
 
     public LocalDateTime getSubmittedAt() { return submittedAt; }
     public void setSubmittedAt(LocalDateTime submittedAt) { this.submittedAt = submittedAt; }
+
+    public List<StudentAnswer> getAnswers() { return answers; }
+    public void setAnswers(List<StudentAnswer> answers) { this.answers = answers; }
 }
