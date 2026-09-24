@@ -1530,7 +1530,7 @@ function renderTimetableGrid() {
         });
         
         let filteredEntries = window.currentTimetableEntries;
-        if (getEffectiveRole() === 'ADMIN' && typeof currentSection !== 'undefined' && currentSection) {
+        if (typeof currentSection !== 'undefined' && currentSection) {
             let q1 = currentSection.toUpperCase();
             let q2 = currentSection.replace('_', ' ').toUpperCase();
             filteredEntries = filteredEntries.filter(e => {
@@ -2982,7 +2982,7 @@ window.openStudentDetailsModal = async function (searchQuery = '') {
     const viewModal = new bootstrap.Modal(document.getElementById('studentDetailsOnlyModal'));
     viewModal.show();
 
-    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Loading student details...</td></tr>';
+    body.innerHTML = '<tr><td colspan="11" class="text-center text-muted">Loading student details...</td></tr>';
 
     try {
         const res = await apiFetch('/api/students');
@@ -2994,29 +2994,47 @@ window.openStudentDetailsModal = async function (searchQuery = '') {
             }
             body.innerHTML = '';
             data.forEach((s, i) => {
-                const username = buildGeneratedUsername('STUDENT', s.firstName + ' ' + s.lastName);
-                const password = getStoredPassword(username) || 'Not Set';
+                let username = s.registerNumber ? String(s.registerNumber).toLowerCase() : '-';
+                if (s.user && s.user.username) username = s.user.username;
+                
+                let password = 'student123';
+                if (s.user && s.user.rawPassword) {
+                    password = s.user.rawPassword;
+                } else if (s.phone && String(s.phone).length >= 4 && s.firstName) {
+                    const phoneStr = String(s.phone).replace(/\D/g, '');
+                    const last4 = phoneStr.length >= 4 ? phoneStr.slice(-4) : '0000';
+                    password = s.firstName.split(' ')[0].toUpperCase() + last4;
+                }
+                
+                const secDisplay = s.section ? (s.section.sectionName || s.section.name || s.section.id || s.section) : '-';
+                
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${s.registerNumber || '-'}</td>
-                    <td>${s.firstName} ${s.lastName}</td>
-                    <td>${s.section ? s.section.id : '-'}</td>
-                    <td>${s.email || '-'}</td>
-                    <td>${s.collegeEmail || '-'}</td>
+                    <td>${s.firstName || ''} ${s.lastName || ''}</td>
+                    <td><span class="badge bg-secondary">${secDisplay}</span></td>
+                    <td><small>${s.email || '-'}</small></td>
+                    <td><small>${s.collegeEmail || '-'}</small></td>
                     <td>${s.phone || '-'}</td>
+                    <td>${s.parentPhone1 || '-'}</td>
+                    <td>${s.parentPhone2 || '-'}</td>
                     <td><code>${username || '-'}</code></td>
                     <td>${currentUserRole === 'ADMIN' ? `<code class="text-warning">${password}</code>` : '<span class="badge bg-secondary">Hidden</span>'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editPersistentStudent(${s.id || `'${s.registerNumber}'`})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id || `'${s.registerNumber}'`})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    </td>
                 `;
                 body.appendChild(tr);
             });
             if (data.length === 0) {
-                body.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No students found.</td></tr>';
+                body.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No students found.</td></tr>';
             }
         } else {
-            body.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Failed to fetch students.</td></tr>';
+            body.innerHTML = '<tr><td colspan="11" class="text-center text-danger">Failed to fetch students.</td></tr>';
         }
     } catch (err) {
-        body.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error connecting to server.</td></tr>';
+        body.innerHTML = '<tr><td colspan="11" class="text-center text-danger">Error connecting to server.</td></tr>';
     }
 };
 
@@ -3149,81 +3167,74 @@ async function openStudentProfileModal() {
 
     const body = document.getElementById('studentProfileBody');
     if (!body) return;
+    
+    // Unconditionally fetch from API to get the most updated admin details
+    let s = null;
+    let username = localStorage.getItem('sece_logged_in_user');
+    try {
+        const userInfo = JSON.parse(localStorage.getItem('user_info'));
+        if (userInfo && userInfo.username) username = userInfo.username;
+    } catch (e) {}
 
-    let s = currentStudentRecord();
-
-    // If using backend auth, fetch student details directly from backend to ensure accurate data
-    if (typeof hasBackendToken !== 'undefined' && hasBackendToken) {
-        try {
-            body.innerHTML = '<div class="text-center py-2"><div class="spinner-border text-success" role="status"></div></div>';
-            const res = await apiFetch('/api/students');
-            if (res.ok) {
-                const data = await res.json();
-                const userInfo = JSON.parse(localStorage.getItem('user_info'));
-                const username = userInfo ? userInfo.username : null;
-                const backendStudent = data.find(st => st.user && st.user.username === username);
-                if (backendStudent) {
-                    s = {
-                        id: backendStudent.id,
-                        firstName: backendStudent.firstName || '',
-                        lastName: backendStudent.lastName || '',
-                        roll: backendStudent.registerNumber,
-                        name: `${backendStudent.firstName || ''} ${backendStudent.lastName || ''}`.trim(),
-                        sec: backendStudent.section ? (backendStudent.section.sectionName || backendStudent.section.id) : '',
-                        email: backendStudent.email || '',
-                        collegeEmail: backendStudent.collegeEmail || '',
-                        phone: backendStudent.phone || '',
-                        parentPhone1: backendStudent.parentPhone1 || '',
-                        parentPhone2: backendStudent.parentPhone2 || '',
-                        semester: backendStudent.semester
-                    };
-                }
+    try {
+        body.innerHTML = '<div class="text-center py-2"><div class="spinner-border text-success" role="status"></div></div>';
+        const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
+        const res = await fetchFn('/api/students');
+        if (res.ok) {
+            const data = await res.json();
+            const backendStudent = data.find(st => 
+                (st.user && st.user.username === username) || 
+                (st.registerNumber && String(st.registerNumber).toLowerCase() === String(username).toLowerCase())
+            );
+            if (backendStudent) {
+                s = {
+                    id: backendStudent.id,
+                    firstName: backendStudent.firstName || '',
+                    lastName: backendStudent.lastName || '',
+                    roll: backendStudent.registerNumber,
+                    name: `${backendStudent.firstName || ''} ${backendStudent.lastName || ''}`.trim(),
+                    sec: backendStudent.section ? (backendStudent.section.sectionName || backendStudent.section.name || backendStudent.section.id) : (backendStudent.sec || ''),
+                    email: backendStudent.email || '',
+                    collegeEmail: backendStudent.collegeEmail || '',
+                    phone: backendStudent.phone || '',
+                    parentPhone1: backendStudent.parentPhone1 || '',
+                    parentPhone2: backendStudent.parentPhone2 || '',
+                    semester: backendStudent.semester || '',
+                    residentType: backendStudent.residentType || '',
+                    roomNumber: backendStudent.roomNumber || '',
+                    hostelBlock: backendStudent.hostelBlock || ''
+                };
             }
-        } catch (e) {
-            console.error('Error fetching student profile from backend:', e);
         }
+    } catch (e) {
+        console.error('Error fetching student profile from backend:', e);
+    }
+
+    if (!s) {
+        s = currentStudentRecord();
     }
 
     if (!s) {
         body.innerHTML = '<div class="alert alert-warning">Your enrolled student record could not be found.</div>';
     } else {
-        if (typeof hasBackendToken !== 'undefined' && hasBackendToken) {
-            // Render Editable Form for Backend Mode
-            body.innerHTML = `
-                <form id="studentProfileUpdateForm" onsubmit="window.updateMyStudentProfile(event, ${s.id})">
-                    <div id="studentProfileAlert" class="alert d-none small py-2"></div>
-                    <div class="row g-2 small">
-                        <div class="col-6"><strong>Roll No:</strong><br><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" value="${s.roll || ''}" disabled></div>
-                        <div class="col-6"><strong>Section:</strong><br><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" value="${s.sec || ''}" disabled></div>
-                        
-                        <div class="col-6"><strong>First Name:</strong><br><input type="text" id="spFirstName" class="form-control form-control-sm bg-dark text-white border-secondary" value="${s.firstName}" required></div>
-                        <div class="col-6"><strong>Last Name:</strong><br><input type="text" id="spLastName" class="form-control form-control-sm bg-dark text-white border-secondary" value="${s.lastName}"></div>
-                        
-                        <div class="col-6"><strong>Personal Email:</strong><br><input type="email" id="spEmail" class="form-control form-control-sm bg-dark text-white border-secondary" value="${s.email}"></div>
-                        <div class="col-6"><strong>College Email:</strong><br><input type="email" id="spCollegeEmail" class="form-control form-control-sm bg-dark text-white border-secondary" value="${s.collegeEmail}"></div>
-                        
-                        <div class="col-12"><strong>My Mobile:</strong><br><input type="text" id="spPhone" class="form-control form-control-sm bg-dark text-white border-secondary" value="${s.phone}"></div>
-                        <div class="col-6"><strong>Parent Mobile 1:</strong><br><input type="text" id="spParentPhone1" class="form-control form-control-sm bg-dark text-white border-secondary" value="${s.parentPhone1}"></div>
-                        <div class="col-6"><strong>Parent Mobile 2:</strong><br><input type="text" id="spParentPhone2" class="form-control form-control-sm bg-dark text-white border-secondary" value="${s.parentPhone2}"></div>
-                        <input type="hidden" id="spSemester" value="${s.semester || ''}">
-                    </div>
-                    <div class="mt-3 text-end">
-                        <button type="submit" class="btn btn-sm btn-success"><i class="fa-solid fa-save"></i> Save Details</button>
-                    </div>
-                </form>
-            `;
-        } else {
-            body.innerHTML = `
-                <div class="row g-2 small">
-                    <div class="col-6"><strong>Roll No:</strong><br>${s.roll || '-'}</div>
-                    <div class="col-6"><strong>Name:</strong><br>${s.name || '-'}</div>
-                    <div class="col-12"><strong>Section:</strong><br>${s.sec || '-'}</div>
-                    <div class="col-6"><strong>My Mobile:</strong><br>${maskStudentPhone(s.phone)}</div>
-                    <div class="col-6"><strong>Parent Mobile 1:</strong><br>${maskStudentPhone(s.parentPhone1)}</div>
-                    <div class="col-6"><strong>Parent Mobile 2:</strong><br>${maskStudentPhone(s.parentPhone2)}</div>
-                    <div class="col-12 text-muted mt-2">Email is hidden from Student view and is available only to Faculty/Admin.</div>
-                </div>`;
-        }
+        const computedUsername = s.roll ? String(s.roll).toLowerCase() : '-';
+        const password = getStoredPassword(computedUsername) || 'student123';
+        body.innerHTML = `
+            <div class="row g-2 small">
+                <div class="col-6"><strong>Roll No:</strong><br>${s.roll || '-'}</div>
+                <div class="col-6"><strong>Name:</strong><br>${s.name || '-'}</div>
+                <div class="col-6"><strong>Section:</strong><br>${s.sec || '-'}</div>
+                <div class="col-6"><strong>Semester:</strong><br>${s.semester || '-'}</div>
+                <div class="col-6"><strong>Personal Email:</strong><br>${s.email || '-'}</div>
+                <div class="col-6"><strong>College Email:</strong><br>${s.collegeEmail || '-'}</div>
+                <div class="col-12"><strong>My Mobile:</strong><br>${s.phone || '-'}</div>
+                <div class="col-6"><strong>Parent Mobile 1:</strong><br>${s.parentPhone1 || '-'}</div>
+                <div class="col-6"><strong>Parent Mobile 2:</strong><br>${s.parentPhone2 || '-'}</div>
+                <div class="col-6"><strong>Resident Type:</strong><br>${s.residentType || 'Day Scholar'}</div>
+                <div class="col-6"><strong>Room / Block:</strong><br>${s.roomNumber ? s.roomNumber + ' / ' + (s.hostelBlock||'') : '-'}</div>
+                <div class="col-6"><strong>Username:</strong><br><code>${computedUsername}</code></div>
+                <div class="col-6"><strong>Password:</strong><br><code class="text-warning">${password}</code></div>
+            </div>`;
     }
     new bootstrap.Modal(document.getElementById('studentProfileModal')).show();
 }
@@ -3409,10 +3420,63 @@ function renderAdminResourcesUI() {
             '<tr><td colspan="5" class="text-muted text-center py-3">No subjects found.</td></tr>';
     }
 
-    if (venueList) {
-        venueList.innerHTML = adminResources.venues.length ? adminResources.venues.map((v, i) =>
-            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? '– Block ' + v.block : ''}${v.capacity ? ' – Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
-        ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No custom venues.</div>';
+            if (venueList) {
+        // Collect built-in venues from defaults and active sections
+        const builtInVenueNames = new Set([
+            'SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'
+        ]);
+        
+        courseReferenceList.forEach(c => { if(c.venue && c.venue !== '-' && c.venue !== 'TBD') builtInVenueNames.add(c.venue.trim()); });
+        activeSections.forEach(s => { if(s.classroom && s.classroom !== '-' && s.classroom !== 'TBD') builtInVenueNames.add(s.classroom.trim()); });
+        
+        const builtInVenues = Array.from(builtInVenueNames).map(name => ({ name, type: 'Built-in', block: '', capacity: '' }));
+
+        // Load venue overrides
+        let builtInVenueOverrides = {};
+        let hiddenBuiltInVenues = [];
+        try {
+            builtInVenueOverrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}');
+            hiddenBuiltInVenues = JSON.parse(localStorage.getItem('sece_hidden_builtin_venues') || '[]');
+        } catch(e) {}
+
+        const customRows = adminResources.venues.map((v, i) =>
+            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center" style="background:rgba(13,202,240,0.05) !important;">
+                <span>
+                    <strong>${v.name || v}</strong> 
+                    <small class="text-muted">${v.type || ''} ${v.block ? '— Block ' + v.block : ''}${v.capacity ? ' — Capacity ' + v.capacity : ''}</small>
+                </span>
+                <div class="d-flex gap-1 align-items-center">
+                    <span class="badge bg-success me-1">Custom</span>
+                    <button class="btn btn-sm btn-outline-warning py-0 px-1" onclick="editAdminVenue('custom', ${i})" title="Edit Venue"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deleteAdminVenue('custom', ${i})" title="Delete Venue"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+            </div>`
+        ).join('');
+
+        const builtInRows = builtInVenues
+            .filter(v => !hiddenBuiltInVenues.includes(v.name))
+            .map(v => {
+                const ov = builtInVenueOverrides[v.name] || {};
+                const name = ov.name || v.name;
+                const type = ov.type || v.type;
+                const block = ov.block || v.block;
+                const capacity = ov.capacity || v.capacity;
+                const isEdited = !!builtInVenueOverrides[v.name];
+
+                return `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
+                    <span>
+                        <strong>${name}</strong>
+                        <small class="text-muted ms-2">${type || ''} ${block ? '— Block ' + block : ''}${capacity ? ' — Capacity ' + capacity : ''}</small>
+                        ${isEdited ? '<span class="badge bg-warning text-dark ms-2" style="font-size:0.6rem">Edited</span>' : ''}
+                    </span>
+                    <div class="d-flex gap-1 align-items-center">
+                        <button class="btn btn-sm btn-outline-warning py-0 px-1" onclick="editAdminVenue('builtin', '${v.name}')" title="Edit Venue"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deleteAdminVenue('builtin', '${v.name}')" title="Hide Venue"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                </div>`;
+            }).join('');
+
+        venueList.innerHTML = (customRows + builtInRows) || '<div class="list-group-item bg-dark text-muted border-secondary">No venues found.</div>';
     }
     if (classList) {
         classList.innerHTML = activeSections.length ? activeSections.map((s, i) =>
@@ -3621,6 +3685,130 @@ window.deleteAdminSubject = function(type, id) {
     }
 };
 
+window.editAdminVenue = function(type, id) {
+    if (!adminOnly()) return;
+    
+    let venue = null;
+    let originalName = null;
+    
+    if (type === 'custom') {
+        venue = adminResources.venues[id];
+        originalName = typeof venue === 'string' ? venue : venue.name;
+        if (typeof venue === 'string') venue = { name: venue, type: '', block: '', capacity: '' };
+    } else {
+        originalName = id;
+        let overrides = {};
+        try { overrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}'); } catch(e){}
+        venue = overrides[id] || { name: id, type: 'Built-in', block: '', capacity: '' };
+    }
+
+    let modal = document.getElementById('editVenueModalDynamic');
+    if (!modal) {
+        document.body.insertAdjacentHTML('beforeend', `
+            <div class="modal fade" id="editVenueModalDynamic" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content bg-dark text-white border-secondary">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title text-info"><i class="fa-solid fa-pen me-2"></i> Edit Venue</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="dynamicEditVenueForm">
+                                <input type="hidden" id="editVenueOriginalName">
+                                <input type="hidden" id="editVenueType">
+                                <input type="hidden" id="editVenueCustomIndex">
+                                <div class="mb-2">
+                                    <label class="form-label small">Venue Name (Cannot change for Built-in)</label>
+                                    <input type="text" id="editVenueName" class="form-control form-control-sm bg-dark text-white border-secondary" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small">Type (e.g., Lab, Lecture Hall)</label>
+                                    <input type="text" id="editVenueTypeInput" class="form-control form-control-sm bg-dark text-white border-secondary">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small">Block</label>
+                                    <input type="text" id="editVenueBlock" class="form-control form-control-sm bg-dark text-white border-secondary">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small">Capacity</label>
+                                    <input type="text" id="editVenueCapacity" class="form-control form-control-sm bg-dark text-white border-secondary">
+                                </div>
+                                <div class="text-end">
+                                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-sm btn-success">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        document.getElementById('dynamicEditVenueForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const origName = document.getElementById('editVenueOriginalName').value;
+            const t = document.getElementById('editVenueType').value;
+            const customIdx = document.getElementById('editVenueCustomIndex').value;
+            
+            const name = document.getElementById('editVenueName').value.trim();
+            const typeVal = document.getElementById('editVenueTypeInput').value.trim();
+            const block = document.getElementById('editVenueBlock').value.trim();
+            const capacity = document.getElementById('editVenueCapacity').value.trim();
+            
+            if (t === 'custom') {
+                adminResources.venues[customIdx] = { name, type: typeVal, block, capacity };
+                saveAdminResources();
+            } else {
+                let overrides = {};
+                try { overrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}'); } catch(e){}
+                overrides[origName] = { name, type: typeVal, block, capacity };
+                localStorage.setItem('sece_builtin_venue_overrides', JSON.stringify(overrides));
+            }
+            
+            bootstrap.Modal.getInstance(document.getElementById('editVenueModalDynamic')).hide();
+            renderAdminResourcesUI();
+            showToast('Venue Updated', `${name} has been updated.`);
+        });
+    }
+
+    document.getElementById('editVenueOriginalName').value = originalName;
+    document.getElementById('editVenueType').value = type;
+    document.getElementById('editVenueCustomIndex').value = id; 
+    
+    const nameInput = document.getElementById('editVenueName');
+    nameInput.value = venue.name || originalName;
+    nameInput.disabled = (type === 'builtin'); 
+    
+    document.getElementById('editVenueTypeInput').value = venue.type || '';
+    document.getElementById('editVenueBlock').value = venue.block || '';
+    document.getElementById('editVenueCapacity').value = venue.capacity || '';
+    
+    new bootstrap.Modal(document.getElementById('editVenueModalDynamic')).show();
+};
+
+window.deleteAdminVenue = function(type, id) {
+    if (!adminOnly()) return;
+    
+    if (type === 'custom') {
+        if (!confirm('Are you sure you want to delete this custom venue?')) return;
+        adminResources.venues.splice(id, 1);
+        saveAdminResources();
+        renderAdminResourcesUI();
+        showToast('Venue Deleted', `Custom venue removed.`);
+    } else {
+        if (!confirm('Are you sure you want to hide this built-in venue?')) return;
+        let hidden = [];
+        try { hidden = JSON.parse(localStorage.getItem('sece_hidden_builtin_venues') || '[]'); } catch(e){}
+        if (!hidden.includes(id)) {
+            hidden.push(id);
+            localStorage.setItem('sece_hidden_builtin_venues', JSON.stringify(hidden));
+        }
+        renderAdminResourcesUI();
+        showToast('Venue Hidden', `Built-in venue hidden from list.`);
+    }
+};
+
+
 function importAdminSubjectExcel(event) {
     if (!adminOnly()) return;
     const file = event.target.files[0];
@@ -3721,7 +3909,18 @@ function handleAddVenue(e) {
     const capacity = document.getElementById('newVenueCapacity') ? document.getElementById('newVenueCapacity').value.trim() : '';
     
     if (!venueName) return;
-    if (adminResources.venues.some(v => (typeof v === 'string' ? v.toLowerCase() : v.name.toLowerCase()) === venueName.toLowerCase())) {
+    
+    // Check built-in venues too
+    const builtInVenueNames = new Set([
+        'SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'
+    ]);
+    courseReferenceList.forEach(c => { if(c.venue && c.venue !== '-' && c.venue !== 'TBD') builtInVenueNames.add(c.venue.trim().toLowerCase()); });
+    activeSections.forEach(s => { if(s.classroom && s.classroom !== '-' && s.classroom !== 'TBD') builtInVenueNames.add(s.classroom.trim().toLowerCase()); });
+    
+    const isBuiltIn = builtInVenueNames.has(venueName.toLowerCase());
+    const isCustom = adminResources.venues.some(v => (typeof v === 'string' ? v.toLowerCase() : v.name.toLowerCase()) === venueName.toLowerCase());
+    
+    if (isBuiltIn || isCustom) {
         alert('That venue already exists.');
         return;
     }
@@ -4499,7 +4698,7 @@ async function loadRecentStudents() {
             list.innerHTML = '';
             const displayData = data.length > 0 ? data : (window.studentsRoster || []);
             if (displayData.length === 0) {
-                list.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-2">No students added yet.</td></tr>';
+                list.innerHTML = '<tr><td colspan="14" class="text-center text-muted py-2">No students added yet.</td></tr>';
                 return;
             }
             displayData.reverse().forEach((s, idx) => {
@@ -4539,6 +4738,7 @@ async function loadRecentStudents() {
                     <td><small>${classDisplay}</small></td>
                     <td><span class="badge bg-secondary">${secDisplay}</span></td>
                     <td class="text-center">${s.semester || semDisplay}</td>
+                    <td><small>${s.residentType || '-'}</small></td>
                     <td class="text-center">
                         <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editPersistentStudent(${s.id || `'${roll}'`})" title="Edit student"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id || `'${roll}'`})" title="Delete student"><i class="fa-solid fa-trash"></i></button>
@@ -4549,7 +4749,7 @@ async function loadRecentStudents() {
         }
     } catch (err) {
         console.error(err);
-        list.innerHTML = '<tr><td colspan="13" class="text-center text-danger py-2">Error loading students.</td></tr>';
+        list.innerHTML = '<tr><td colspan="14" class="text-center text-danger py-2">Error loading students.</td></tr>';
     }
 }
 
@@ -4564,18 +4764,24 @@ window.loadAdminFullFaculty = async function () {
 
             const renderRows = () => {
                 const displayData = data.length > 0 ? data : (window.staffDirectory || []);
+                window.lastLoadedFaculty = displayData; // Save for editing
                 if (displayData.length === 0) return '<tr><td colspan="9" class="text-center text-muted">No faculty records found.</td></tr>';
                 return displayData.map(t => `
                     <tr>
                         <td>${t.employeeId || '-'}</td>
                         <td>${((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-'}</td>
-                        <td>${t.department ? t.department.name : (t.department || t.dept || '-')}</td>
+                        <td>${t.department ? (t.department.name || t.department) : (t.dept || '-')}</td>
                         <td>${t.subjectHandling || '-'}</td>
                         <td>${t.personalEmail || t.email || '-'}</td>
                         <td>${t.collegeEmail || '-'}</td>
                         <td>${t.phone1 || t.phone || '-'}</td>
                         <td>${t.phone2 || '-'}</td>
-                        <td><button class="btn btn-sm btn-outline-danger" onclick="deletePersistentFaculty(${t.id || `'${t.name}'`})"><i class="fa-solid fa-trash"></i></button></td>
+                        <td>
+                            <div class="d-flex gap-1 justify-content-center">
+                                <button class="btn btn-sm btn-outline-warning py-0 px-1" onclick="editPersistentFaculty(${t.id || `'${t.name}'`})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deletePersistentFaculty(${t.id || `'${t.name}'`})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
                     </tr>
                 `).join('');
             };
@@ -4586,6 +4792,95 @@ window.loadAdminFullFaculty = async function () {
         if (adminBody) adminBody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Error loading faculty details.</td></tr>';
     }
 };
+
+window.editPersistentFaculty = function(id) {
+    if (!window.lastLoadedFaculty) return;
+    const t = window.lastLoadedFaculty.find(f => f.id === id || f.name === id);
+    if (!t) return;
+    
+    try {
+        const m1 = bootstrap.Modal.getInstance(document.getElementById('adminFacultyDetailsModal'));
+        if (m1) m1.hide();
+        const m2 = bootstrap.Modal.getInstance(document.getElementById('adminViewFacultyModal'));
+        if (m2) m2.hide();
+        const m3 = bootstrap.Modal.getInstance(document.getElementById('manageFacultyModal'));
+        if (m3) m3.hide();
+    } catch(e) {}
+    
+    window.currentEditFacultyDepartment = t.department;
+    
+    document.getElementById('editFacultyId').value = t.id || '';
+    document.getElementById('editFacultyEmpId').value = t.employeeId || '';
+    document.getElementById('editFacultyFirstName').value = t.firstName || (t.name ? t.name.split(' ')[0] : '');
+    document.getElementById('editFacultyLastName').value = t.lastName || (t.name ? t.name.substring(t.name.indexOf(' ')+1) : '');
+    document.getElementById('editFacultyDept').value = t.department ? (t.department.name || t.department) : (t.dept || '');
+    document.getElementById('editFacultySubject').value = t.subjectHandling || '';
+    document.getElementById('editFacultyPersonalEmail').value = t.personalEmail || t.email || '';
+    document.getElementById('editFacultyCollegeEmail').value = t.collegeEmail || '';
+    document.getElementById('editFacultyPhone1').value = t.phone1 || t.phone || '';
+    document.getElementById('editFacultyPhone2').value = t.phone2 || '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('editFacultyModal'));
+    modal.show();
+};
+
+window.saveEditFaculty = async function() {
+    const id = document.getElementById('editFacultyId').value;
+    if (!id) {
+        alert("Cannot update faculty without an ID.");
+        return;
+    }
+    
+    const deptInput = document.getElementById('editFacultyDept').value.trim();
+    let deptObj = window.currentEditFacultyDepartment;
+    if (typeof deptObj === 'string' || !deptObj) {
+        deptObj = { name: deptInput };
+    } else {
+        deptObj = { ...deptObj, name: deptInput };
+    }
+    
+    const payload = {
+        employeeId: document.getElementById('editFacultyEmpId').value.trim(),
+        firstName: document.getElementById('editFacultyFirstName').value.trim(),
+        lastName: document.getElementById('editFacultyLastName').value.trim(),
+        department: deptObj, 
+        subjectHandling: document.getElementById('editFacultySubject').value.trim(),
+        personalEmail: document.getElementById('editFacultyPersonalEmail').value.trim(),
+        collegeEmail: document.getElementById('editFacultyCollegeEmail').value.trim(),
+        phone1: document.getElementById('editFacultyPhone1').value.trim(),
+        phone2: document.getElementById('editFacultyPhone2').value.trim()
+    };
+    
+    try {
+        const res = await apiFetch(`/api/teachers/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (res.ok) {
+            showToast('Success', 'Faculty details updated successfully.', 'success');
+            const m = bootstrap.Modal.getInstance(document.getElementById('editFacultyModal'));
+            if(m) m.hide();
+            
+            // Refresh data from backend
+            if (window.loadAdminFullFaculty) await window.loadAdminFullFaculty();
+            
+            // Re-open search modal and trigger search to show updated changes
+            try {
+                const adminFacModal = new bootstrap.Modal(document.getElementById('adminFacultyDetailsModal'));
+                adminFacModal.show();
+                if (window.searchAdminFacultyDetails) window.searchAdminFacultyDetails();
+            } catch(e){}
+        } else {
+            alert('Failed to update faculty details. ' + await res.text());
+        }
+    } catch (err) {
+        console.error(err);
+        alert('An error occurred while updating.');
+    }
+};
+
 
 window.deletePersistentFaculty = async function (id) {
     if (!confirm('Are you sure you want to delete this faculty member?')) return;
@@ -5311,29 +5606,62 @@ window.searchUserCredentials = async function() {
     }
 };
 
-window.searchAdminFacultyDetails = function() {
+window.searchAdminFacultyDetails = async function() {
     const tbody = document.getElementById('adminFacultyDetailsBody');
+    const searchInput = document.getElementById('adminFacultySearchInput');
     if (!tbody) return;
-    const facultyList = window.staffDirectory || [];
-    if (facultyList.length === 0) {
-        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">No faculty enrolled yet.</td></tr>';
+    
+    tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">Loading faculty details...</td></tr>';
+    
+    let facultyList = window.lastLoadedFaculty;
+    if (!facultyList || facultyList.length === 0) {
+        try {
+            const res = await apiFetch('/api/teachers');
+            if (res.ok) {
+                facultyList = await res.json();
+                window.lastLoadedFaculty = facultyList;
+            } else {
+                facultyList = window.staffDirectory || [];
+            }
+        } catch (e) {
+            facultyList = window.staffDirectory || [];
+        }
+    }
+    
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    
+    const filtered = query ? facultyList.filter(f => 
+        (f.employeeId && f.employeeId.toLowerCase().includes(query)) ||
+        (f.firstName && f.firstName.toLowerCase().includes(query)) ||
+        (f.lastName && f.lastName.toLowerCase().includes(query)) ||
+        (f.name && f.name.toLowerCase().includes(query)) ||
+        (f.department && (f.department.name || f.department).toLowerCase().includes(query))
+    ) : facultyList;
+
+    if (!filtered || filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">No faculty found.</td></tr>';
         return;
     }
-    tbody.innerHTML = facultyList.map(f => `
+    
+    tbody.innerHTML = filtered.map(f => {
+        const name = ((f.firstName || '') + ' ' + (f.lastName || '')).trim() || f.name || '-';
+        const dept = f.department ? (f.department.name || f.department) : (f.dept || '-');
+        
+        return `
         <tr>
-            <td><strong>${f.name || '-'}</strong></td>
-            <td><span class="badge bg-primary">${f.department || '-'}</span></td>
+            <td><strong>${name}</strong><br><small class="text-warning">${f.employeeId || ''}</small></td>
+            <td><span class="badge bg-primary">${dept}</span></td>
             <td>${f.subjectHandling || '-'}</td>
-            <td><small>${f.personalEmail || '-'}</small></td>
-            <td><small>${f.email || '-'}</small></td>
-            <td>${f.phone || '-'}</td>
-            <td>${f.altPhone || '-'}</td>
+            <td><small>${f.personalEmail || f.email || '-'}</small></td>
+            <td><small>${f.collegeEmail || '-'}</small></td>
+            <td>${f.phone1 || f.phone || '-'}</td>
+            <td>${f.phone2 || f.altPhone || '-'}</td>
             <td>
-                <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editFaculty('${f.id || f.name}')"><i class="fa-solid fa-pen"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="window.deleteFaculty('${f.id || f.name}')"><i class="fa-solid fa-trash"></i></button>
+                <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editPersistentFaculty(${f.id || `'${f.name}'`})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentFaculty(${f.id || `'${f.name}'`})" title="Delete"><i class="fa-solid fa-trash"></i></button>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 };
 
 // Updates the scrolling announcement ticker bar at the top of the page
@@ -5522,6 +5850,13 @@ window.editPersistentStudent = function(id) {
     document.getElementById('esResidentType').value = student.residentType || '';
     document.getElementById('esHostelBlock').value = student.hostelBlock || '';
     document.getElementById('esRoomNumber').value = student.roomNumber || '';
+    
+    try {
+        const m1 = bootstrap.Modal.getInstance(document.getElementById('manageStudentsModal'));
+        if (m1) m1.hide();
+        const m2 = bootstrap.Modal.getInstance(document.getElementById('studentDetailsOnlyModal'));
+        if (m2) m2.hide();
+    } catch(e) {}
     
     const esHostelFields = document.getElementById('esHostelFields');
     if (esHostelFields) {

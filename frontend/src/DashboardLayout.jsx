@@ -996,15 +996,15 @@ export default function DashboardLayout() {
                                             </div>
                                             <div className="row g-2 mb-3">
                                                 <div className="col-md-3">
-                                                    <label className="form-label small">Department <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                                    <label className="form-label small">Department <span className="text-danger">*</span></label>
                                                     <input type="text" id="rsDept" list="deptDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. CSE" autoComplete="off" />
                                                 </div>
                                                 <div className="col-md-3">
-                                                    <label className="form-label small">Class <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                                    <label className="form-label small">Class <span className="text-danger">*</span></label>
                                                     <input type="text" id="rsCourse" list="courseDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. BTECH-CSE" autoComplete="off" />
                                                 </div>
                                                 <div className="col-md-3">
-                                                    <label className="form-label small">Section <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                                    <label className="form-label small">Section <span className="text-danger">*</span></label>
                                                     <input type="text" id="rsSection" list="sectionDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. II CSE C" autoComplete="off" />
                                                 </div>
                                                 <div className="col-md-3">
@@ -1059,7 +1059,7 @@ export default function DashboardLayout() {
                             <h6 className="fw-bold text-info"><i className="fa-solid fa-folder-plus me-1"></i> Add New Section</h6>
                             <form id="addSectionForm" onSubmit={(event) => window.handleAddSection(event)} >
                                 <div className="mb-2">
-                                    <label className="form-label small">Department <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                    <label className="form-label small">Department <span className="text-danger">*</span></label>
                                     <input type="text" id="secDept" list="secDeptList" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. CSE" required autoComplete="off" />
                                     <datalist id="secDeptList">
                                         <option value="CSE">CSE - Computer Science & Engg</option>
@@ -1907,17 +1907,17 @@ export default function DashboardLayout() {
                                 </div>
                                 <div className="row g-2 mb-3">
                                     <div className="col-md-3">
-                                        <label className="form-label small">Department <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                        <label className="form-label small">Department <span className="text-danger">*</span></label>
                                         <input type="text" id="msDept" list="deptDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. CSE" autoComplete="off" />
                                         <datalist id="deptDatalist"></datalist>
                                     </div>
                                     <div className="col-md-3">
-                                        <label className="form-label small">Class <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                        <label className="form-label small">Class <span className="text-danger">*</span></label>
                                         <input type="text" id="msCourse" list="courseDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. BTECH-CSE" autoComplete="off" />
                                         <datalist id="courseDatalist"></datalist>
                                     </div>
                                     <div className="col-md-3">
-                                        <label className="form-label small">Section <span className="text-danger">*</span> <small className="text-muted">(pick or type new)</small></label>
+                                        <label className="form-label small">Section <span className="text-danger">*</span></label>
                                         <input type="text" id="msSection" list="sectionDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. II CSE C" autoComplete="off" />
                                         <datalist id="sectionDatalist"></datalist>
                                     </div>
@@ -1951,7 +1951,7 @@ export default function DashboardLayout() {
                                         </tr>
                                     </thead>
                                     <tbody id="manageStudentsList">
-                                        <tr><td colSpan="13" className="text-center text-muted">No students added yet.</td></tr>
+                                        <tr><td colSpan="14" className="text-center text-muted">No students added yet.</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -1976,7 +1976,7 @@ export default function DashboardLayout() {
                                 <table className="table table-dark table-striped table-hover align-middle small text-nowrap">
                                     <thead>
                                         <tr>
-                                            <th>Emp ID</th>
+                                            <th>Faculty ID</th>
                                             <th>Name</th>
                                             <th>Department</th>
                                             <th>Subject Handling</th>
@@ -2009,8 +2009,8 @@ export default function DashboardLayout() {
                             <input type="hidden" id="editFacultyId" />
                             <div className="row g-3">
                                 <div className="col-md-6">
-                                    <label className="form-label small">Employee ID</label>
-                                    <input id="editFacultyEmpId" className="form-control bg-dark text-white border-secondary" placeholder="Employee ID" />
+                                    <label className="form-label small">Faculty ID</label>
+                                    <input id="editFacultyEmpId" className="form-control bg-dark text-white border-secondary" placeholder="Faculty ID" />
                                 </div>
                                 <div className="col-md-6">
                                     <label className="form-label small">First Name</label>

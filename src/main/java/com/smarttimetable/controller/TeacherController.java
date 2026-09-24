@@ -49,6 +49,9 @@ public class TeacherController {
     public ResponseEntity<Teacher> updateTeacher(@PathVariable Long id, @RequestBody Teacher teacherDetails) {
         return teacherService.getTeacherById(id)
                 .map(existing -> {
+                    if (teacherDetails.getEmployeeId() != null && !teacherDetails.getEmployeeId().isEmpty()) {
+                        existing.setEmployeeId(teacherDetails.getEmployeeId());
+                    }
                     existing.setFirstName(teacherDetails.getFirstName());
                     existing.setLastName(teacherDetails.getLastName());
                     existing.setPersonalEmail(teacherDetails.getPersonalEmail());
