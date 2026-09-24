@@ -13,6 +13,7 @@ import com.smarttimetable.service.AiQuizGeneratorService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/quizzes")
@@ -43,9 +44,10 @@ public class QuizController {
             String topic = (String) request.get("topic");
             String notes = (String) request.get("notes");
             String difficulty = (String) request.getOrDefault("difficulty", "Medium");
+            String type = (String) request.getOrDefault("type", "MCQ");
             int count = Integer.parseInt(request.getOrDefault("count", "5").toString());
 
-            List<QuizQuestion> questions = aiQuizGeneratorService.generateQuestions(topic, notes, difficulty, count);
+            List<QuizQuestion> questions = aiQuizGeneratorService.generateQuestions(topic, notes, difficulty, type, count);
             return ResponseEntity.ok(questions);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
@@ -99,5 +101,19 @@ public class QuizController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
+    }
+
+    // Faculty: get all submissions for a quiz (full student details for analytics)
+    @GetMapping("/{quizId}/submissions")
+    public ResponseEntity<List<QuizSubmission>> getSubmissions(@PathVariable Long quizId) {
+        return ResponseEntity.ok(quizService.getResultsForQuiz(quizId));
+    }
+
+    // Student: check if they already submitted a specific quiz
+    @GetMapping("/{quizId}/submission/{studentId}")
+    public ResponseEntity<?> getMySubmission(@PathVariable Long quizId, @PathVariable Long studentId) {
+        return quizService.getSubmissionForStudent(quizId, studentId)
+            .<ResponseEntity<?>>map(ResponseEntity::ok)
+            .orElse(ResponseEntity.noContent().build());
     }
 }

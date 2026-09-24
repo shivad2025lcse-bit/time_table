@@ -36,6 +36,8 @@ import com.smarttimetable.entity.Student;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.web.multipart.MultipartFile;
+import com.smarttimetable.service.AiTimetableParserService;
 
 @RestController
 @RequestMapping("/api/timetable")
@@ -47,6 +49,23 @@ public class TimetableController {
 
     @Autowired
     private TimetableRepository timetableRepository;
+    
+    @Autowired
+    private AiTimetableParserService aiTimetableParserService;
+
+    @Autowired
+    private com.smarttimetable.service.ExcelImportService excelImportService;
+
+    @PostMapping("/upload-image")
+    public ResponseEntity<?> parseTimetableImage(@RequestParam("file") MultipartFile file) {
+        try {
+            String jsonResult = aiTimetableParserService.parseTimetableImage(file);
+            return ResponseEntity.ok(jsonResult);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
 
     @Autowired
     private TeacherRepository teacherRepository;
@@ -208,5 +227,27 @@ public class TimetableController {
     public ResponseEntity<Void> clearTimetable() {
         timetableRepository.deleteAll();
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/import-excel")
+    public ResponseEntity<?> importExcel(@RequestParam("file") MultipartFile file, @RequestParam("section") String sectionName) {
+        try {
+            java.util.Map<String, Object> result = excelImportService.importTimetableExcel(file, sectionName);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "Excel import failed: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/save-manual")
+    public ResponseEntity<?> saveManualTimetable(@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> request) {
+        try {
+            String sectionName = (String) request.get("section");
+            java.util.Map<String, java.util.Map<String, String>> gridData = (java.util.Map<String, java.util.Map<String, String>>) request.get("grid");
+            java.util.Map<String, Object> result = excelImportService.saveManualTimetable(sectionName, gridData);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "Manual save failed: " + e.getMessage()));
+        }
     }
 }

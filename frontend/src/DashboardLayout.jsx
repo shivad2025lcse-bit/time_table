@@ -20,7 +20,7 @@ export default function DashboardLayout() {
         }
         window.__seceLegacyScriptsLoaded = true;
 
-        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js", "/js/charts.js", "/js/reports.js", "/js/quiz.js"];
+        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js?v=3", "/js/charts.js", "/js/reports.js", "/js/quiz.js?v=2"];
         scripts.forEach(src => {
             const script = document.createElement("script");
             script.src = src + '?v=' + new Date().getTime();
@@ -35,12 +35,12 @@ export default function DashboardLayout() {
             if (window.renderStaffAvailability) window.renderStaffAvailability();
             if (window.renderEnrolledStudentsRoster) window.renderEnrolledStudentsRoster();
 
-            // For student route: re-apply login session so timetable loads for the correct section
-            if (location.pathname === '/student') {
+            // Re-apply login session so timetable and roles load correctly
+            if (location.pathname !== '/login' && location.pathname !== '/') {
                 if (typeof window.restoreLoginSession === 'function') {
                     window.restoreLoginSession();
                 } else if (typeof window.switchRole === 'function') {
-                    const role = localStorage.getItem('sece_logged_in_role') || 'STUDENT';
+                    const role = localStorage.getItem('sece_logged_in_role') || (location.pathname === '/admin' ? 'ADMIN' : location.pathname === '/faculty' ? 'FACULTY' : 'STUDENT');
                     window.switchRole(role, true);
                 }
             }
@@ -173,7 +173,7 @@ export default function DashboardLayout() {
 
                                 <div className="d-flex align-items-center gap-2 border border-secondary rounded px-2 py-1 bg-dark">
                                     <i className="fa-solid fa-user-shield text-info"></i>
-                                    <span id="currentRoleLabel" className="text-white small">Role: ADMIN</span>
+                                    <span id="currentRoleLabel" className="text-white small">Role: {isAdmin ? 'ADMIN' : isFaculty ? 'FACULTY' : isStudent ? 'STUDENT' : 'ADMIN'}</span>
                                     <small id="loggedInUsernameLabel" className="text-muted ms-1"></small>
                                 </div>
 
@@ -248,7 +248,7 @@ export default function DashboardLayout() {
                                     <i className="fa-solid fa-chalkboard-user"></i> Faculty Details
                                 </button>
 
-                                <button id="studentDayNotificationBtn" className={`btn btn-sm btn-outline-info align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
+                                <button id="studentDayNotificationBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1" type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
 
                                 <button id="facultyQuizBtn" className={`btn btn-sm btn-outline-danger align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openFacultyQuizModal && window.openFacultyQuizModal()}>
                                     <i className="fa-solid fa-clipboard-question"></i> Manage Quizzes
@@ -260,7 +260,7 @@ export default function DashboardLayout() {
 
 
                                 {(!isAdmin && !isStudent) && (
-                                    <button id="substitutionBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#substitutionModal">
+                                    <button id="substitutionBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#substitutionModal" onClick={() => window.initSubstitutionModal && window.initSubstitutionModal()}>
                                         <i className="fa-solid fa-people-arrows"></i> Staff Availability / Substitution
                                     </button>
                                 )}
@@ -292,7 +292,73 @@ export default function DashboardLayout() {
                 </div>
 
 
-                <main className="container-fluid px-4 py-3">
+                    <main className="container-fluid px-4 py-3">
+                        {/* Student Dashboard Dynamic Current Period Card */}
+                        <div id="studentDynamicDashboard" className="d-none mb-4 row justify-content-center">
+                            
+                            {/* Current Period Card */}
+                            <div className="col-lg-5 col-md-6 mb-3">
+                                <div className="card bg-dark text-white border-secondary shadow-sm h-100" style={{borderRadius: "10px", overflow: "hidden"}}>
+                                    <div className="card-header border-secondary bg-primary bg-gradient py-2">
+                                        <h6 className="mb-0 fw-bold small"><i className="fa-solid fa-clock me-2"></i>CURRENT PERIOD</h6>
+                                    </div>
+                                    <div className="card-body p-3">
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                            <h6 id="dynCurrentName" className="fw-bold text-info mb-0">Loading...</h6>
+                                            <span id="dynCurrentTime" className="badge bg-secondary" style={{fontSize: "0.7rem"}}>--:--</span>
+                                        </div>
+                                        
+                                        <div id="dynCurrentDetails" className="mt-2">
+                                            <h5 id="dynCurrentSubject" className="fw-bold mb-2 text-warning">Please wait</h5>
+                                            <p className="mb-1 small text-light"><i className="fa-solid fa-user-tie me-2 text-secondary"></i><span id="dynCurrentFaculty"></span></p>
+                                            <p className="mb-0 small text-light"><i className="fa-solid fa-location-dot me-2 text-secondary"></i>Room: <span id="dynCurrentRoom"></span></p>
+                                        </div>
+                                        
+                                        <div id="dynCurrentStatusMessage" className="d-none mt-2 text-center">
+                                            <h5 id="dynStatusText" className="fw-bold mb-0 text-success"></h5>
+                                        </div>
+                                    </div>
+                                    <div className="card-footer border-secondary bg-dark" style={{fontSize: "0.75rem"}}>
+                                        <div className="d-flex justify-content-between align-items-center text-muted">
+                                            <span id="dynStudentProfile"><i className="fa-solid fa-graduation-cap me-1"></i>...</span>
+                                            <span id="dynNextPeriodBadge" className="badge bg-secondary d-none px-2 py-1">Next: <span id="dynNextPeriodText"></span></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Today's Timetable List */}
+                            <div className="col-lg-6 col-md-6 mb-3">
+                                <div className="card bg-dark text-white border-secondary shadow-sm h-100" style={{borderRadius: "10px", overflow: "hidden"}}>
+                                    <div className="card-header border-secondary py-2">
+                                        <h6 className="mb-0 fw-bold text-light small"><i className="fa-solid fa-calendar-day me-2"></i>TODAY'S TIMETABLE</h6>
+                                    </div>
+                                    <div className="card-body p-0" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                        <ul className="list-group list-group-flush" id="dynTodayTimetableList">
+                                            <li className="list-group-item bg-dark text-muted text-center py-2 border-secondary" style={{fontSize: "0.85rem"}}>Loading schedule...</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Student Upcoming Class Alert (Legacy) */}
+                        <div id="studentUpcomingClassAlert" className="alert alert-info d-none mb-3 align-items-center shadow-sm" role="alert" style={{ borderLeft: "4px solid #0dcaf0" }}>
+                            <i className="fa-solid fa-clock fa-2x me-3 text-info"></i>
+                            <div>
+                                <h6 className="alert-heading mb-1 fw-bold" id="studentUpcomingClassTitle">Upcoming Class</h6>
+                                <p className="mb-0 text-dark" id="studentUpcomingClassText">Loading...</p>
+                            </div>
+                        </div>
+
+                    {/* Faculty Next Class Alert */}
+                    <div id="facultyNextClassAlert" className="alert alert-primary d-none mb-3 align-items-center shadow-sm" role="alert" style={{ borderLeft: "4px solid #0d6efd" }}>
+                        <i className="fa-solid fa-person-chalkboard fa-2x me-3 text-primary"></i>
+                        <div>
+                            <h6 className="alert-heading mb-1 fw-bold" id="facultyNextClassTitle">Your Next Class</h6>
+                            <p className="mb-0 text-dark" id="facultyNextClassText">Loading...</p>
+                        </div>
+                    </div>
 
 
                     {!isAdmin && (
@@ -335,40 +401,7 @@ export default function DashboardLayout() {
                                     </>
                                 )}
 
-                                <div className="col-md-7 d-flex justify-content-md-end justify-content-start flex-wrap align-items-center gap-4 text-light" style={{ fontSize: "1rem" }}>
-                                    <div id="bannerBatchRow" className="d-flex align-items-center gap-2">
-                                        <strong className="text-muted"><i className="fa-solid fa-calendar-check text-info me-1"></i> Batch:</strong>
-                                        <span id="batchTextHeader" className="badge bg-primary">2024 - 2028</span>
-                                        <i id="batchEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Batch"></i>
-                                    </div>
-                                    <div id="bannerSemRow" className="d-flex align-items-center gap-2">
-                                        <strong className="text-muted"><i className="fa-solid fa-book-open text-warning me-1"></i> Semester:</strong>
-                                        <span id="semTextHeader" className="badge bg-secondary">II Year / III Semester</span>
-                                        <i id="semEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Semester"></i>
-                                    </div>
-                                    <div className="d-flex align-items-center gap-2" id="bannerAyRow">
-                                        <strong className="text-muted"><i className="fa-solid fa-calendar-days text-success me-1"></i> Academic Year:</strong>
-                                        <span id="ayTextHeader" className="fw-bold">2026 - 2027</span>
-                                        <i id="ayEditIcon" className="fa-solid fa-pencil text-muted ms-2 d-none" style={{ cursor: "pointer", fontSize: "0.8rem" }} title="Edit Academic Year"></i>
-                                    </div>
-                                    <div id="studentAdvisorBannerRow" className="d-none align-items-center gap-2">
-                                        <strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Advisor:</strong>
-                                        <span id="studentAdvisorNameBanner" className="fw-bold text-warning"></span>
-                                        <span id="studentAdvisorPhoneBanner" className="badge bg-dark border border-secondary text-light"></span>
-                                    </div>
-                                    <div className="d-flex align-items-center gap-2">
-                                        <strong className="text-muted"><i className="fa-solid fa-users text-primary me-1"></i> Class Strength:</strong>
-                                        <span className="badge bg-success" id="classStrengthBadge">61 Students</span>
-                                    </div>
-                                    <div className="d-flex align-items-center gap-2">
-                                        <strong className="text-muted"><i className="fa-solid fa-user-tie text-danger me-1"></i> Class Advisor:</strong>
-                                        <span className="text-warning fw-bold" id="classAdvisorLabel">Ms.J.Keerthika, AP/CSE</span>
-                                    </div>
-                                    <div id="classTutorsRow" className="d-none align-items-center gap-2">
-                                        <strong className="text-muted"><i className="fa-solid fa-chalkboard-user text-info me-1"></i> Class Tutors:</strong>
-                                        <span className="text-light" id="classTutorsLabel"></span>
-                                    </div>
-                                </div>
+
                             </div>
                         </div>
                     )}
@@ -416,10 +449,10 @@ export default function DashboardLayout() {
                                                 <th>1<br /><small className="text-dim" id="ttHeaderP1">08.40 - 09.40</small></th>
                                                 <th>2<br /><small className="text-dim" id="ttHeaderP2">09.40 - 10.40</small></th>
                                                 <th>3<br /><small className="text-dim" id="ttHeaderP3">11.00 - 12.00</small></th>
-                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }} id="ttHeaderTea">12.00-12.15</th>
+                                                <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderTea">12.00<br/>-<br/>12.15</th>
                                                 <th>4<br /><small className="text-dim" id="ttHeaderP4">12.00 - 01.00</small></th>
                                                 <th>5<br /><small className="text-dim" id="ttHeaderP5">01.40 - 02.30</small></th>
-                                                <th className="text-warning" style={{ width: "35px", writingMode: "vertical-rl", transform: "rotate(180deg)" }} id="ttHeaderLunch">02.30-03.15</th>
+                                                <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderLunch">02.30<br/>-<br/>03.15</th>
                                                 <th>ACT<br /><small className="text-dim" id="ttHeaderAct">Activity</small></th>
                                                 <th>6<br /><small className="text-dim" id="ttHeaderP6">02.30 - 03.20</small></th>
                                                 <th>7<br /><small className="text-dim" id="ttHeaderP7">03.20 - 04.10</small></th>
@@ -479,9 +512,11 @@ export default function DashboardLayout() {
                                 </div>
                         </div>
 
+                        {isAdmin && (
                         <div className="mt-4 px-2" id="adminControlPanelContainer">
-                            <h4 className="text-info fw-bold mb-4"><i className="fa-solid fa-shield-halved me-2"></i> Admin Control Panel</h4>
+                            <h4 className="text-info fw-bold mb-4"><i className="fa-solid fa-shield-halved me-2"></i> {isAdmin ? 'Admin Control Panel' : 'Faculty Control Panel'}</h4>
                             <div className="row g-4">
+                                {isAdmin && (
                                 <div className="col-md-4 col-sm-6">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminResourcesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,188,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -491,6 +526,8 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
+                                )}
+                                {isAdmin && (
                                 <div className="col-md-4 col-sm-6">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminVenuesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(25,200,100,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -500,6 +537,7 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
+                                )}
                                 <div className="col-md-4 col-sm-6">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageRosterModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(130,100,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -509,6 +547,7 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
+                                {isAdmin && (
                                 <div className="col-lg-4 col-md-6 col-sm-12">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminFacultyDetailsModal" onClick={() => window.renderAdminFacultyDetails && window.renderAdminFacultyDetails()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -518,6 +557,7 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
+                                )}
                                 <div className="col-lg-4 col-md-6 col-sm-12">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onClick={() => window.initAdminViewEditTimetableModal && window.initAdminViewEditTimetableModal()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,100,200,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -546,6 +586,7 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
+                                {isAdmin && (
                                 <div className="col-lg-4 col-md-6 col-sm-12">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewCredentialsModal" onClick={() => window.renderCredentialsList && window.renderCredentialsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,255,150,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -555,8 +596,10 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
+                                )}
                             </div>
                         </div>
+                        )}
 
                 </main>
             </div>
@@ -1577,13 +1620,13 @@ export default function DashboardLayout() {
 
                                 <div className="tab-pane fade" id="tabMyLeave">
                                     <div className="mb-2">
-                                        <label className="form-label small">Who are you in the staff directory?</label>
-                                        <select id="myStaffIdentitySelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onStaffIdentityChange()} >
-                                            <option value="">-- Select your name --</option>
+                                            <label className="form-label small">Who are you in the staff directory?</label>
+                                            <select id="myStaffIdentitySelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onStaffIdentityChange()} >
+                                                <option value="">-- Select your name --</option>
 
-                                        </select>
-                                        <div className="form-text text-muted">Remembered for next time you log in.</div>
-                                    </div>
+                                            </select>
+                                            <div className="form-text text-muted">Remembered for next time you log in.</div>
+                                        </div>
                                     <div className="mb-3">
                                         <label className="form-label small">Reason (optional)</label>
                                         <input type="text" id="leaveReasonInput" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Medical leave, personal work" />
@@ -1928,7 +1971,7 @@ export default function DashboardLayout() {
             </div>
 
             {/* Edit Faculty Modal */}
-            <div className="modal fade" id="editFacultyModal" tabIndex="-1" style={{ zIndex: 1060 }}>
+            <div className="modal fade" id="editFacultyModal" tabIndex="-1">
                 <div className="modal-dialog modal-lg modal-dialog-centered">
                     <div className="modal-content bg-dark text-white border-secondary">
                         <div className="modal-header border-secondary">
@@ -2062,6 +2105,10 @@ export default function DashboardLayout() {
                         <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
                             <h5 className="modal-title text-primary fw-bold"><i className="fa-solid fa-table me-2"></i> Timetable Builder</h5>
                             <div>
+                                <input type="file" id="importImageInput" accept=".png, .jpg, .jpeg" style={{ display: "none" }} onChange={(e) => window.importTimetableImage && window.importTimetableImage(e)} />
+                                <button type="button" className="btn btn-sm btn-outline-info me-2" onClick={() => document.getElementById('importImageInput').click()}>
+                                    <i className="fa-solid fa-image me-1"></i> Scan Image with AI
+                                </button>
                                 <input type="file" id="importExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importTimetableExcel && window.importTimetableExcel(e)} />
                                 <button type="button" className="btn btn-sm btn-outline-success me-3" onClick={() => document.getElementById('importExcelInput').click()}>
                                     <i className="fa-solid fa-file-excel me-1"></i> Import Excel

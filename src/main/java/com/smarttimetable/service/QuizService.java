@@ -30,6 +30,8 @@ public class QuizService {
     private TeacherRepository teacherRepository;
     @Autowired
     private StudentRepository studentRepository;
+    @Autowired
+    private TopicPerformanceRepository topicPerformanceRepository;
 
     @Transactional
     public Quiz createQuiz(Long sectionId, Long teacherId, com.smarttimetable.dto.QuizCreateRequest request) {
@@ -113,6 +115,48 @@ public class QuizService {
         submission.setTotalScore(totalAwardedMarks);
         double percentage = totalMaxMarks > 0 ? ((double) totalAwardedMarks / totalMaxMarks) * 100 : 0;
         submission.setPercentage(percentage);
+
+        // Update Topic Performance
+        java.util.Map<String, int[]> topicStats = new java.util.HashMap<>();
+        for (StudentAnswer answer : answers) {
+            String topic = answer.getQuestion().getTopicConcept();
+            if (topic == null || topic.isEmpty()) topic = "General";
+            topicStats.putIfAbsent(topic, new int[]{0, 0}); // [correct, total]
+            topicStats.get(topic)[1]++;
+            if (Boolean.TRUE.equals(answer.getIsCorrect())) {
+                topicStats.get(topic)[0]++;
+            }
+        }
+
+        List<TopicPerformance> existingPerformances = topicPerformanceRepository.findByStudentId(studentId);
+        for (java.util.Map.Entry<String, int[]> entry : topicStats.entrySet()) {
+            String topic = entry.getKey();
+            int correct = entry.getValue()[0];
+            int total = entry.getValue()[1];
+            double currentScore = ((double) correct / total) * 100;
+
+            TopicPerformance tp = existingPerformances.stream()
+                .filter(p -> p.getTopicName().equalsIgnoreCase(topic))
+                .findFirst()
+                .orElse(new TopicPerformance());
+            
+            if (tp.getId() == null) {
+                tp.setStudent(student);
+                tp.setTopicName(topic);
+                tp.setSubjectName(quiz.getSubjectName() != null ? quiz.getSubjectName() : "General");
+                tp.setPercentage(currentScore);
+            } else {
+                // Moving average or simple average with new attempt
+                tp.setPercentage((tp.getPercentage() + currentScore) / 2);
+            }
+
+            if (tp.getPercentage() >= 90) tp.setCompetencyLevel("Excellent");
+            else if (tp.getPercentage() >= 75) tp.setCompetencyLevel("Good");
+            else if (tp.getPercentage() >= 50) tp.setCompetencyLevel("Developing");
+            else tp.setCompetencyLevel("Needs Improvement");
+
+            topicPerformanceRepository.save(tp);
+        }
         
         if (percentage < 50.0) {
             List<StudentAnswer> incorrect = answerRepository.findBySubmissionId(submission.getId())
@@ -140,5 +184,9 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(quizId)
             .orElseThrow(() -> new RuntimeException("Quiz not found with id: " + quizId));
         quizRepository.delete(quiz); // cascades to questions, submissions, answers
+    }
+
+    public java.util.Optional<QuizSubmission> getSubmissionForStudent(Long quizId, Long studentId) {
+        return submissionRepository.findByQuizIdAndStudentId(quizId, studentId);
     }
 }

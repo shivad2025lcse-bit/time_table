@@ -608,7 +608,7 @@ function saveTimetableEdit(section, day, pIdx, slotData) {
 }
 
 // Course Incharge Reference List
-let courseReferenceList = JSON.parse(localStorage.getItem('modified_courseReferenceList')) || [
+const courseReferenceList = [
     { short: 'IoT', code: 'P23CS408 Internet of Things', faculty: 'Mr.V.Parthipan, AP/ECE', venue: '1CloudHub', cat: 'PC', credits: 3, hrs: '4' },
     { short: 'DVT', code: 'P23CS513 Data Visualization Techniques', faculty: 'Dr.A.Anandaraj, AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
     { short: 'BDA', code: 'P23CS521 Big Data Analytics', faculty: 'Dr.A.Sarfaraz Ahmed,AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
@@ -1583,7 +1583,7 @@ function renderTimetableGrid() {
             const teaTd = document.createElement('td');
             teaTd.className = 'tt-break-cell align-middle';
             teaTd.rowSpan = 6;
-            teaTd.innerText = 'TEA BREAK (10.40 - 11.00 AM)';
+            teaTd.innerHTML = 'T<br/>E<br/>A<br/><br/>B<br/>R<br/>E<br/>A<br/>K<br/><div style="font-size:0.55rem; line-height: 1.1; margin-top: 10px;">10.40<br/>-<br/>11.00</div>';
             tr.appendChild(teaTd);
         }
 
@@ -1597,7 +1597,7 @@ function renderTimetableGrid() {
             const lunchTd = document.createElement('td');
             lunchTd.className = 'tt-break-cell align-middle';
             lunchTd.rowSpan = 6;
-            lunchTd.innerText = 'LUNCH BREAK (01.00 - 01.40 PM)';
+            lunchTd.innerHTML = 'L<br/>U<br/>N<br/>C<br/>H<br/><br/>B<br/>R<br/>E<br/>A<br/>K<br/><div style="font-size:0.55rem; line-height: 1.1; margin-top: 10px;">01.00<br/>-<br/>01.40</div>';
             tr.appendChild(lunchTd);
         }
 
@@ -1617,7 +1617,118 @@ function renderTimetableGrid() {
 
         tbody.appendChild(tr);
     });
+
+    updateStudentDashboardPeriod();
 }
+
+// Student Dashboard Ongoing Period Logic
+function updateStudentDashboardPeriod() {
+    if (typeof currentUserRole !== 'undefined' && currentUserRole !== 'STUDENT') {
+        const studentAlert = document.getElementById('studentUpcomingClassAlert');
+        if (studentAlert) studentAlert.classList.add('d-none');
+        return;
+    }
+
+    const studentAlert = document.getElementById('studentUpcomingClassAlert');
+    const studentTitle = document.getElementById('studentUpcomingClassTitle');
+    const studentText = document.getElementById('studentUpcomingClassText');
+    
+    if (!studentAlert || !studentTitle || !studentText) return;
+
+    if (!window.currentTimetableEntries || window.currentTimetableEntries.length === 0) {
+        studentAlert.classList.add('d-none');
+        return;
+    }
+
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const time = h + m / 60.0;
+
+    const timeSlots = [
+        { idx: 1, start: 8.66, end: 9.66, label: "08:40 AM - 09:40 AM" }, // Period 1
+        { idx: 2, start: 9.66, end: 10.66, label: "09:40 AM - 10:40 AM" }, // Period 2
+        { idx: 3, start: 11.00, end: 12.00, label: "11:00 AM - 12:00 PM" }, // Period 3
+        { idx: 4, start: 12.00, end: 13.00, label: "12:00 PM - 01:00 PM" }, // Period 4
+        { idx: 5, start: 13.66, end: 14.50, label: "01:40 PM - 02:30 PM" }, // Period 5
+        { idx: 6, start: 14.50, end: 15.33, label: "02:30 PM - 03:20 PM" }, // Period 6
+        { idx: 7, start: 15.33, end: 16.16, label: "03:20 PM - 04:10 PM" }  // Period 7
+    ];
+
+    const todaysEntries = window.currentTimetableEntries.filter(e => e.day === todayStr);
+    
+    let activeEntry = null;
+    let matchingSlot = null;
+    let isOngoing = false;
+
+    // First, check if there is a class going on RIGHT NOW
+    for (let slot of timeSlots) {
+        if (time >= slot.start && time < slot.end) {
+            const entry = todaysEntries.find(e => parseInt(e.periodIndex) === slot.idx);
+            if (entry) {
+                activeEntry = entry;
+                matchingSlot = slot;
+                isOngoing = true;
+                break;
+            }
+        }
+    }
+
+    // If no class is ongoing right now, find the NEXT upcoming class for today
+    if (!activeEntry) {
+        for (let slot of timeSlots) {
+            if (slot.start > time) {
+                const entry = todaysEntries.find(e => parseInt(e.periodIndex) === slot.idx);
+                if (entry) {
+                    activeEntry = entry;
+                    matchingSlot = slot;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (activeEntry && matchingSlot) {
+        studentAlert.classList.remove('d-none');
+        studentAlert.classList.add('d-flex');
+        
+        studentTitle.innerText = isOngoing ? "Currently Ongoing Period" : "Next Upcoming Class";
+        if (isOngoing) {
+            studentAlert.style.borderLeft = "4px solid #198754";
+            studentAlert.className = "alert alert-success mb-3 align-items-center shadow-sm d-flex";
+            studentAlert.querySelector('i').className = "fa-solid fa-clock fa-spin fa-2x me-3 text-success";
+        } else {
+            studentAlert.style.borderLeft = "4px solid #0dcaf0";
+            studentAlert.className = "alert alert-info mb-3 align-items-center shadow-sm d-flex";
+            studentAlert.querySelector('i').className = "fa-solid fa-clock fa-2x me-3 text-info";
+        }
+
+        const subName = activeEntry.subjectName || 'Unknown Subject';
+        const teacher = activeEntry.teacherName || 'Unknown Faculty';
+        const room = activeEntry.classroomNumber || activeEntry.laboratoryName || 'Unknown Venue';
+        
+        studentText.innerHTML = `<strong>${subName}</strong> &bull; ${matchingSlot.label}<br/><span class="text-muted small">Faculty: ${teacher} | Venue: ${room}</span>`;
+    } else {
+        studentAlert.classList.remove('d-none');
+        studentAlert.classList.add('d-flex');
+        studentTitle.innerText = "No More Classes";
+        studentAlert.style.borderLeft = "4px solid #6c757d";
+        studentAlert.className = "alert alert-secondary mb-3 align-items-center shadow-sm d-flex";
+        studentAlert.querySelector('i').className = "fa-solid fa-mug-hot fa-2x me-3 text-secondary";
+        
+        if (todaysEntries.length === 0) {
+            studentText.innerHTML = `You have no classes scheduled for today (${todayStr}). Enjoy your day!`;
+        } else {
+            studentText.innerHTML = `You have finished all your scheduled classes for today.`;
+        }
+    }
+}
+
+// Call on load and every minute
+setInterval(updateStudentDashboardPeriod, 60000);
+window.addEventListener('load', () => setTimeout(updateStudentDashboardPeriod, 1000));
+
 
 // Helper to Create Period Cell
 function createCell(day, pIdx, pData) {
@@ -2017,6 +2128,11 @@ function switchRole(role, silent = false) {
     if (role === 'STUDENT') {
         renderTimetableGrid();
         renderStudentsRoster();
+        if (typeof window.fetchStudentDynamicDashboard === 'function') {
+            window.fetchStudentDynamicDashboard();
+            if (window.dynamicDashboardInterval) clearInterval(window.dynamicDashboardInterval);
+            window.dynamicDashboardInterval = setInterval(window.fetchStudentDynamicDashboard, 30000);
+        }
     } else {
         if (typeof onFilterChange === 'function') {
             onFilterChange();
@@ -3200,56 +3316,14 @@ function renderAdminResourcesUI() {
     const venueList = document.getElementById('adminVenuesList');
     const classList = document.getElementById('adminClassesList');
     if (subList) {
-        const allSubjects = [...courseReferenceList];
-        
-        subList.innerHTML = allSubjects.length ? allSubjects.map((s, i) => {
-            const parts = s.code.split(' ');
-            const displayCode = parts[0];
-            const displayTitle = parts.slice(1).join(' ');
-            const safeCode = encodeURIComponent(s.code);
-            return `<tr>
-                <td>${displayCode}</td>
-                <td>${displayTitle}</td>
-                <td>${s.faculty}</td>
-                <td>${s.venue || '-'}</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-info me-1" onclick="editAdminSubjectByIdx(${i})" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAdminSubjectByIdx(${i})" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                </td>
-            </tr>`;
-        }).join('') : '<tr><td colspan="5" class="text-muted text-center">No subjects found.</td></tr>';
+        subList.innerHTML = adminResources.subjects.length ? adminResources.subjects.map((s, i) =>
+            `<tr><td>${s.code}</td><td>${s.title}</td><td>${s.faculty}</td><td>${s.venue || '-'}</td><td><button class="btn btn-sm btn-outline-danger" onclick="removeAdminSubject(${i})">Remove</button></td></tr>`
+        ).join('') : '<tr><td colspan="5" class="text-muted text-center">No custom subjects.</td></tr>';
     }
-    
     if (venueList) {
-        const builtInVenues = new Set();
-        courseReferenceList.forEach(c => {
-            if (c.venue && c.venue !== 'Not Assigned' && !adminResources.venues.some(v => (v.name || v) === c.venue)) {
-                builtInVenues.add(c.venue);
-            }
-        });
-        
-        let venueHtml = '';
-        builtInVenues.forEach((v, bIdx) => {
-            venueHtml += `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
-                <span><strong>${v}</strong> <small class="text-muted">Built-in</small></span>
-                <div>
-                    <button class="btn btn-sm btn-outline-info me-1" onclick="editAdminBuiltinVenue('${v.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAdminBuiltinVenue('${v.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                </div>
-            </div>`;
-        });
-        
-        venueHtml += adminResources.venues.map((v, i) =>
-            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
-                <span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? '— Block ' + v.block : ''}${v.capacity ? ' — Capacity ' + v.capacity : ''}</small></span>
-                <div>
-                    <button class="btn btn-sm btn-outline-info me-1" onclick="editAdminCustomVenue(${i})" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAdminCustomVenue(${i})" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                </div>
-            </div>`
-        ).join('');
-        
-        venueList.innerHTML = venueHtml || '<div class="list-group-item bg-dark text-muted border-secondary">No venues found.</div>';
+        venueList.innerHTML = adminResources.venues.length ? adminResources.venues.map((v, i) =>
+            `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center"><span><strong>${v.name || v}</strong> <small class="text-muted">${v.type || ''} ${v.block ? 'â€” Block ' + v.block : ''}${v.capacity ? ' â€” Capacity ' + v.capacity : ''}</small></span><button class="btn btn-sm btn-outline-danger" onclick="removeAdminVenue(${i})">Remove</button></div>`
+        ).join('') : '<div class="list-group-item bg-dark text-muted border-secondary">No custom venues.</div>';
     }
     if (classList) {
         classList.innerHTML = activeSections.length ? activeSections.map((s, i) =>
@@ -3346,118 +3420,6 @@ function importAdminSubjectExcel(event) {
     reader.readAsBinaryString(file);
     event.target.value = '';
 }
-
-// ============================================================
-// ADMIN SUBJECT & VENUE EDIT / DELETE HANDLERS
-// ============================================================
-
-window.editAdminSubjectByIdx = function(idx) {
-    const s = courseReferenceList[idx];
-    if (!s) return;
-    const parts = s.code.split(' ');
-    const oldCode = parts[0];
-    const oldTitle = parts.slice(1).join(' ');
-
-    const newCode = prompt('Edit Subject Code:', oldCode);
-    if (newCode === null) return;
-    const newTitle = prompt('Edit Subject Name:', oldTitle);
-    if (newTitle === null) return;
-    const newFaculty = prompt('Edit Faculty Incharge:', s.faculty);
-    if (newFaculty === null) return;
-    const newVenue = prompt('Edit Venue:', s.venue || '');
-    if (newVenue === null) return;
-
-    // Update courseReferenceList entry
-    s.code = newCode.trim() + ' ' + newTitle.trim();
-    s.faculty = newFaculty.trim();
-    s.venue = newVenue.trim();
-    localStorage.setItem('modified_courseReferenceList', JSON.stringify(courseReferenceList));
-
-    // Also update adminResources.subjects if there's a custom entry
-    const cs = adminResources.subjects.find(c => c.short === s.short || c.code === oldCode);
-    if (cs) {
-        cs.code = newCode.trim();
-        cs.title = newTitle.trim();
-        cs.faculty = newFaculty.trim();
-        cs.venue = newVenue.trim();
-        saveAdminResources();
-    }
-
-    renderAdminResourcesUI();
-    if (typeof renderCourseRefTable === 'function') renderCourseRefTable();
-};
-
-window.deleteAdminSubjectByIdx = function(idx) {
-    const s = courseReferenceList[idx];
-    if (!s) return;
-    if (!confirm('Delete "' + s.code + '"? This cannot be undone.')) return;
-
-    const parts = s.code.split(' ');
-    const oldCode = parts[0];
-
-    // Remove from courseReferenceList
-    courseReferenceList.splice(idx, 1);
-    localStorage.setItem('modified_courseReferenceList', JSON.stringify(courseReferenceList));
-
-    // Remove from adminResources.subjects if present
-    adminResources.subjects = adminResources.subjects.filter(c => c.code !== oldCode && c.short !== s.short);
-    saveAdminResources();
-
-    renderAdminResourcesUI();
-    if (typeof renderCourseRefTable === 'function') renderCourseRefTable();
-};
-
-window.editAdminBuiltinVenue = function(venueName) {
-    const newName = prompt('Edit Venue Name:', venueName);
-    if (newName === null || !newName.trim()) return;
-    courseReferenceList.forEach(c => {
-        if (c.venue === venueName) c.venue = newName.trim();
-    });
-    localStorage.setItem('modified_courseReferenceList', JSON.stringify(courseReferenceList));
-    renderAdminResourcesUI();
-};
-
-window.deleteAdminBuiltinVenue = function(venueName) {
-    if (!confirm('Remove built-in venue "' + venueName + '"? Subjects using it will be set to "Not Assigned".')) return;
-    courseReferenceList.forEach(c => {
-        if (c.venue === venueName) c.venue = 'Not Assigned';
-    });
-    localStorage.setItem('modified_courseReferenceList', JSON.stringify(courseReferenceList));
-    renderAdminResourcesUI();
-};
-
-window.editAdminCustomVenue = function(idx) {
-    const v = adminResources.venues[idx];
-    if (!v) return;
-    const oldName = v.name || v;
-
-    const newName = prompt('Edit Venue Name:', oldName);
-    if (newName === null || !newName.trim()) return;
-
-    if (typeof v === 'string') {
-        adminResources.venues[idx] = newName.trim();
-    } else {
-        v.name = newName.trim();
-        const newType = prompt('Edit Type (Class/Lab):', v.type || '');
-        if (newType !== null) v.type = newType.trim();
-        const newBlock = prompt('Edit Block:', v.block || '');
-        if (newBlock !== null) v.block = newBlock.trim();
-        const newCap = prompt('Edit Capacity:', v.capacity || '');
-        if (newCap !== null) v.capacity = newCap.trim();
-    }
-    saveAdminResources();
-    renderAdminResourcesUI();
-};
-
-window.deleteAdminCustomVenue = function(idx) {
-    const v = adminResources.venues[idx];
-    if (!v) return;
-    if (!confirm('Delete venue "' + (v.name || v) + '"?')) return;
-    adminResources.venues.splice(idx, 1);
-    saveAdminResources();
-    renderAdminResourcesUI();
-};
-
 
 function removeAdminSubject(idx) {
     if (!adminOnly()) return;
@@ -4318,7 +4280,6 @@ async function loadRecentStudents() {
                     <td><small>${classDisplay}</small></td>
                     <td><span class="badge bg-secondary">${secDisplay}</span></td>
                     <td class="text-center">${s.semester || semDisplay}</td>
-                    <td><small>${s.residentType || '-'}</small></td>
                     <td class="text-center">
                         <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editPersistentStudent(${s.id || `'${roll}'`})" title="Edit student"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id || `'${roll}'`})" title="Delete student"><i class="fa-solid fa-trash"></i></button>
@@ -4345,9 +4306,7 @@ window.loadAdminFullFaculty = async function () {
             const renderRows = () => {
                 const displayData = data.length > 0 ? data : (window.staffDirectory || []);
                 if (displayData.length === 0) return '<tr><td colspan="9" class="text-center text-muted">No faculty records found.</td></tr>';
-                // Store data globally so Edit can access full object by index
-                window._adminFacultyData = displayData;
-                return displayData.map((t, idx) => `
+                return displayData.map(t => `
                     <tr>
                         <td>${t.employeeId || '-'}</td>
                         <td>${((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-'}</td>
@@ -4357,14 +4316,7 @@ window.loadAdminFullFaculty = async function () {
                         <td>${t.collegeEmail || '-'}</td>
                         <td>${t.phone1 || t.phone || '-'}</td>
                         <td>${t.phone2 || '-'}</td>
-                        <td class="text-nowrap">
-                            <button class="btn btn-sm btn-outline-info me-1" title="Edit Faculty"
-                                onclick="openEditFaculty(${idx})"
-                            ><i class="fa-solid fa-pen"></i></button>
-                            <button class="btn btn-sm btn-outline-danger" title="Delete Faculty"
-                                onclick="deletePersistentFaculty(${t.id || idx})"
-                            ><i class="fa-solid fa-trash"></i></button>
-                        </td>
+                        <td><button class="btn btn-sm btn-outline-danger" onclick="deletePersistentFaculty(${t.id || `'${t.name}'`})"><i class="fa-solid fa-trash"></i></button></td>
                     </tr>
                 `).join('');
             };
@@ -4373,68 +4325,6 @@ window.loadAdminFullFaculty = async function () {
         }
     } catch (err) {
         if (adminBody) adminBody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Error loading faculty details.</td></tr>';
-    }
-};
-
-window.openEditFaculty = function(idxOrObj) {
-    let t;
-    if (typeof idxOrObj === 'number') {
-        t = (window._adminFacultyData || [])[idxOrObj];
-    } else {
-        t = idxOrObj;
-    }
-    if (!t) return;
-    document.getElementById('editFacultyId').value = t.id || '';
-    document.getElementById('editFacultyEmpId').value = t.employeeId || '';
-    document.getElementById('editFacultyFirstName').value = t.firstName || '';
-    document.getElementById('editFacultyLastName').value = t.lastName || '';
-    document.getElementById('editFacultyDept').value = (t.department && t.department.name) ? t.department.name : (t.dept || '');
-    document.getElementById('editFacultySubject').value = t.subjectHandling || '';
-    document.getElementById('editFacultyPersonalEmail').value = t.personalEmail || t.email || '';
-    document.getElementById('editFacultyCollegeEmail').value = t.collegeEmail || '';
-    document.getElementById('editFacultyPhone1').value = t.phone1 || t.phone || '';
-    document.getElementById('editFacultyPhone2').value = t.phone2 || '';
-    // Close the view modal and open edit modal
-    const viewModal = bootstrap.Modal.getInstance(document.getElementById('adminViewFacultyModal'));
-    if (viewModal) viewModal.hide();
-    setTimeout(() => {
-        const editModal = new bootstrap.Modal(document.getElementById('editFacultyModal'));
-        editModal.show();
-    }, 400);
-};
-
-window.saveEditFaculty = async function() {
-    const id = document.getElementById('editFacultyId').value;
-    if (!id) { alert('No faculty selected.'); return; }
-
-    const payload = {
-        employeeId: document.getElementById('editFacultyEmpId').value.trim(),
-        firstName: document.getElementById('editFacultyFirstName').value.trim(),
-        lastName: document.getElementById('editFacultyLastName').value.trim(),
-        subjectHandling: document.getElementById('editFacultySubject').value.trim(),
-        personalEmail: document.getElementById('editFacultyPersonalEmail').value.trim(),
-        collegeEmail: document.getElementById('editFacultyCollegeEmail').value.trim(),
-        phone1: document.getElementById('editFacultyPhone1').value.trim(),
-        phone2: document.getElementById('editFacultyPhone2').value.trim(),
-    };
-
-    try {
-        const res = await apiFetch(`/api/teachers/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-            bootstrap.Modal.getInstance(document.getElementById('editFacultyModal'))?.hide();
-            showToast('Faculty Updated', `${payload.firstName} ${payload.lastName} updated successfully.`);
-            loadAdminFullFaculty();
-        } else {
-            const errText = await res.text();
-            alert('Failed to update faculty: ' + errText);
-        }
-    } catch(err) {
-        console.error(err);
-        alert('Error updating faculty. Check console for details.');
     }
 };
 
@@ -5256,15 +5146,6 @@ window.editPersistentStudent = function(id) {
     
     const modalEl = document.getElementById('editStudentModal');
     if (modalEl) {
-        // Prevent body from losing modal-open class when edit modal closes
-        const ensureScroll = function() {
-            modalEl.removeEventListener('hidden.bs.modal', ensureScroll);
-            if (document.getElementById('manageStudentsModal').classList.contains('show')) {
-                document.body.classList.add('modal-open');
-            }
-        };
-        modalEl.addEventListener('hidden.bs.modal', ensureScroll);
-        
         const modal = new bootstrap.Modal(modalEl);
         modal.show();
     }
@@ -5423,6 +5304,16 @@ window.saveTimetableBuilder = function() {
     });
     
     localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
+    
+    // Attempt to save to backend MySQL database as requested
+    fetch('/api/timetable/save-manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section: section, grid: data.grid })
+    }).then(r => r.ok ? r.json() : Promise.reject())
+      .then(() => console.log('Saved to MySQL Database successfully'))
+      .catch(() => console.warn('Failed to save to MySQL Database'));
+
     showToast('Success', `Timetable for ${section} saved!`);
     
     const modalEl = bootstrap.Modal.getInstance(document.getElementById('timetableBuilderModal'));
@@ -5502,179 +5393,280 @@ window.sectionChanged = function(sec) {
     renderTimetableGrid();
 };
 
-// ============================================================
-// ADMIN: USER CREDENTIALS MANAGEMENT
-// ============================================================
+window.importTimetableImage = async function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-window.currentCredRole = 'STUDENT';
-window.allCredData = [];
+    showToast('Scanning timetable...', 'Sending image to AI for processing. Please wait...', 'info');
 
-window.renderCredentialsList = function() {
-    window.switchCredTab(window.currentCredRole);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/timetable/upload-image', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            let errText = await response.text();
+            try {
+                const errJson = JSON.parse(errText);
+                if (errJson && errJson.error) {
+                    errText = errJson.error;
+                }
+            } catch (e) {}
+            throw new Error(errText);
+        }
+
+        const jsonText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(jsonText);
+        } catch (e) {
+            throw new Error("Invalid JSON response from AI");
+        }
+
+        if (data && data.data) {
+            const ttData = data.data;
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            let totalEntries = 0;
+            days.forEach(day => {
+                if (ttData[day]) {
+                    const periods = ttData[day];
+                    for (let p = 1; p <= 7; p++) {
+                        const inputId = `ttb_${day}_P${p}`;
+                        const input = document.getElementById(inputId);
+                        if (input) {
+                            const per = periods[p-1];
+                            if (per && per.sub && per.sub.toUpperCase() !== 'FREE' && per.sub.toUpperCase() !== 'BREAK') {
+                                let val = per.sub;
+                                if (per.faculty) val += `, ${per.faculty}`;
+                                if (per.venue) val += `, ${per.venue}`;
+                                input.value = val;
+                                totalEntries++;
+                            } else {
+                                input.value = '';
+                            }
+                        }
+                    }
+                }
+            });
+            showToast('Image Scan Completed', `Timetable detected. Please verify the imported data. Total: ${totalEntries} timetable entries`, 'success');
+        } else {
+            throw new Error("Could not detect a timetable table in this image. Please upload a clear timetable screenshot.");
+        }
+
+    } catch (err) {
+        console.error("AI Upload Error:", err);
+        let errorMsg = err.message;
+        if (errorMsg && errorMsg.includes('AI scanning service is not configured')) {
+            showToast('Error', errorMsg, 'danger');
+            alert(errorMsg);
+        } else {
+            showToast('Scan Failed', 'Could not detect a timetable table in this image. Please upload a clear timetable screenshot.', 'danger');
+            alert('Could not detect a timetable table in this image. Please upload a clear timetable screenshot.');
+        }
+    }
+    
+    // Reset the input so it can be used again
+    event.target.value = '';
 };
 
-window.switchCredTab = function(role) {
-    window.currentCredRole = role;
+window.importTimetableExcel = async function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
     
-    // Update active tab UI
-    const tabs = ['STUDENT', 'FACULTY', 'CLASS_ADVISOR'];
-    const ids = ['credTabStudents', 'credTabFaculty', 'credTabAdvisor'];
+    const section = window.currentTimetableSection;
+    if (!section) {
+        alert("Please open a specific timetable section before importing.");
+        event.target.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('section', section);
     
-    tabs.forEach((t, i) => {
-        const btn = document.getElementById(ids[i]);
-        if (btn) {
-            if (t === role) {
-                btn.classList.add('active', 'text-white');
-                btn.classList.remove('text-info', 'text-warning');
-                if (t === 'FACULTY') btn.classList.add('bg-info');
-                else if (t === 'CLASS_ADVISOR') btn.classList.add('bg-warning', 'text-dark');
-                else btn.classList.add('bg-primary');
+    showToast('Uploading Excel', 'Sending to backend for parsing...', 'info');
+
+    try {
+        const response = await fetch('/api/timetable/import-excel', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const json = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(json.error || 'Backend failed to process Excel file');
+        }
+
+        const gridData = json.grid;
+        if (!gridData) throw new Error("No grid data returned from server.");
+
+        const daysList = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        daysList.forEach(day => {
+            if (gridData[day]) {
+                const rowData = gridData[day];
+                for (let p = 1; p <= 7; p++) {
+                    const inputId = `ttb_${day}_P${p}`;
+                    const input = document.getElementById(inputId);
+                    if (input && rowData[`P${p}`] !== undefined) {
+                        input.value = rowData[`P${p}`];
+                    }
+                }
+            }
+        });
+        
+        // Save the builder automatically so the main timetable view updates!
+        window.saveTimetableBuilder();
+        
+        showToast('Excel Imported Successfully', json.message || 'Timetable updated in database and UI refreshed.', 'success');
+        
+    } catch (error) {
+        console.error('Error importing Excel via API:', error);
+        alert('Error parsing the Excel file: ' + error.message);
+    }
+    
+    event.target.value = '';
+};
+
+window.fetchStudentDynamicDashboard = async function() {
+    try {
+        const token = localStorage.getItem("jwt_token");
+        if (!token) return;
+        
+        const response = await fetch("/api/student/dashboard/current", {
+            headers: {
+                "Authorization": "Bearer " + token
+            }
+        });
+        
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        
+        const dynContainer = document.getElementById("studentDynamicDashboard");
+        const alertLegacy = document.getElementById("studentUpcomingClassAlert");
+        
+        if (dynContainer) dynContainer.classList.remove("d-none");
+        if (alertLegacy) alertLegacy.classList.add("d-none");
+        
+        if (data.status === "NO_PROFILE") {
+            if(document.getElementById("dynCurrentName")) document.getElementById("dynCurrentName").innerText = "Profile Incomplete";
+            if(document.getElementById("dynCurrentSubject")) {
+                document.getElementById("dynCurrentSubject").innerText = data.message;
+                document.getElementById("dynCurrentSubject").classList.replace("text-warning", "text-danger");
+            }
+            if(document.getElementById("dynCurrentFaculty")) document.getElementById("dynCurrentFaculty").parentElement.style.display = "none";
+            if(document.getElementById("dynCurrentRoom")) document.getElementById("dynCurrentRoom").parentElement.style.display = "none";
+            return;
+        }
+
+        // Populate Profile Info
+        if (data.student && document.getElementById("dynStudentProfile")) {
+            document.getElementById("dynStudentProfile").innerHTML = `<i class="fa-solid fa-graduation-cap me-1"></i>${data.student.year} Yr ${data.student.department} - Sec ${data.student.section}`;
+        }
+        
+        // Handle HOLIDAY or AFTER/BEFORE college
+        const statusBox = document.getElementById("dynCurrentStatusMessage");
+        const statusText = document.getElementById("dynStatusText");
+        const detailsBox = document.getElementById("dynCurrentDetails");
+        const nameBox = document.getElementById("dynCurrentName");
+        const timeBox = document.getElementById("dynCurrentTime");
+        const nextBadge = document.getElementById("dynNextPeriodBadge");
+        const nextText = document.getElementById("dynNextPeriodText");
+        
+        if(detailsBox) detailsBox.classList.add("d-none");
+        if(statusBox) statusBox.classList.add("d-none");
+        if(nextBadge) nextBadge.classList.add("d-none");
+        if(nameBox) nameBox.innerText = data.status.replace(/_/g, " ");
+        if(timeBox) timeBox.innerText = "--:--";
+
+        if (data.status === "HOLIDAY" || data.status === "BEFORE_COLLEGE" || data.status === "AFTER_COLLEGE") {
+            if(statusBox) statusBox.classList.remove("d-none");
+            if(statusText) {
+                 statusText.innerText = data.status === "HOLIDAY" ? "Holiday! No Classes" : (data.status === "BEFORE_COLLEGE" ? "Classes haven't started yet" : "Classes are over for today");
+                 statusText.className = "fw-bold mb-0 text-success";
+            }
+        } else if (data.status === "CURRENT_PERIOD") {
+            if(detailsBox) detailsBox.classList.remove("d-none");
+            if(nameBox) nameBox.innerText = data.currentPeriod.name;
+            if(timeBox) timeBox.innerText = `${data.currentPeriod.startTime} - ${data.currentPeriod.endTime}`;
+            if(document.getElementById("dynCurrentSubject")) {
+                document.getElementById("dynCurrentSubject").innerText = data.currentPeriod.subject;
+                document.getElementById("dynCurrentSubject").className = "fw-bold mb-3 text-warning";
+            }
+            if(document.getElementById("dynCurrentFaculty")) document.getElementById("dynCurrentFaculty").innerText = data.currentPeriod.faculty || "TBA";
+            if(document.getElementById("dynCurrentRoom")) document.getElementById("dynCurrentRoom").innerText = data.currentPeriod.room || "TBA";
+        } else if (data.status === "NO_CLASS") {
+             if(statusBox) statusBox.classList.remove("d-none");
+             if(statusText) {
+                 statusText.innerText = "FREE HOUR";
+                 statusText.className = "fw-bold mb-0 text-info";
+             }
+             if(nameBox) nameBox.innerText = data.currentPeriod.name;
+             if(timeBox) timeBox.innerText = `${data.currentPeriod.startTime} - ${data.currentPeriod.endTime}`;
+        } else {
+             // Breaks (TEA_BREAK, LUNCH_BREAK, ACTIVITY)
+             if(statusBox) statusBox.classList.remove("d-none");
+             if(statusText) {
+                 statusText.innerText = data.status.replace(/_/g, " ");
+                 statusText.className = "fw-bold mb-0 text-warning";
+             }
+             if(nameBox) nameBox.innerText = "Break Time";
+             if (data.currentPeriod && timeBox) {
+                timeBox.innerText = `${data.currentPeriod.startTime} - ${data.currentPeriod.endTime}`;
+             }
+        }
+        
+        if (data.nextPeriod) {
+            if(nextBadge) nextBadge.classList.remove("d-none");
+            if(nextText) nextText.innerText = `${data.nextPeriod.name}: ${data.nextPeriod.subject}`;
+        }
+        
+        // Populate Today's Timetable List
+        const ttList = document.getElementById("dynTodayTimetableList");
+        if(ttList) {
+            ttList.innerHTML = "";
+            if (data.todayTimetable && data.todayTimetable.length > 0) {
+                data.todayTimetable.forEach(p => {
+                    const li = document.createElement("li");
+                    li.className = "list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center";
+                    
+                    let isCurrent = false;
+                    if (data.currentPeriod && data.currentPeriod.name === p.name) isCurrent = true;
+                    
+                    if (isCurrent) {
+                        li.classList.replace("bg-dark", "bg-primary");
+                        li.classList.add("bg-gradient");
+                    }
+                    
+                    const timeSpan = `<span class="badge ${isCurrent ? "bg-light text-dark" : "bg-secondary"} me-2">${p.startTime}</span>`;
+                    const subjectName = p.subject === "FREE" ? `<span class="text-muted">FREE</span>` : p.subject;
+                    
+                    li.innerHTML = `<div>${timeSpan} <span class="fw-bold">${subjectName}</span></div>
+                                    <div class="small ${isCurrent ? "text-light" : "text-info"}">${p.room || ""}</div>`;
+                    ttList.appendChild(li);
+                });
             } else {
-                btn.classList.remove('active', 'text-white', 'bg-primary', 'bg-info', 'bg-warning', 'text-dark');
-                if (t === 'FACULTY') btn.classList.add('text-info');
-                else if (t === 'CLASS_ADVISOR') btn.classList.add('text-warning');
-                else btn.classList.add('text-primary');
+                ttList.innerHTML = "<li class='list-group-item bg-dark text-muted text-center py-3 border-secondary small'>No schedule available for today.</li>";
             }
         }
-    });
-    
-    // Fetch and render
-    const tbody = document.getElementById('credentialsTableBody');
-    if (tbody) tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-muted">Loading credentials...</td></tr>';
-    
-    apiFetch(`/api/admin/credentials?role=${role}`)
-        .then(res => res.ok ? res.json() : [])
-        .then(data => {
-            window.allCredData = data;
-            document.getElementById('credSearchInput').value = '';
-            window.filterCredentials();
-        })
-        .catch(err => {
-            console.error(err);
-            if (tbody) tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-danger">Error loading credentials.</td></tr>';
-        });
-};
-
-window.filterCredentials = function() {
-    const query = (document.getElementById('credSearchInput').value || '').toLowerCase();
-    const tbody = document.getElementById('credentialsTableBody');
-    if (!tbody) return;
-    
-    const filtered = window.allCredData.filter(u => 
-        (u.username && u.username.toLowerCase().includes(query)) ||
-        (u.email && u.email.toLowerCase().includes(query))
-    );
-    
-    if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-muted">No matching credentials found.</td></tr>';
-        return;
+        
+    } catch (e) {
+        console.error("Failed to fetch student dynamic dashboard", e);
     }
-    
-    tbody.innerHTML = filtered.map((u, i) => `
-        <tr>
-            <td class="text-muted">${i + 1}</td>
-            <td><code class="text-warning fw-bold">${u.username}</code></td>
-            <td><strong>${u.email ? u.email.split('@')[0].toUpperCase() : 'User'}</strong></td>
-            <td><small class="text-muted">${u.role}</small></td>
-            <td>
-                <div class="input-group input-group-sm" style="max-width: 200px;">
-                    <input type="text" class="form-control bg-dark text-white border-secondary border-end-0" value="${u.rawPassword}" readonly id="pwd_${i}">
-                    <button class="btn btn-outline-secondary border-start-0" type="button" onclick="const p = document.getElementById('pwd_${i}'); p.type = p.type === 'password' ? 'text' : 'password';" title="Toggle Visibility">
-                        <i class="fa-solid fa-eye"></i>
-                    </button>
-                    <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('${u.rawPassword}'); showToast('Copied', 'Password copied to clipboard');" title="Copy Password">
-                        <i class="fa-regular fa-copy"></i>
-                    </button>
-                </div>
-            </td>
-            <td>
-                ${u.active === 'true' || u.active === true 
-                    ? '<span class="badge bg-success">Active</span>' 
-                    : '<span class="badge bg-danger">Disabled</span>'}
-            </td>
-        </tr>
-    `).join('');
-    
-    // Default masks passwords
-    filtered.forEach((_, i) => {
-        const p = document.getElementById(`pwd_${i}`);
-        if(p) p.type = 'password';
-    });
 };
 
-// ============================================================
-// ADMIN: ENROLLED FACULTY DETAILS MANAGEMENT
-// ============================================================
-
-window.renderAdminFacultyDetails = async function() {
-    const tbody = document.getElementById('adminFacultyDetailsBody');
-    if (!tbody) return;
-    
-    try {
-        const res = await apiFetch('/api/teachers');
-        if (res.ok) {
-            const data = await res.json();
-            window._adminFacultyData = data;
-            
-            const renderRows = (list) => {
-                if (!list || list.length === 0) return '<tr><td colSpan="8" class="text-center text-muted py-4">No faculty enrolled yet.</td></tr>';
-                return list.map((t, idx) => `
-                    <tr>
-                        <td><strong>${((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-'}</strong></td>
-                        <td>${t.department ? t.department.name : (t.department || t.dept || '-')}</td>
-                        <td>${t.subjectHandling || '-'}</td>
-                        <td>${t.personalEmail || t.email || '-'}</td>
-                        <td>${t.collegeEmail || '-'}</td>
-                        <td>${t.phone1 || t.phone || '-'}</td>
-                        <td>${t.phone2 || '-'}</td>
-                        <td class="text-nowrap">
-                            <button class="btn btn-sm btn-outline-info me-1" title="Edit Faculty" onclick="window.openEditFaculty(${idx})"><i class="fa-solid fa-pen"></i></button>
-                            <button class="btn btn-sm btn-outline-danger" title="Delete Faculty" onclick="window.deletePersistentFaculty(${t.id || idx})"><i class="fa-solid fa-trash"></i></button>
-                        </td>
-                    </tr>
-                `).join('');
-            };
-            
-            tbody.innerHTML = renderRows(data);
+// Force start polling in case switchRole missed it
+if (window.dynamicDashboardInterval) clearInterval(window.dynamicDashboardInterval);
+window.dynamicDashboardInterval = setInterval(() => {
+    if (localStorage.getItem("sece_logged_in_role") === "STUDENT") {
+        if (typeof window.fetchStudentDynamicDashboard === 'function') {
+            window.fetchStudentDynamicDashboard();
         }
-    } catch (err) {
-        console.error(err);
-        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-danger py-4">Error loading faculty details.</td></tr>';
     }
-};
+}, 3000);
 
-window.searchAdminFacultyDetails = function() {
-    const query = (document.getElementById('adminFacultySearchInput').value || '').toLowerCase();
-    const tbody = document.getElementById('adminFacultyDetailsBody');
-    if (!tbody || !window._adminFacultyData) return;
-    
-    const filtered = window._adminFacultyData.filter(t => {
-        const name = (((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '').toLowerCase();
-        const dept = (t.department ? t.department.name : (t.department || t.dept || '')).toLowerCase();
-        return name.includes(query) || dept.includes(query);
-    });
-    
-    if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">No matching faculty found.</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = filtered.map(t => {
-        const originalIdx = window._adminFacultyData.indexOf(t);
-        return `
-            <tr>
-                <td><strong>${((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-'}</strong></td>
-                <td>${t.department ? t.department.name : (t.department || t.dept || '-')}</td>
-                <td>${t.subjectHandling || '-'}</td>
-                <td>${t.personalEmail || t.email || '-'}</td>
-                <td>${t.collegeEmail || '-'}</td>
-                <td>${t.phone1 || t.phone || '-'}</td>
-                <td>${t.phone2 || '-'}</td>
-                <td class="text-nowrap">
-                    <button class="btn btn-sm btn-outline-info me-1" title="Edit Faculty" onclick="window.openEditFaculty(${originalIdx})"><i class="fa-solid fa-pen"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" title="Delete Faculty" onclick="window.deletePersistentFaculty(${t.id || originalIdx})"><i class="fa-solid fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-};

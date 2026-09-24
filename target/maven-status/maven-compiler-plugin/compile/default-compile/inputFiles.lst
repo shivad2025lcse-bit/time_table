@@ -5,6 +5,7 @@ D:\Java_project\src\main\java\com\smarttimetable\entity\CustomVenue.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\CoverageRequest.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\TimetableController.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\QuizQuestionRepository.java
+D:\Java_project\src\main\java\com\smarttimetable\service\ExcelImportService.java
 D:\Java_project\src\main\java\com\smarttimetable\dto\QuizSubmitRequest.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\FacultyAvailabilityRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\QuizSubmission.java
@@ -20,6 +21,8 @@ D:\Java_project\src\main\java\com\smarttimetable\entity\Substitution.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\WebViewController.java
 D:\Java_project\src\main\java\com\smarttimetable\service\DepartmentService.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\DepartmentRepository.java
+D:\Java_project\src\main\java\com\smarttimetable\controller\UserCredentialsController.java
+D:\Java_project\src\main\java\com\smarttimetable\dto\QuizAiGenerateRequest.java
 D:\Java_project\src\main\java\com\smarttimetable\dto\ConflictDetailDto.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\SectionRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\FacultyAvailability.java
@@ -29,6 +32,7 @@ D:\Java_project\src\main\java\com\smarttimetable\service\DashboardService.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Role.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\ClassroomRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\NotificationController.java
+D:\Java_project\src\main\java\com\smarttimetable\service\AiTimetableParserService.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Course.java
 D:\Java_project\src\main\java\com\smarttimetable\package-info.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\CoverageRequestRepository.java
@@ -71,6 +75,7 @@ D:\Java_project\src\main\java\com\smarttimetable\SmartTimetableApplication.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\LaboratoryRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\StudentNotificationRegistration.java
 D:\Java_project\src\main\java\com\smarttimetable\service\TeacherService.java
+D:\Java_project\src\main\java\com\smarttimetable\controller\StudentDashboardController.java
 D:\Java_project\src\main\java\com\smarttimetable\dto\TimetableGenerateRequest.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\StudentRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\service\TimeSlotService.java

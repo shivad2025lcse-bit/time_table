@@ -18,7 +18,7 @@ public class QuizSubmission {
 
     @ManyToOne
     @JoinColumn(name = "student_id", nullable = false)
-    @JsonIgnoreProperties({"timetableEntries", "notifications", "hibernateLazyInitializer"})
+    @JsonIgnoreProperties({"timetableEntries", "notifications", "hibernateLazyInitializer", "user", "section", "course", "department", "parentPhone1", "parentPhone2", "hostelBlock", "roomNumber", "residentType"})
     private Student student;
 
     private Integer totalScore;
