@@ -4785,6 +4785,121 @@ async function loadRecentStudents() {
     }
 }
 
+window._credDataCache = [];
+window._credCurrentRole = 'STUDENT';
+
+window.renderCredentialsList = async function() {
+    const tbody = document.getElementById('credTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading credentials...</td></tr>';
+    
+    try {
+        const token = localStorage.getItem('jwt_token') || '';
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        
+        // Fetch all data in parallel
+        const [credRes, studentRes, teacherRes] = await Promise.all([
+            fetch('/api/admin/credentials', { headers }),
+            fetch('/api/students', { headers }),
+            fetch('/api/teachers', { headers })
+        ]);
+        
+        let creds = [];
+        let students = [];
+        let teachers = [];
+        
+        if (credRes.ok) creds = await credRes.json();
+        if (studentRes.ok) students = await studentRes.json();
+        if (teacherRes.ok) teachers = await teacherRes.json();
+        
+        // Enhance credentials with extra info
+        window._credDataCache = creds.map(c => {
+            const extra = { name: '-', sectionDept: '-', isAdvisor: false };
+            if (c.role === 'ROLE_STUDENT') {
+                const s = students.find(x => (x.user && x.user.username === c.username) || x.username === c.username || x.registerNumber?.toLowerCase() === c.username);
+                if (s) {
+                    extra.name = s.name || s.studentName || s.firstName || '-';
+                    extra.sectionDept = s.section ? s.section.sectionName : (s.department ? s.department.name : '-');
+                }
+            } else if (c.role === 'ROLE_FACULTY') {
+                const t = teachers.find(x => (x.user && x.user.username === c.username) || x.username === c.username);
+                if (t) {
+                    extra.name = t.displayName || t.name || t.firstName || '-';
+                    extra.sectionDept = t.department ? (t.department.name || t.department) : (t.dept || '-');
+                    if (t.classAdvisorFor && t.classAdvisorFor.trim() !== '') {
+                        extra.isAdvisor = true;
+                    }
+                }
+            }
+            return { ...c, ...extra };
+        });
+        
+        // Switch to the default tab
+        window.switchCredTab('STUDENT');
+        
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-danger py-4">Error loading data.</td></tr>';
+    }
+};
+
+window.switchCredTab = function(roleType) {
+    window._credCurrentRole = roleType;
+    document.getElementById('credTabStudents')?.classList.remove('active', 'text-white');
+    document.getElementById('credTabFaculty')?.classList.remove('active', 'text-white');
+    document.getElementById('credTabAdvisor')?.classList.remove('active', 'text-white');
+    
+    if (roleType === 'STUDENT') {
+        document.getElementById('credTabStudents')?.classList.add('active', 'text-white');
+    } else if (roleType === 'FACULTY') {
+        document.getElementById('credTabFaculty')?.classList.add('active', 'text-white');
+    } else if (roleType === 'CLASS_ADVISOR') {
+        document.getElementById('credTabAdvisor')?.classList.add('active', 'text-white');
+    }
+    
+    window.filterCredentials();
+};
+
+window.filterCredentials = function() {
+    const tbody = document.getElementById('credTableBody');
+    if (!tbody || !window._credDataCache) return;
+    
+    const input = document.getElementById('credSearchInput');
+    const query = input ? input.value.toLowerCase().trim() : '';
+    
+    // Filter by role
+    let filtered = window._credDataCache.filter(c => {
+        if (window._credCurrentRole === 'STUDENT') return c.role === 'ROLE_STUDENT';
+        if (window._credCurrentRole === 'FACULTY') return c.role === 'ROLE_FACULTY';
+        if (window._credCurrentRole === 'CLASS_ADVISOR') return c.role === 'ROLE_FACULTY' && c.isAdvisor;
+        return false;
+    });
+    
+    // Filter by query
+    if (query) {
+        filtered = filtered.filter(c => 
+            (c.username && c.username.toLowerCase().includes(query)) ||
+            (c.name && c.name.toLowerCase().includes(query)) ||
+            (c.sectionDept && c.sectionDept.toLowerCase().includes(query))
+        );
+    }
+    
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-muted py-4">No records found.</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = filtered.map((c, idx) => `
+        <tr>
+            <td>${idx + 1}</td>
+            <td class="fw-bold text-info">${c.username}</td>
+            <td>${c.name}</td>
+            <td>${c.sectionDept}</td>
+            <td class="font-monospace text-warning">${c.rawPassword}</td>
+            <td>${c.active === 'true' ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-danger">Inactive</span>'}</td>
+        </tr>
+    `).join('');
+};
+
 window.renderAdminFacultyDetails = async function() {
     const tbody = document.getElementById('adminFacultyDetailsBody');
     if (!tbody) return;
