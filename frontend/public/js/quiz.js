@@ -146,11 +146,13 @@ function injectQuizModals() {
                                     </div>
                                     <div class="col-md-4">
                                         <label class="cc-form-label">Section *</label>
-                                        <input type="number" id="fqSectionId" class="form-control cc-form-control" placeholder="Error loading sections" required min="1">
+                                        <select id="fqSectionId" class="form-select cc-form-control" required>
+                                            <option value="">Loading sections...</option>
+                                        </select>
                                     </div>
                                     <div class="col-md-3">
                                         <label class="cc-form-label">Teacher *</label>
-                                        <input type="text" id="fqTeacherDisplay" class="form-control cc-form-control" placeholder="Error loading teachers" readonly>
+                                        <input type="text" id="fqTeacherDisplay" class="form-control cc-form-control" placeholder="Loading..." readonly>
                                         <input type="hidden" id="fqTeacherId">
                                     </div>
                                 </div>
@@ -425,7 +427,10 @@ async function _resolveTeacherInfo() {
             t.username === username ||
             String(t.collegeEmail || '').toLowerCase().startsWith(username)
         );
-        return me ? me.id : null;
+        if (!me) return null;
+        // Return both id and display name
+        const displayName = me.displayName || me.name || (me.firstName + ' ' + (me.lastName || ''));
+        return { id: me.id, name: displayName };
     } catch (err) {
         console.error('Could not resolve teacher info', err);
         return null;
@@ -434,23 +439,42 @@ async function _resolveTeacherInfo() {
 
 // ── Faculty: Open Modal ──────────────────────────────────────────────────────
 window.openFacultyQuizModal = async () => {
-    // Resolve teacher ID from API
-    let tchId = await _resolveTeacherInfo();
-    if (!tchId) tchId = 1; // fallback
+    new bootstrap.Modal(document.getElementById('facultyQuizModal')).show();
 
-    document.getElementById('fqTeacherId').value = tchId;
-    document.getElementById('fqTeacherDisplay').value = 'Teacher (Auto-detected): ID ' + tchId;
-
-    // Reset form
+    // Reset form state
     document.getElementById('quizCreateForm').reset();
-    document.getElementById('fqTeacherId').value = tchId;
-    document.getElementById('fqTeacherDisplay').value = 'Teacher (Auto-detected): ID ' + tchId;
-
     document.getElementById('fqQuestionsWrap').innerHTML = '';
     _questionCount = 0;
     quizAddQuestion();
 
-    new bootstrap.Modal(document.getElementById('facultyQuizModal')).show();
+    // Load sections dropdown
+    const secSel = document.getElementById('fqSectionId');
+    secSel.innerHTML = '<option value="">Loading sections...</option>';
+    try {
+        const token = localStorage.getItem('jwt_token') || '';
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        const secRes = await fetch('/api/sections', { headers });
+        if (secRes.ok) {
+            const sections = await secRes.json();
+            secSel.innerHTML = '<option value="">-- Select Section --</option>' +
+                sections.map(s => {
+                    const label = s.sectionName || ('Section ' + s.id);
+                    return `<option value="${s.id}">${label}</option>`;
+                }).join('');
+        } else {
+            secSel.innerHTML = '<option value="">Error loading sections</option>';
+        }
+    } catch (e) {
+        secSel.innerHTML = '<option value="">Error loading sections</option>';
+    }
+
+    // Resolve teacher ID + name from API
+    const tchInfo = await _resolveTeacherInfo();
+    const tchId   = tchInfo ? tchInfo.id : 1;
+    const tchName = tchInfo ? tchInfo.name : ('ID ' + tchId);
+
+    document.getElementById('fqTeacherId').value = tchId;
+    document.getElementById('fqTeacherDisplay').value = tchName;
 };
 
 window.quizShowAiPrompt = () => {
@@ -614,7 +638,11 @@ window.quizHandleCreate = async (e) => {
     e.preventDefault();
 
     const title    = document.getElementById('fqTitle').value.trim();
-    const sectionId = parseInt(document.getElementById('fqSectionId').value) || 1;
+    const sectionId = parseInt(document.getElementById('fqSectionId').value) || 0;
+    if (!sectionId) {
+        alert('Please select a section.');
+        return;
+    }
     const teacherId = parseInt(document.getElementById('fqTeacherId').value) || 1;
 
     const questions = [];
@@ -678,7 +706,11 @@ window.quizLoadFacultyList = async () => {
         const list = await res.json();
         const sel = document.getElementById('fqQuizSelect');
         sel.innerHTML = '<option value="">-- Choose a Quiz --</option>' +
-            list.map(q => `<option value="${q.id}">${q.title}</option>`).join('');
+            list.map(q => {
+                const secLabel = q.section ? (q.section.sectionName || ('Section ' + q.section.id)) : '';
+                const label = q.title + (secLabel ? ' — ' + secLabel : '');
+                return `<option value="${q.id}">${label}</option>`;
+            }).join('');
         document.getElementById('fqResultsBody').innerHTML = '';
     } catch (err) { console.error(err); }
 };
