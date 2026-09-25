@@ -8,6 +8,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import com.smarttimetable.repository.QuizRepository;
+import com.smarttimetable.repository.TimetableRepository;
+import com.smarttimetable.repository.FacultyAvailabilityRepository;
+import com.smarttimetable.repository.UserRepository;
+import com.smarttimetable.service.QuizService;
 
 @Service
 public class TeacherService {
@@ -24,13 +29,25 @@ public class TeacherService {
     }
 
     @Autowired
-    private com.smarttimetable.repository.UserRepository userRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private DepartmentRepository departmentRepository;
 
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private TimetableRepository timetableRepository;
+    
+    @Autowired
+    private FacultyAvailabilityRepository facultyAvailabilityRepository;
+    
+    @Autowired
+    private QuizService quizService;
+    
+    @Autowired
+    private QuizRepository quizRepository;
 
     public Teacher saveTeacher(Teacher teacher) {
         if (teacher.getDepartment() != null && teacher.getDepartment().getId() == null) {
@@ -78,6 +95,26 @@ public class TeacherService {
     }
 
     public void deleteTeacher(Long id) {
-        teacherRepository.deleteById(id);
+        Teacher teacher = teacherRepository.findById(id).orElse(null);
+        if (teacher != null) {
+            // Cascade delete quizzes
+            quizRepository.findByTeacherId(id).forEach(q -> {
+                quizService.deleteQuiz(q.getId());
+            });
+            
+            // Cascade delete timetables
+            timetableRepository.deleteAll(timetableRepository.findByTeacherId(id));
+            
+            // Cascade delete availability
+            facultyAvailabilityRepository.deleteAll(facultyAvailabilityRepository.findByTeacherId(id));
+            
+            // Delete teacher
+            teacherRepository.deleteById(id);
+            
+            // Delete user if exists
+            if (teacher.getUser() != null) {
+                userRepository.deleteById(teacher.getUser().getId());
+            }
+        }
     }
 }

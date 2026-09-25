@@ -4911,6 +4911,7 @@ window.renderAdminFacultyDetails = async function() {
         const res = await fetch('/api/teachers', { headers });
         if (res.ok) {
             window._allAdminFacultyCache = await res.json();
+            window.lastLoadedFaculty = window._allAdminFacultyCache;
             window._renderAdminFacultyTable(window._allAdminFacultyCache);
         } else {
             tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-danger py-4">Failed to load faculty details.</td></tr>';
@@ -5102,7 +5103,8 @@ window.deletePersistentFaculty = async function (id) {
         const res = await apiFetch(`/api/teachers/${id}`, { method: 'DELETE' });
         if (res.ok) {
             alert('Faculty deleted.');
-            loadAdminFullFaculty();
+            if (window.loadAdminFullFaculty) loadAdminFullFaculty();
+            if (window.renderAdminFacultyDetails) renderAdminFacultyDetails();
         } else {
             alert('Failed to delete faculty.');
         }
