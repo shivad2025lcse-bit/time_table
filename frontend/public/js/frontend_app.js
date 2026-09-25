@@ -5629,6 +5629,157 @@ window.deleteAnnouncement = function(idx) {
     window.renderAnnouncements();
 };
 
+window.renderAssignTaskList = async function() {
+    const secSel = document.getElementById('newTaskSectionInput');
+    if (secSel && secSel.options.length <= 1) {
+        secSel.innerHTML = '<option value="">Loading sections...</option>';
+        try {
+            const token = localStorage.getItem('jwt_token') || '';
+            const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+            const secRes = await fetch('/api/sections', { headers });
+            if (secRes.ok) {
+                const sections = await secRes.json();
+                secSel.innerHTML = '<option value="">-- Select Section --</option>' +
+                    sections.map(s => {
+                        const label = s.sectionName || ('Section ' + s.id);
+                        return `<option value="${s.id}" data-name="${label}">${label}</option>`;
+                    }).join('');
+            } else {
+                secSel.innerHTML = '<option value="">Error loading sections</option>';
+            }
+        } catch (e) {
+            secSel.innerHTML = '<option value="">Error loading sections</option>';
+        }
+    }
+
+    const tbody = document.getElementById('assignTasksBody');
+    const tasks = JSON.parse(localStorage.getItem('sece_class_tasks') || '[]');
+    if (tbody) {
+        if (tasks.length === 0) {
+            tbody.innerHTML = '<tr><td colSpan="3" class="text-center text-muted py-4">No tasks assigned yet.</td></tr>';
+        } else {
+            tbody.innerHTML = tasks.map((t, idx) => `
+                <tr>
+                    <td class="text-center fw-bold text-info">${t.sectionName}</td>
+                    <td class="text-start">${t.text} <br><small class="text-muted">${t.date}</small></td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-warning me-2" onclick="window.editAssignTask(${idx})"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.deleteAssignTask(${idx})"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    }
+};
+
+window.addAssignTask = function() {
+    const input = document.getElementById('newTaskInput');
+    const secSel = document.getElementById('newTaskSectionInput');
+    
+    if (!secSel || !secSel.value) {
+        alert('Please select a section.');
+        return;
+    }
+    if (!input || !input.value.trim()) {
+        alert('Please enter a task message.');
+        return;
+    }
+    
+    const sectionName = secSel.options[secSel.selectedIndex].getAttribute('data-name') || secSel.options[secSel.selectedIndex].text;
+    
+    const tasks = JSON.parse(localStorage.getItem('sece_class_tasks') || '[]');
+    tasks.unshift({
+        sectionId: secSel.value,
+        sectionName: sectionName,
+        text: input.value.trim(),
+        date: new Date().toLocaleString()
+    });
+    
+    localStorage.setItem('sece_class_tasks', JSON.stringify(tasks));
+    input.value = '';
+    window.renderAssignTaskList();
+};
+
+window.deleteAssignTask = function(idx) {
+    if (!confirm('Delete this task?')) return;
+    const tasks = JSON.parse(localStorage.getItem('sece_class_tasks') || '[]');
+    tasks.splice(idx, 1);
+    localStorage.setItem('sece_class_tasks', JSON.stringify(tasks));
+    window.renderAssignTaskList();
+};
+
+window.editAssignTask = function(idx) {
+    const tasks = JSON.parse(localStorage.getItem('sece_class_tasks') || '[]');
+    const t = tasks[idx];
+    if (!t) return;
+    
+    const newText = prompt('Edit Task Message:', t.text);
+    if (newText !== null && newText.trim() !== '') {
+        t.text = newText.trim();
+        t.date = new Date().toLocaleString() + ' (Edited)';
+        localStorage.setItem('sece_class_tasks', JSON.stringify(tasks));
+        window.renderAssignTaskList();
+    }
+};
+
+window.renderStudentTasks = async function() {
+    const listDiv = document.getElementById('studentTasksList');
+    if (!listDiv) return;
+    
+    listDiv.innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading tasks...</div>';
+    
+    // Get student section
+    const username = localStorage.getItem('sece_logged_in_user');
+    if (!username) {
+        listDiv.innerHTML = '<div class="alert alert-danger">Error: Not logged in.</div>';
+        return;
+    }
+    
+    let sectionId = null;
+    try {
+        const token = localStorage.getItem('jwt_token') || '';
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        const res = await fetch('/api/students', { headers });
+        if (res.ok) {
+            const students = await res.json();
+            const me = students.find(s =>
+                (s.user && s.user.username === username) ||
+                s.username === username ||
+                String(s.registerNumber || '').toLowerCase() === username
+            );
+            if (me && me.section) sectionId = me.section.id;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+    
+    if (!sectionId) {
+        listDiv.innerHTML = '<div class="alert alert-warning">Could not determine your class section. Make sure you are assigned to a section.</div>';
+        return;
+    }
+    
+    // Fetch tasks from local storage
+    const tasks = JSON.parse(localStorage.getItem('sece_class_tasks') || '[]');
+    const myTasks = tasks.filter(t => parseInt(t.sectionId) === sectionId);
+    
+    if (myTasks.length === 0) {
+        listDiv.innerHTML = '<div class="text-center text-muted py-4"><i class="fa-solid fa-mug-hot text-secondary mb-2" style="font-size:2rem;"></i><br/>No active tasks for your class right now!</div>';
+        return;
+    }
+    
+    listDiv.innerHTML = myTasks.map(t => `
+        <div class="card bg-dark border-warning shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="text-warning fw-bold mb-0"><i class="fa-solid fa-thumbtack me-2"></i>Task Assigned</h6>
+                    <small class="text-muted">${t.date}</small>
+                </div>
+                <p class="card-text text-white mb-0" style="white-space:pre-wrap;">${t.text}</p>
+            </div>
+        </div>
+    `).join('');
+};
+
 window.shareViaWhatsApp = function() {
     const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
     window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent('Check out the SECE Timetable App: ' + link), '_blank');

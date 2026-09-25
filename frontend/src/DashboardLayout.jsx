@@ -221,6 +221,11 @@ export default function DashboardLayout() {
                                     <i className="fa-solid fa-bullhorn"></i> Manage Announcements
                                 </button>
 
+                                <button id="assignTaskBtn" className={`btn btn-sm btn-outline-primary align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`}
+                                    type="button" data-bs-toggle="modal" data-bs-target="#assignTaskModal" onClick={() => window.renderAssignTaskList && window.renderAssignTaskList()}>
+                                    <i className="fa-solid fa-list-check"></i> Assign Task
+                                </button>
+
                                 <button id="adminViewFacultyBtn" className={`btn btn-sm btn-outline-info align-items-center gap-1 ${isAdmin ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#adminViewFacultyModal">
                                     <i className="fa-solid fa-address-card"></i> View Full Faculty Details
                                 </button>
@@ -228,6 +233,10 @@ export default function DashboardLayout() {
 
                                 <button id="studentProfileBtn" className={`btn btn-sm btn-outline-success align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openStudentProfileModal()} >
                                     <i className="fa-solid fa-id-card"></i> My Student Details
+                                </button>
+
+                                <button id="studentTasksBtn" className={`btn btn-sm btn-outline-warning align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#studentTasksModal" onClick={() => window.renderStudentTasks && window.renderStudentTasks()}>
+                                    <i className="fa-solid fa-list-check"></i> My Class Tasks
                                 </button>
 
                                 <button id="manageSectionsBtn" className={`btn btn-sm btn-outline-warning align-items-center gap-1 style-btn ${isAdmin || isFaculty ? 'd-flex' : 'd-none'}`} data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()}>
@@ -2340,6 +2349,71 @@ export default function DashboardLayout() {
                                         <tr><td colSpan="2" className="text-center text-muted py-4">Loading announcements...</td></tr>
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="modal fade" id="assignTaskModal" tabIndex="-1">
+                <div className="modal-dialog modal-lg modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-primary fw-bold"><i className="fa-solid fa-list-check me-2"></i> Assign Task to Class</h5>
+                            <div>
+                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                        </div>
+                        <div className="modal-body">
+                            <div className="mb-4">
+                                <label className="form-label text-warning small">Assign New Task</label>
+                                <div className="row g-2 mb-2">
+                                    <div className="col-md-4">
+                                        <select id="newTaskSectionInput" className="form-select bg-dark text-white border-secondary">
+                                            <option value="">Loading sections...</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-md-8">
+                                        <div className="input-group">
+                                            <input type="text" id="newTaskInput" className="form-control bg-dark text-white border-secondary" placeholder="e.g., Complete Chapter 3 exercises by tomorrow..." />
+                                            <button className="btn btn-primary" type="button" onClick={() => window.addAssignTask && window.addAssignTask()}>Assign</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <h6 className="text-light fw-bold border-bottom border-secondary pb-2 mb-3">Active Tasks</h6>
+                            <div className="table-responsive">
+                                <table className="table table-dark table-striped table-hover align-middle mb-0 text-center">
+                                    <thead className="sticky-top" style={{ backgroundColor: "#1e1e1e" }}>
+                                        <tr>
+                                            <th style={{ width: "25%" }}>Section</th>
+                                            <th style={{ width: "55%" }}>Task Message</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="assignTasksBody">
+                                        <tr><td colSpan="3" className="text-center text-muted py-4">Loading tasks...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="modal fade" id="studentTasksModal" tabIndex="-1">
+                <div className="modal-dialog modal-lg modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title fw-bold text-warning"><i className="fa-solid fa-list-check me-2"></i> My Class Tasks</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body p-4">
+                            <div className="alert alert-info border-info bg-dark text-info mb-4">
+                                <i className="fa-solid fa-circle-info me-2"></i> These tasks are assigned by faculty for your class section.
+                            </div>
+                            <div id="studentTasksList" className="d-flex flex-column gap-3">
+                                <div className="text-center text-muted py-4">Loading tasks...</div>
                             </div>
                         </div>
                     </div>
