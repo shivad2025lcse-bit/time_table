@@ -51,12 +51,23 @@ public class TeacherService {
 
     public Teacher saveTeacher(Teacher teacher) {
         if (teacher.getDepartment() != null && teacher.getDepartment().getId() == null) {
+            Department existingDept = null;
             if (teacher.getDepartment().getCode() != null) {
-                departmentRepository.findByCode(teacher.getDepartment().getCode())
-                    .ifPresent(teacher::setDepartment);
+                existingDept = departmentRepository.findByCode(teacher.getDepartment().getCode()).orElse(null);
             } else if (teacher.getDepartment().getName() != null) {
-                departmentRepository.findByName(teacher.getDepartment().getName())
-                    .ifPresent(teacher::setDepartment);
+                existingDept = departmentRepository.findByName(teacher.getDepartment().getName()).orElse(null);
+            }
+            
+            if (existingDept != null) {
+                teacher.setDepartment(existingDept);
+            } else {
+                // Auto-create department if it doesn't exist
+                if (teacher.getDepartment().getName() == null && teacher.getDepartment().getCode() != null) {
+                    teacher.getDepartment().setName(teacher.getDepartment().getCode());
+                } else if (teacher.getDepartment().getCode() == null && teacher.getDepartment().getName() != null) {
+                    teacher.getDepartment().setCode(teacher.getDepartment().getName().substring(0, Math.min(4, teacher.getDepartment().getName().length())).toUpperCase());
+                }
+                departmentRepository.save(teacher.getDepartment());
             }
         }
         if (teacher.getId() == null && teacher.getUser() == null) {
