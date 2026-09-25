@@ -705,25 +705,63 @@ window.quizLoadResults = async (quizId) => {
     const all  = await allRes.json();
     const weak = await weakRes.json();
 
+    // ── Compute aggregate stats ───────────────────────────────────────────────
+    const total = all.length;
+    const passCount = all.filter(r => (r.percentage || 0) >= 50).length;
+    const failCount = total - passCount;
+    const avgPct = total > 0 ? (all.reduce((s, r) => s + (r.percentage || 0), 0) / total) : 0;
+    const classAccuracy = avgPct.toFixed(1);
+    const passRate = total > 0 ? ((passCount / total) * 100).toFixed(1) : '0.0';
+
+    // ── Per-student row with precision/accuracy ───────────────────────────────
     const tableRows = all.map(r => {
         const pct = r.percentage != null ? r.percentage.toFixed(1) : '0.0';
-        const badge = r.percentage >= 50
-            ? `<span class="badge bg-success">${pct}%</span>`
-            : `<span class="badge bg-danger">${pct}%</span>`;
         const name = r.student ? (r.student.studentName || ('ID:' + r.student.id)) : 'Unknown';
-        return `<tr><td>${name}</td><td>${r.totalScore ?? 0}</td><td>${badge}</td></tr>`;
+        // Compute per-student answer accuracy
+        let correct = 0, totalQ = 0;
+        if (r.answers && r.answers.length > 0) {
+            totalQ = r.answers.length;
+            correct = r.answers.filter(a => a.isCorrect).length;
+        }
+        const accuracy = totalQ > 0 ? ((correct / totalQ) * 100).toFixed(1) : '?';
+        const level = parseFloat(pct) >= 75 ? {label:'Excellent',cls:'success'} :
+                      parseFloat(pct) >= 50 ? {label:'Proficient',cls:'info'} :
+                      parseFloat(pct) >= 35 ? {label:'Developing',cls:'warning'} :
+                      {label:'Needs Help',cls:'danger'};
+        const badgePct = `<span class="badge bg-${level.cls}">${pct}%</span>`;
+        return `<tr>
+            <td class="fw-bold">${name}</td>
+            <td>${r.totalScore ?? 0}</td>
+            <td>${badgePct}</td>
+            <td>${correct}/${totalQ} <span class="text-muted small">(${accuracy}%)</span></td>
+            <td><span class="badge bg-${level.cls}">${level.label}</span></td>
+        </tr>`;
     }).join('');
+
+    // ── Class performance chart data ──────────────────────────────────────────
+    const chartId = 'fqClassChart_' + quizId;
+    const studentNames = all.map(r => r.student ? (r.student.studentName || 'ID:'+r.student.id) : 'Unknown');
+    const studentPcts  = all.map(r => +(r.percentage || 0).toFixed(1));
 
     const weakCards = weak.length === 0
         ? '<p class="text-success fw-bold"><i class="fa-solid fa-trophy me-1"></i> All students scored 50% or above!</p>'
         : weak.map(r => {
             const name = r.student ? (r.student.studentName || ('ID:' + r.student.id)) : 'Unknown';
             const pct = r.percentage != null ? r.percentage.toFixed(1) : '0.0';
+            let correct = 0, totalQ = 0;
+            if (r.answers && r.answers.length > 0) {
+                totalQ = r.answers.length;
+                correct = r.answers.filter(a => a.isCorrect).length;
+            }
+            const accuracy = totalQ > 0 ? ((correct / totalQ) * 100).toFixed(1) : '?';
             return `
             <div class="card mb-3" style="background:#1a0000;border:1px solid #dc2626;">
                 <div class="card-header d-flex justify-content-between align-items-center" style="background:#2d0000;">
                     <strong class="text-danger"><i class="fa-solid fa-user-xmark me-1"></i>${name}</strong>
-                    <span class="badge bg-danger">${pct}%</span>
+                    <div class="d-flex gap-2 align-items-center">
+                        <span class="badge bg-danger">${pct}%</span>
+                        <span class="badge bg-secondary">Accuracy: ${accuracy}%</span>
+                    </div>
                 </div>
                 <div class="card-body">
                     <h6 class="text-warning"><i class="fa-solid fa-robot me-1"></i>AI Weakness Analysis</h6>
@@ -733,11 +771,53 @@ window.quizLoadResults = async (quizId) => {
         }).join('');
 
     body.innerHTML = `
+        <!-- Summary Stats Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="p-3 rounded text-center" style="background:#0d1f12;border:1px solid #10b981;">
+                    <div class="fs-4 fw-bold text-success">${total}</div>
+                    <div class="small text-muted">Students Attempted</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-3 rounded text-center" style="background:#0d1a3a;border:1px solid #3b82f6;">
+                    <div class="fs-4 fw-bold text-info">${classAccuracy}%</div>
+                    <div class="small text-muted">Class Avg Score</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-3 rounded text-center" style="background:#1a1200;border:1px solid #eab308;">
+                    <div class="fs-4 fw-bold text-warning">${passRate}%</div>
+                    <div class="small text-muted">Pass Rate</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-3 rounded text-center" style="background:#1a0000;border:1px solid #ef4444;">
+                    <div class="fs-4 fw-bold text-danger">${failCount}</div>
+                    <div class="small text-muted">Need Attention</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Class Performance Bar Chart -->
+        ${total > 0 ? `
+        <div class="mb-4 p-3 rounded" style="background:#0a041f;border:1px solid #4c1d95;">
+            <h6 class="fw-bold mb-3" style="color:#a78bfa;"><i class="fa-solid fa-chart-bar me-2"></i>Student Performance Overview</h6>
+            <canvas id="${chartId}" height="120"></canvas>
+        </div>` : ''}
+
+        <!-- Detailed Table -->
         <h6 class="fw-bold mb-2">All Submissions (${all.length})</h6>
         <div class="table-responsive mb-4">
             <table class="table table-sm" style="color:#e0e0ff;background:#0d0d2e;">
                 <thead style="background:#1a003a;">
-                    <tr><th>Student</th><th>Score</th><th>Percentage</th></tr>
+                    <tr>
+                        <th>Student</th>
+                        <th>Score</th>
+                        <th>Percentage</th>
+                        <th>Accuracy (Q)</th>
+                        <th>Level</th>
+                    </tr>
                 </thead>
                 <tbody>${tableRows}</tbody>
             </table>
@@ -745,6 +825,58 @@ window.quizLoadResults = async (quizId) => {
         <h6 class="fw-bold text-danger mb-2"><i class="fa-solid fa-triangle-exclamation me-1"></i>Needs Attention (below 50%)</h6>
         ${weakCards}
     `;
+
+    // ── Render chart after DOM update ────────────────────────────────────────
+    if (total > 0) {
+        setTimeout(() => {
+            _ensureChartJs(() => {
+                const ctx = document.getElementById(chartId);
+                if (!ctx) return;
+                const colors = studentPcts.map(p =>
+                    p >= 75 ? 'rgba(16,185,129,0.8)' :
+                    p >= 50 ? 'rgba(59,130,246,0.8)' :
+                    p >= 35 ? 'rgba(234,179,8,0.8)' :
+                    'rgba(239,68,68,0.8)'
+                );
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: studentNames,
+                        datasets: [{
+                            label: 'Score (%)',
+                            data: studentPcts,
+                            backgroundColor: colors,
+                            borderColor: colors.map(c => c.replace('0.8','1')),
+                            borderWidth: 1,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => `Score: ${ctx.raw}%`
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                min: 0, max: 100,
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                ticks: { color: '#94a3b8', callback: v => v + '%' }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: '#94a3b8', maxRotation: 45 }
+                            }
+                        }
+                    }
+                });
+            });
+        }, 100);
+    }
 };
 
 // ── Student: Open Modal ──────────────────────────────────────────────────────
@@ -892,18 +1024,57 @@ window.quizStudentSubmit = async (e) => {
             const pct = sub.percentage != null ? sub.percentage.toFixed(1) : '0.0';
             const isPassed = parseFloat(pct) >= 50;
 
+            // Compute accuracy from answers
+            let correct = 0, totalQ = 0;
+            if (sub.answers && sub.answers.length > 0) {
+                totalQ = sub.answers.length;
+                correct = sub.answers.filter(a => a.isCorrect).length;
+            }
+            const accuracy = totalQ > 0 ? ((correct / totalQ) * 100).toFixed(1) : '0.0';
+            const level = parseFloat(pct) >= 75 ? {label:'Excellent 🌟',color:'#10b981'} :
+                          parseFloat(pct) >= 50 ? {label:'Proficient ✅',color:'#3b82f6'} :
+                          parseFloat(pct) >= 35 ? {label:'Developing 📈',color:'#eab308'} :
+                          {label:'Needs Improvement 📚',color:'#ef4444'};
+            const donutId = 'sq_donut_' + sub.id;
+
             document.getElementById('sqResultContainer').style.display = 'block';
             document.getElementById('sqResultContainer').innerHTML = `
                 <div class="text-center mb-4">
-                    <div style="font-size:4rem;">${isPassed ? '🎉' : '📚'}</div>
-                    <h4 class="fw-bold mt-2" style="color:${isPassed ? '#10b981' : '#ef4444'}">
-                        ${isPassed ? 'Well Done!' : 'Needs Improvement'}
-                    </h4>
-                    <div class="display-4 fw-bold" style="color:${isPassed ? '#10b981' : '#ef4444'}">${pct}%</div>
-                    <p class="text-muted mt-1">Score: ${sub.totalScore ?? 0}</p>
+                    <div style="font-size:3rem;">${isPassed ? '🎉' : '📚'}</div>
+                    <h4 class="fw-bold mt-2" style="color:${level.color}">${level.label}</h4>
+                </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <div class="p-3 rounded text-center" style="background:#0d1f12;border:1px solid #10b981;">
+                            <div class="fs-2 fw-bold" style="color:${level.color}">${pct}%</div>
+                            <div class="small text-muted mt-1">Overall Score</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded text-center" style="background:#0d1a3a;border:1px solid #3b82f6;">
+                            <div class="fs-2 fw-bold text-info">${accuracy}%</div>
+                            <div class="small text-muted mt-1">Accuracy</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded text-center" style="background:#1a1200;border:1px solid #eab308;">
+                            <div class="fs-2 fw-bold text-warning">${correct}/${totalQ}</div>
+                            <div class="small text-muted mt-1">Correct / Total</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded text-center" style="background:#0a041f;border:1px solid #8b5cf6;">
+                            <div class="fs-4 fw-bold text-purple">${sub.totalScore ?? 0}</div>
+                            <div class="small text-muted mt-1">Marks Scored</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Donut chart -->
+                <div class="d-flex justify-content-center mb-4">
+                    <div style="width:200px;height:200px;"><canvas id="${donutId}"></canvas></div>
                 </div>
                 ${!isPassed && sub.aiWeaknessAnalysis ? `
-                <div class="p-3 rounded" style="background:#1a0000;border:1px solid #dc2626;">
+                <div class="p-3 rounded mb-3" style="background:#1a0000;border:1px solid #dc2626;">
                     <h6 class="text-warning fw-bold"><i class="fa-solid fa-robot me-1"></i>AI Study Recommendations</h6>
                     <p style="color:#fde68a;white-space:pre-wrap;">${sub.aiWeaknessAnalysis}</p>
                 </div>` : ''}
@@ -911,6 +1082,29 @@ window.quizStudentSubmit = async (e) => {
                     <button class="btn btn-outline-info" data-bs-dismiss="modal">Close</button>
                 </div>
             `;
+            // Render donut chart
+            _ensureChartJs(() => {
+                const ctx = document.getElementById(donutId);
+                if (!ctx) return;
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Correct', 'Incorrect'],
+                        datasets: [{
+                            data: [correct, Math.max(0, totalQ - correct)],
+                            backgroundColor: ['rgba(16,185,129,0.85)', 'rgba(239,68,68,0.7)'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        cutout: '70%',
+                        plugins: {
+                            legend: { labels: { color: '#94a3b8' } },
+                            tooltip: { callbacks: { label: c => c.label + ': ' + c.raw + ' Q' } }
+                        }
+                    }
+                });
+            });
         } else {
             const errText = await res.text();
             alert('Submission failed: ' + errText);
@@ -964,6 +1158,17 @@ function _showSuccess(msg) {
     setTimeout(() => el.remove(), 4000);
 }
 
+/**
+ * Dynamically loads Chart.js if not already loaded, then calls `cb`.
+ */
+function _ensureChartJs(cb) {
+    if (window.Chart) { cb(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js';
+    s.onload = cb;
+    document.head.appendChild(s);
+}
+
 
 // ── Student Quiz History ──────────────────────────────────────────────────────
 window.openStudentQuizHistoryModal = async () => {
@@ -996,21 +1201,72 @@ window.openStudentQuizHistoryModal = async () => {
 
         window._quizHistoryData = history;
         
+        // ── Performance Summary Chart ─────────────────────────────────────────
+        const perfChartId = 'sqHistoryPerfChart';
+        const histLabels = [...history].reverse().map(s => s.quiz ? s.quiz.title.substring(0,15) : 'Quiz');
+        const histPcts   = [...history].reverse().map(s => +(s.percentage||0).toFixed(1));
+        const histAcc    = [...history].reverse().map(s => {
+            if (!s.answers || !s.answers.length) return 0;
+            const c = s.answers.filter(a => a.isCorrect).length;
+            return +((c / s.answers.length) * 100).toFixed(1);
+        });
+
+        // Overall stats
+        const totalAttempted = history.length;
+        const avgScore = (history.reduce((s, r) => s + (r.percentage||0), 0) / totalAttempted).toFixed(1);
+        const bestScore = Math.max(...history.map(r => r.percentage||0)).toFixed(1);
+        const passedCount = history.filter(r => (r.percentage||0) >= 50).length;
+        const overallLevel = parseFloat(avgScore) >= 75 ? {label:'Excellent 🌟',cls:'success'} :
+                             parseFloat(avgScore) >= 50 ? {label:'Proficient ✅',cls:'info'} :
+                             parseFloat(avgScore) >= 35 ? {label:'Developing 📈',cls:'warning'} :
+                             {label:'Needs Improvement 📚',cls:'danger'};
+
+        const summaryHtml = `
+            <div class="mb-4 p-3 rounded" style="background:#0a041f;border:1px solid #6d28d9;">
+                <h6 class="fw-bold mb-3" style="color:#a78bfa;"><i class="fa-solid fa-chart-line me-2"></i>My Performance Dashboard</h6>
+                <div class="row g-2 mb-3">
+                    <div class="col-3"><div class="p-2 rounded text-center" style="background:#0d1f12;border:1px solid #10b981;">
+                        <div class="fs-5 fw-bold text-success">${avgScore}%</div><div class="tiny text-muted" style="font-size:0.72rem;">Avg Score</div></div></div>
+                    <div class="col-3"><div class="p-2 rounded text-center" style="background:#0d1a3a;border:1px solid #3b82f6;">
+                        <div class="fs-5 fw-bold text-info">${bestScore}%</div><div class="tiny text-muted" style="font-size:0.72rem;">Best Score</div></div></div>
+                    <div class="col-3"><div class="p-2 rounded text-center" style="background:#1a1200;border:1px solid #eab308;">
+                        <div class="fs-5 fw-bold text-warning">${passedCount}/${totalAttempted}</div><div class="tiny text-muted" style="font-size:0.72rem;">Passed</div></div></div>
+                    <div class="col-3"><div class="p-2 rounded text-center" style="background:#120326;border:1px solid #8b5cf6;">
+                        <span class="badge bg-${overallLevel.cls} fs-6">${overallLevel.label}</span><div class="tiny text-muted mt-1" style="font-size:0.72rem;">Level</div></div></div>
+                </div>
+                <canvas id="${perfChartId}" height="100"></canvas>
+            </div>
+        `;
+
+        const summaryEl = document.createElement('div');
+        summaryEl.innerHTML = summaryHtml;
+        listEl.parentNode.insertBefore(summaryEl, listEl);
+
         history.forEach(sub => {
             const quizTitle = sub.quiz ? sub.quiz.title : 'Unknown Quiz';
             const subject = (sub.quiz && sub.quiz.subjectName) ? sub.quiz.subjectName : '';
             const dt = new Date(sub.submittedAt).toLocaleString();
             
-            // Calculate max marks since it might not be explicitly passed
             let calculatedMaxMarks = 0;
             if (sub.answers && sub.answers.length > 0) {
                 calculatedMaxMarks = sub.answers.reduce((sum, ans) => sum + (ans.question ? ans.question.marks : 0), 0);
             }
             const displayMaxMarks = calculatedMaxMarks > 0 ? calculatedMaxMarks : '?';
 
+            // Per-quiz accuracy
+            let correct = 0, totalQ = 0;
+            if (sub.answers && sub.answers.length > 0) {
+                totalQ = sub.answers.length;
+                correct = sub.answers.filter(a => a.isCorrect).length;
+            }
+            const qAccuracy = totalQ > 0 ? ((correct / totalQ)*100).toFixed(0) : '?';
+
             let badgeColor = 'bg-danger';
-            if (sub.percentage >= 75) badgeColor = 'bg-success';
-            else if (sub.percentage >= 50) badgeColor = 'bg-warning text-dark';
+            let levelLabel = 'Needs Help';
+            const p = sub.percentage || 0;
+            if (p >= 75) { badgeColor = 'bg-success'; levelLabel = 'Excellent'; }
+            else if (p >= 50) { badgeColor = 'bg-info'; levelLabel = 'Proficient'; }
+            else if (p >= 35) { badgeColor = 'bg-warning text-dark'; levelLabel = 'Developing'; }
 
             const item = document.createElement('div');
             item.className = 'list-group-item list-group-item-action bg-dark text-white border-secondary mb-2 rounded d-flex justify-content-between align-items-center';
@@ -1019,6 +1275,11 @@ window.openStudentQuizHistoryModal = async () => {
                     <div class="flex-grow-1">
                         <h6 class="mb-1 text-info fw-bold">${quizTitle} ${subject && subject !== 'null' ? `<small class="text-muted ms-2">${subject}</small>` : ''}</h6>
                         <small class="text-muted"><i class="fa-solid fa-calendar me-1"></i> ${dt}</small>
+                        <div class="mt-1">
+                            <span class="badge ${badgeColor} me-1">${levelLabel}</span>
+                            <span class="badge bg-secondary me-1">Accuracy: ${qAccuracy}%</span>
+                            <span class="badge bg-dark border border-secondary">${correct}/${totalQ} Correct</span>
+                        </div>
                     </div>
                     <div class="text-end me-3">
                         <span class="badge ${badgeColor} fs-6">${sub.totalScore} / ${displayMaxMarks}</span>
@@ -1031,6 +1292,56 @@ window.openStudentQuizHistoryModal = async () => {
             `;
             listEl.appendChild(item);
         });
+
+        // Render performance trend chart
+        if (histPcts.length > 0) {
+            setTimeout(() => {
+                _ensureChartJs(() => {
+                    const ctx = document.getElementById(perfChartId);
+                    if (!ctx) return;
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: histLabels,
+                            datasets: [
+                                {
+                                    label: 'Score %',
+                                    data: histPcts,
+                                    borderColor: '#8b5cf6',
+                                    backgroundColor: 'rgba(139,92,246,0.1)',
+                                    tension: 0.4,
+                                    fill: true,
+                                    pointBackgroundColor: '#a78bfa',
+                                    pointRadius: 5
+                                },
+                                {
+                                    label: 'Accuracy %',
+                                    data: histAcc,
+                                    borderColor: '#10b981',
+                                    backgroundColor: 'rgba(16,185,129,0.08)',
+                                    tension: 0.4,
+                                    fill: true,
+                                    pointBackgroundColor: '#10b981',
+                                    pointRadius: 5
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: { labels: { color: '#94a3b8' } },
+                                tooltip: { callbacks: { label: c => c.dataset.label + ': ' + c.raw + '%' } }
+                            },
+                            scales: {
+                                y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', callback: v => v + '%' } },
+                                x: { grid: { display: false }, ticks: { color: '#94a3b8', maxRotation: 30 } }
+                            }
+                        }
+                    });
+                });
+            }, 200);
+        }
+
     } catch (e) {
         console.error(e);
         listEl.innerHTML = '<div class="alert alert-danger">Error loading quiz history.</div>';
@@ -1075,18 +1386,54 @@ window.showQuizHistoryDetails = (sub) => {
     }
     const displayMaxMarks = calculatedMaxMarks > 0 ? calculatedMaxMarks : '?';
 
+    // Compute accuracy
+    let correctCount = 0;
+    if (sub.answers && sub.answers.length > 0) {
+        correctCount = sub.answers.filter(a => a.isCorrect).length;
+    }
+    const totalQCount = sub.answers ? sub.answers.length : 0;
+    const detailAccuracy = totalQCount > 0 ? ((correctCount / totalQCount)*100).toFixed(1) : '0.0';
+    const detailLevel = parseFloat(sub.percentage||0) >= 75 ? {label:'Excellent 🌟',color:'#10b981'} :
+                        parseFloat(sub.percentage||0) >= 50 ? {label:'Proficient ✅',color:'#3b82f6'} :
+                        parseFloat(sub.percentage||0) >= 35 ? {label:'Developing 📈',color:'#eab308'} :
+                        {label:'Needs Improvement 📚',color:'#ef4444'};
+    const detailDonutId = 'detail_donut_' + sub.id;
+
     let html = `
         <h5 class="text-info fw-bold mb-1">${sub.quiz ? sub.quiz.title : 'Quiz'}</h5>
         <div class="mb-3 text-muted small">Submitted: ${new Date(sub.submittedAt).toLocaleString()}</div>
-        <div class="card bg-dark border-secondary mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div><strong>Score:</strong> ${sub.totalScore} / ${displayMaxMarks}</div>
-                    <div><strong>Percentage:</strong> ${sub.percentage ? sub.percentage.toFixed(1) : '0'}%</div>
+        <!-- Metrics Row -->
+        <div class="row g-2 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="p-2 rounded text-center" style="background:#0d1f12;border:1px solid #10b981;">
+                    <div class="fs-5 fw-bold" style="color:${detailLevel.color}">${sub.percentage ? sub.percentage.toFixed(1) : '0'}%</div>
+                    <div class="tiny text-muted" style="font-size:0.72rem;">Score</div>
                 </div>
-                ${sub.aiWeaknessAnalysis ? `<hr class="border-secondary"><div class="text-warning small"><strong>AI Feedback:</strong><br/>${sub.aiWeaknessAnalysis.replace(/\\n/g, '<br/>')}</div>` : ''}
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-2 rounded text-center" style="background:#0d1a3a;border:1px solid #3b82f6;">
+                    <div class="fs-5 fw-bold text-info">${detailAccuracy}%</div>
+                    <div class="tiny text-muted" style="font-size:0.72rem;">Accuracy</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-2 rounded text-center" style="background:#1a1200;border:1px solid #eab308;">
+                    <div class="fs-5 fw-bold text-warning">${correctCount}/${totalQCount}</div>
+                    <div class="tiny text-muted" style="font-size:0.72rem;">Correct / Total</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-2 rounded text-center" style="background:#120326;border:1px solid #8b5cf6;">
+                    <div style="color:${detailLevel.color};font-size:0.85rem;font-weight:bold;">${detailLevel.label}</div>
+                    <div class="tiny text-muted" style="font-size:0.72rem;">Level</div>
+                </div>
             </div>
         </div>
+        <!-- Accuracy Donut -->
+        <div class="d-flex justify-content-center mb-4">
+            <div style="width:160px;height:160px;"><canvas id="${detailDonutId}"></canvas></div>
+        </div>
+        ${sub.aiWeaknessAnalysis ? `<div class="p-3 rounded mb-3" style="background:#1a0000;border:1px solid #dc2626;"><div class="text-warning small"><strong>AI Feedback:</strong><br/>${sub.aiWeaknessAnalysis.replace(/\\n/g, '<br/>')}</div></div>` : ''}
         <h6 class="fw-bold mb-3 border-bottom border-secondary pb-2">Questions & Answers</h6>
     `;
 
@@ -1113,6 +1460,30 @@ window.showQuizHistoryDetails = (sub) => {
 
     detailEl.innerHTML = html;
     document.getElementById('sqHistoryDetailContainer').style.display = 'block';
+
+    // Render detail donut chart
+    _ensureChartJs(() => {
+        const ctx = document.getElementById(detailDonutId);
+        if (!ctx) return;
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Correct', 'Incorrect'],
+                datasets: [{
+                    data: [correctCount, Math.max(0, totalQCount - correctCount)],
+                    backgroundColor: ['rgba(16,185,129,0.85)', 'rgba(239,68,68,0.7)'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                cutout: '65%',
+                plugins: {
+                    legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+                    tooltip: { callbacks: { label: c => c.label + ': ' + c.raw } }
+                }
+            }
+        });
+    });
 };
 
 // ── Faculty: Delete Quiz ─────────────────────────────────────────────────────
