@@ -18,6 +18,9 @@ public class UserCredentialsController {
 
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     /**
      * Returns username + rawPassword for all users, grouped by role.
@@ -53,5 +56,31 @@ public class UserCredentialsController {
         }).collect(Collectors.toList());
 
         return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("/reset")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Map<String, String>> adminResetPassword(
+            @RequestBody Map<String, String> payload) {
+        
+        String username = payload.get("username");
+        String newPassword = payload.get("newPassword");
+        
+        if (username == null || newPassword == null || username.isBlank() || newPassword.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Username and new password are required"));
+        }
+        
+        Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
+        }
+        
+        User user = userOpt.get();
+        
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setRawPassword(newPassword);
+        userRepository.save(user);
+        
+        return ResponseEntity.ok(Map.of("message", "Password reset successfully for " + username));
     }
 }

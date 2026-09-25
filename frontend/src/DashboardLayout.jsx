@@ -648,10 +648,11 @@ export default function DashboardLayout() {
                                             <th>Section / Dept</th>
                                             <th>Password</th>
                                             <th>Status</th>
+                                            <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="credentialsTableBody">
-                                        <tr><td colSpan="6" className="text-center text-muted">Loading...</td></tr>
+                                        <tr><td colSpan="7" className="text-center text-muted">Loading...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -659,6 +660,26 @@ export default function DashboardLayout() {
                                 <i className="fa-solid fa-lock me-1"></i>
                                 This section is visible to Admin only. Passwords shown are the plain-text credentials used during registration.
                             </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Admin Reset Password Modal */}
+            <div className="modal fade" id="adminResetPasswordModal" tabIndex="-1">
+                <div className="modal-dialog modal-dialog-centered modal-sm">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h6 className="modal-title text-warning fw-bold"><i className="fa-solid fa-key me-2"></i>Reset Password</h6>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body">
+                            <p className="small text-muted mb-2">Reset password for: <strong className="text-info" id="resetPasswordUsername"></strong></p>
+                            <input type="hidden" id="resetPasswordUsernameInput" />
+                            <input type="text" id="adminNewPassword" className="form-control form-control-sm bg-dark text-white border-secondary mb-3" placeholder="Enter new password" />
+                            <button type="button" className="btn btn-warning btn-sm w-100" onClick={() => window.adminSubmitResetPassword && window.adminSubmitResetPassword()}>
+                                <i className="fa-solid fa-check me-2"></i>Reset Now
+                            </button>
                         </div>
                     </div>
                 </div>

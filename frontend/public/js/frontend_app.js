@@ -4884,7 +4884,7 @@ window.filterCredentials = function() {
     }
     
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-muted py-4">No records found.</td></tr>';
+        tbody.innerHTML = '<tr><td colSpan="7" class="text-center text-muted py-4">No records found.</td></tr>';
         return;
     }
     
@@ -4896,8 +4896,58 @@ window.filterCredentials = function() {
             <td>${c.sectionDept}</td>
             <td class="font-monospace text-warning">${c.rawPassword}</td>
             <td>${c.active === 'true' ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-danger">Inactive</span>'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-warning py-0 px-2" onclick="window.adminResetPassword('${c.username}')" title="Reset Password">
+                    <i class="fa-solid fa-key"></i> Reset
+                </button>
+            </td>
         </tr>
     `).join('');
+};
+
+window.adminResetPassword = function(username) {
+    document.getElementById('resetPasswordUsername').textContent = username;
+    document.getElementById('resetPasswordUsernameInput').value = username;
+    document.getElementById('adminNewPassword').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('adminResetPasswordModal'));
+    modal.show();
+};
+
+window.adminSubmitResetPassword = async function() {
+    const username = document.getElementById('resetPasswordUsernameInput').value;
+    const newPassword = document.getElementById('adminNewPassword').value;
+    
+    if (!newPassword || newPassword.length < 6) {
+        showToast('Password must be at least 6 characters long.', 'danger');
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('jwt_token') || '';
+        const res = await fetch('/api/admin/credentials/reset', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, newPassword })
+        });
+        
+        if (res.ok) {
+            showToast('Password reset successfully!', 'success');
+            const modalEl = document.getElementById('adminResetPasswordModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+            
+            // Reload credentials to show updated password
+            window.renderCredentialsList();
+        } else {
+            const data = await res.json();
+            showToast(data.error || 'Failed to reset password', 'danger');
+        }
+    } catch (e) {
+        showToast('Network error while resetting password', 'danger');
+    }
 };
 
 window.renderAdminFacultyDetails = async function() {
