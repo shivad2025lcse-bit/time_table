@@ -5327,7 +5327,7 @@ window.submitAddFacultyForm = async function (e) {
     const alertBox = document.getElementById('manageFacultyAlert');
 
     const payload = {
-        employeeId: tempEmpId,
+        employeeId: 'EMP' + Date.now().toString().slice(-6),
         firstName: fName,
         lastName: lName,
         personalEmail: personalEmail,
@@ -5339,6 +5339,9 @@ window.submitAddFacultyForm = async function (e) {
     };
 
     try {
+        alertBox.classList.remove('d-none', 'alert-success', 'alert-danger');
+        alertBox.innerText = 'Adding faculty...';
+        
         const res = await apiFetch('/api/teachers', {
             method: 'POST',
             body: JSON.stringify(payload)
@@ -5347,6 +5350,13 @@ window.submitAddFacultyForm = async function (e) {
             alertBox.classList.add('alert-success');
             alertBox.innerText = 'Faculty member added successfully! User account provisioned.';
             document.getElementById('manageFacultyForm').reset();
+            
+            // Refresh tables to show the new data
+            if (window.renderAdminFacultyDetails) window.renderAdminFacultyDetails();
+            if (window.renderCredentialsList) window.renderCredentialsList();
+            if (window.loadAdminFullFaculty) window.loadAdminFullFaculty();
+            
+            setTimeout(() => alertBox.classList.add('d-none'), 5000);
         } else {
             alertBox.classList.add('alert-danger');
             alertBox.innerText = 'Failed to add faculty member.';
