@@ -4785,6 +4785,73 @@ async function loadRecentStudents() {
     }
 }
 
+window.renderAdminFacultyDetails = async function() {
+    const tbody = document.getElementById('adminFacultyDetailsBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading faculty data...</td></tr>';
+    
+    try {
+        const token = localStorage.getItem('jwt_token') || '';
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        const res = await fetch('/api/teachers', { headers });
+        if (res.ok) {
+            window._allAdminFacultyCache = await res.json();
+            window._renderAdminFacultyTable(window._allAdminFacultyCache);
+        } else {
+            tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-danger py-4">Failed to load faculty details.</td></tr>';
+        }
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-danger py-4">Error connecting to server.</td></tr>';
+    }
+};
+
+window.searchAdminFacultyDetails = function() {
+    const input = document.getElementById('adminFacultySearchInput');
+    if (!input || !window._allAdminFacultyCache) return;
+    const query = input.value.toLowerCase().trim();
+    if (!query) {
+        window._renderAdminFacultyTable(window._allAdminFacultyCache);
+        return;
+    }
+    const filtered = window._allAdminFacultyCache.filter(f => {
+        return (f.name && f.name.toLowerCase().includes(query)) ||
+               (f.collegeEmail && f.collegeEmail.toLowerCase().includes(query)) ||
+               (f.user && f.user.username && f.user.username.toLowerCase().includes(query)) ||
+               (f.displayName && f.displayName.toLowerCase().includes(query)) ||
+               (f.department && f.department.name && f.department.name.toLowerCase().includes(query));
+    });
+    window._renderAdminFacultyTable(filtered);
+};
+
+window._renderAdminFacultyTable = function(facultyList) {
+    const tbody = document.getElementById('adminFacultyDetailsBody');
+    if (!tbody) return;
+    if (!facultyList || facultyList.length === 0) {
+        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">No faculty found.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = facultyList.map(t => {
+        const dept = t.department ? (t.department.name || t.department) : (t.dept || '-');
+        const name = ((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-';
+        return `
+            <tr>
+                <td class="fw-bold text-info">${name}</td>
+                <td>${dept}</td>
+                <td>${t.subjectHandling || '-'}</td>
+                <td>${t.personalEmail || t.email || '-'}</td>
+                <td>${t.collegeEmail || '-'}</td>
+                <td>${t.phone1 || t.phone || '-'}</td>
+                <td>${t.phone2 || '-'}</td>
+                <td>
+                    <div class="d-flex gap-1 justify-content-center">
+                        <button class="btn btn-sm btn-outline-warning py-0 px-1" onclick="editPersistentFaculty(${t.id || `'${t.name}'`})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deletePersistentFaculty(${t.id || `'${t.name}'`})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+};
 
 window.loadAdminFullFaculty = async function () {
     const adminBody = document.getElementById('adminViewFacultyBody');
