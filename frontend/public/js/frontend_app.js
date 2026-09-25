@@ -4943,7 +4943,7 @@ window._renderAdminFacultyTable = function(facultyList) {
     const tbody = document.getElementById('adminFacultyDetailsBody');
     if (!tbody) return;
     if (!facultyList || facultyList.length === 0) {
-        tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">No faculty found.</td></tr>';
+        tbody.innerHTML = '<tr><td colSpan="5" class="text-center text-muted py-4"><i class="fa-solid fa-folder-open mb-2 fs-3 d-block text-secondary"></i>No faculty found.</td></tr>';
         return;
     }
     tbody.innerHTML = facultyList.map(t => {
@@ -4951,17 +4951,38 @@ window._renderAdminFacultyTable = function(facultyList) {
         const name = ((t.firstName || '') + ' ' + (t.lastName || '')).trim() || t.name || '-';
         return `
             <tr>
-                <td class="fw-bold text-info">${name}</td>
-                <td>${dept}</td>
-                <td>${t.subjectHandling || '-'}</td>
-                <td>${t.personalEmail || t.email || '-'}</td>
-                <td>${t.collegeEmail || '-'}</td>
-                <td>${t.phone1 || t.phone || '-'}</td>
-                <td>${t.phone2 || '-'}</td>
+                <td class="align-middle">
+                    <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                        <span class="fw-bold text-info" style="font-size: 1.05rem;">${name}</span>
+                        <span class="badge bg-secondary mt-1">${t.employeeId || 'No ID'}</span>
+                    </div>
+                </td>
+                <td class="align-middle">
+                    <div class="d-flex flex-column justify-content-center h-100">
+                        <span class="fw-bold text-light">${dept}</span>
+                        <span class="text-muted small mt-1"><i class="fa-solid fa-book text-warning me-1"></i>${t.subjectHandling || 'N/A'}</span>
+                    </div>
+                </td>
                 <td>
-                    <div class="d-flex gap-1 justify-content-center">
-                        <button class="btn btn-sm btn-outline-warning py-0 px-1" onclick="editPersistentFaculty(${t.id || `'${t.name}'`})" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deletePersistentFaculty(${t.id || `'${t.name}'`})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    <div class="d-flex flex-column gap-1 text-start align-items-start justify-content-center h-100 ps-3">
+                        <span class="small" title="College Email"><i class="fa-solid fa-envelope text-primary me-2"></i>${t.collegeEmail || '-'}</span>
+                        <span class="small text-muted" title="Personal Email"><i class="fa-regular fa-envelope me-2"></i>${t.personalEmail || t.email || '-'}</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex flex-column gap-1 text-start align-items-start justify-content-center h-100 ps-3">
+                        <span class="small" title="Primary Mobile"><i class="fa-solid fa-phone text-success me-2"></i>${t.phone1 || t.phone || '-'}</span>
+                        ${t.phone2 ? `<span class="small text-muted" title="Secondary Mobile"><i class="fa-solid fa-mobile-screen me-2"></i>${t.phone2}</span>` : ''}
+                    </div>
+                </td>
+                <td class="align-middle">
+                    <div class="d-flex gap-2 justify-content-center">
+                        <button class="btn btn-sm btn-outline-warning py-1 px-2" onclick="editPersistentFaculty(${t.id || `'${t.name}'`})" title="Edit Faculty">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger py-1 px-2" onclick="deletePersistentFaculty(${t.id || `'${t.name}'`})" title="Delete Faculty">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
                     </div>
                 </td>
             </tr>

@@ -2217,13 +2217,10 @@ export default function DashboardLayout() {
                                 <table className="table table-dark table-striped table-hover align-middle mb-0 text-center">
                                     <thead className="sticky-top" style={{ backgroundColor: "#1e1e1e" }}>
                                         <tr>
-                                            <th>Name</th>
-                                            <th>Department</th>
-                                            <th>Subject Handling</th>
-                                            <th>Personal Email</th>
-                                            <th>College Email</th>
-                                            <th>Mobile 1</th>
-                                            <th>Mobile 2</th>
+                                            <th>Faculty Profile</th>
+                                            <th>Academic Role</th>
+                                            <th>Email Addresses</th>
+                                            <th>Contact Numbers</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
