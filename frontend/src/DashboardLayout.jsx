@@ -198,7 +198,7 @@ export default function DashboardLayout() {
                                 </button>
 
                                 {!isAdmin && (
-                                    <button id="notifBellBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1" style={{ display: "none" }} onClick={() => window.openNotificationModal()} >
+                                    <button id="notifBellBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" style={{ display: "none" }} onClick={() => window.openNotificationModal()} >
                                         <i className="fa-solid fa-bell text-warning"></i> <span id="notifBellLabel">Register SMS / Email Alerts</span>
                                     </button>
                                 )}
@@ -206,12 +206,12 @@ export default function DashboardLayout() {
 
 
 
-                                <button id="manageStudentsBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1"
+                                <button id="manageStudentsBtn" className="btn btn-sm btn-outline-success d-flex align-items-center gap-1"
                                     type="button" data-bs-toggle="modal" data-bs-target="#manageStudentsModal" style={{ display: "none" }}>
                                     <i className="fa-solid fa-users"></i> <span id="manageStudentsBtnText">Add Students</span>
                                 </button>
 
-                                <button id="manageFacultyBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1"
+                                <button id="manageFacultyBtn" className="btn btn-sm btn-outline-success d-flex align-items-center gap-1"
                                     type="button" data-bs-toggle="modal" data-bs-target="#manageFacultyModal" style={{ display: "none" }}>
                                     <i className="fa-solid fa-chalkboard-user"></i> Add Faculty
                                 </button>
@@ -254,11 +254,11 @@ export default function DashboardLayout() {
                                     <i className="fa-solid fa-user-tie"></i> Class Advisor View
                                 </button>
 
-                                <button id="facultyDetailsBtn" className={`btn btn-sm btn-outline-primary align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#facultyDetailsModal">
+                                <button id="facultyDetailsBtn" className={`btn btn-sm btn-outline-primary align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#facultyDetailsModal" onClick={() => window.renderFacultyDetailsView && window.renderFacultyDetailsView()}>
                                     <i className="fa-solid fa-chalkboard-user"></i> Faculty Details
                                 </button>
 
-                                <button id="studentDayNotificationBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1" type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
+                                <button id="studentDayNotificationBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
 
                                 <button id="facultyQuizBtn" className={`btn btn-sm btn-outline-danger align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openFacultyQuizModal && window.openFacultyQuizModal()}>
                                     <i className="fa-solid fa-clipboard-question"></i> Manage Quizzes
@@ -274,13 +274,13 @@ export default function DashboardLayout() {
 
 
                                 {(!isAdmin && !isStudent) && (
-                                    <button id="substitutionBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#substitutionModal" onClick={() => window.initSubstitutionModal && window.initSubstitutionModal()}>
+                                    <button id="substitutionBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#substitutionModal" onClick={() => window.initSubstitutionModal && window.initSubstitutionModal()}>
                                         <i className="fa-solid fa-people-arrows"></i> Staff Availability / Substitution
                                     </button>
                                 )}
 
                                 {(!isAdmin && !isStudent) && (
-                                    <button id="myTimetableBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => { window.renderMyTimetable && window.renderMyTimetable(); }}>
+                                    <button id="myTimetableBtn" className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => { window.renderMyTimetable && window.renderMyTimetable(); }}>
                                         <i className="fa-solid fa-calendar-user"></i> YOUR TIMETABLE
                                     </button>
                                 )}
@@ -838,7 +838,7 @@ export default function DashboardLayout() {
             )}
 
 
-            <div className="modal fade" id="forgotPasswordModal" tabIndex="-1">
+            <div className="modal fade" btn-outline-warning tabIndex="-1">
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content bg-dark text-white border-secondary">
                         <div className="modal-header border-secondary">

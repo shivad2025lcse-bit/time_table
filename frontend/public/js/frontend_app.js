@@ -671,7 +671,7 @@ setTimeout(() => {
     renderNotificationStatus();
     toggleSubstitutionUI();
     const facultyDetailsModalEl = document.getElementById('facultyDetailsModal');
-    if (facultyDetailsModalEl) facultyDetailsModalEl.addEventListener('show.bs.modal', renderFacultyDetailsView);
+    if (facultyDetailsModalEl) facultyDetailsModalEl.addEventListener('show.bs.modal', () => { if (window.renderFacultyDetailsView) window.renderFacultyDetailsView(); });
 
     const substModalEl = document.getElementById('substitutionModal');
     if (substModalEl) {
@@ -3119,78 +3119,100 @@ window.openAddStudentDirectly = function () {
     }, 200);
 }
 
-function renderFacultyDetailsView() {
+window.renderFacultyDetailsView = async function() {
     if (currentUserRole !== 'FACULTY' && currentUserRole !== 'ADMIN') return;
 
     const body = document.getElementById('facultyDetailsBody');
     if (body) {
-        const myUsername = String(localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
-        body.innerHTML = staffDirectory.map((staff, i) => {
-            const fu = buildGeneratedUsername('FACULTY', staff.name);
-            const canEdit = fu === myUsername;
-            return `<tr>
-                <td>${staff.displayName || staff.name || '-'}</td><td>${staff.dept || '-'}</td><td><code>${fu || '-'}</code></td>
-                <td><input type="email" class="form-control form-control-sm bg-dark text-white border-secondary faculty-detail-personal" data-index="${i}" value="${staff.personalEmail || ''}" placeholder="personal@gmail.com" ${canEdit ? '' : 'disabled'}></td>
-                <td><input type="email" class="form-control form-control-sm bg-dark text-white border-secondary faculty-detail-college" data-index="${i}" value="${staff.collegeEmail || ''}" placeholder="name@sece.ac.in" ${canEdit ? '' : 'disabled'}></td>
-                <td>${canEdit ? `<button class="btn btn-sm btn-success" onclick="saveFacultyDetailsView(${i})">Save</button>` : '<span class="badge bg-secondary">View Only</span>'}</td>
-            </tr>`;
-        }).join('');
+        body.innerHTML = '<tr><td colSpan="6" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading faculty data...</td></tr>';
+        
+        try {
+            const token = localStorage.getItem('jwt_token') || '';
+            const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+            const res = await fetch('/api/teachers', { headers });
+            if (res.ok) {
+                const facultyList = await res.json();
+                const myUsername = String(localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
+                
+                body.innerHTML = facultyList.map((f, i) => {
+                    const username = f.user ? f.user.username : '';
+                    const canEdit = (username.toLowerCase() === myUsername);
+                    const deptName = f.department ? f.department.name : '-';
+                    const personalEmail = f.user ? (f.user.personalEmail || '') : '';
+                    const collegeEmail = f.user ? (f.user.email || '') : '';
+                    const fId = f.id;
+                    const userId = f.user ? f.user.id : 'null';
+                    
+                    return `<tr>
+                        <td>${f.displayName || f.name || '-'}</td>
+                        <td>${deptName}</td>
+                        <td><code>${username || '-'}</code></td>
+                        <td><input type="email" id="fac_p_email_${fId}" class="form-control form-control-sm bg-dark text-white border-secondary" value="${personalEmail}" placeholder="personal@gmail.com" ${canEdit ? '' : 'disabled'}></td>
+                        <td><input type="email" id="fac_c_email_${fId}" class="form-control form-control-sm bg-dark text-white border-secondary" value="${collegeEmail}" placeholder="name@sece.ac.in" ${canEdit ? '' : 'disabled'}></td>
+                        <td>${canEdit ? `<button class="btn btn-sm btn-success" onclick="saveFacultyEmailsBackend(${userId}, ${fId})">Save</button>` : '<span class="badge bg-secondary">View Only</span>'}</td>
+                    </tr>`;
+                }).join('');
+            } else {
+                body.innerHTML = '<tr><td colSpan="6" class="text-center text-danger py-4">Failed to load faculty details.</td></tr>';
+            }
+        } catch(e) {
+            body.innerHTML = '<tr><td colSpan="6" class="text-center text-danger py-4">Error connecting to server.</td></tr>';
+        }
     }
 
     const credentialsPanel = document.getElementById('adminCredentialsPanel');
     if (credentialsPanel) credentialsPanel.classList.toggle('d-none', currentUserRole !== 'ADMIN');
-    const facultyCredBody = document.getElementById('facultyCredentialsBody');
-    if (facultyCredBody) {
-        facultyCredBody.innerHTML = currentUserRole === 'ADMIN' ? staffDirectory.map(staff => {
-            const fu = buildGeneratedUsername('FACULTY', staff.name);
-            return `<tr><td>${staff.name}</td><td>${staff.dept || '-'}</td><td><code>${fu || '-'}</code></td><td><code class="text-warning">${fu ? (getStoredPassword(fu) || buildGeneratedPassword('FACULTY', fu)) : '-'}</code></td></tr>`;
-        }).join('') : '';
-    }
-
-    const facultyEmailPanel = document.getElementById('facultyEmailDirectoryPanel');
-    const facultyEmailBody = document.getElementById('facultyEmailDirectoryBody');
-    if (facultyEmailPanel) facultyEmailPanel.classList.toggle('d-none', !(currentUserRole === 'ADMIN' || currentUserRole === 'FACULTY'));
-    if (facultyEmailBody && (currentUserRole === 'ADMIN' || currentUserRole === 'FACULTY')) {
-        const myUsername = String(localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
-        facultyEmailBody.innerHTML = staffDirectory.map((staff, i) => {
-            const fu = buildGeneratedUsername('FACULTY', staff.name);
-            const canEdit = currentUserRole === 'ADMIN' || fu === myUsername;
-            return `<tr>
-                <td>${staff.name || '-'}</td><td>${staff.dept || '-'}</td><td><code>${fu || '-'}</code></td>
-                <td><input type="email" class="form-control form-control-sm bg-dark text-white border-secondary faculty-personal-email" data-index="${i}" value="${staff.personalEmail || ''}" placeholder="personal@gmail.com" ${canEdit ? '' : 'disabled'}></td>
-                <td><input type="email" class="form-control form-control-sm bg-dark text-white border-secondary faculty-college-email" data-index="${i}" value="${staff.collegeEmail || ''}" placeholder="name@sece.ac.in" ${canEdit ? '' : 'disabled'}></td>
-                <td>${canEdit ? `<button class="btn btn-sm btn-success" onclick="saveFacultyEmail(${i})">Save</button>` : '<span class="badge bg-secondary">View Only</span>'}</td>
-            </tr>`;
-        }).join('');
-    }
 }
 
-function saveFacultyDetailsView(index) {
-    if (currentUserRole !== 'FACULTY') {
-        alert('Faculty Details are available only in Faculty view.');
+window.saveFacultyEmailsBackend = async function(userId, teacherId) {
+    if (currentUserRole !== 'FACULTY' && currentUserRole !== 'ADMIN') {
+        alert('Unauthorized.');
         return;
     }
-    const staff = staffDirectory[index];
-    if (!staff) return;
-    const myUsername = String(localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
-    if (buildGeneratedUsername('FACULTY', staff.name) !== myUsername) {
-        alert('You can update only your own faculty email details.');
-        return;
-    }
-    const personalEl = document.querySelector(`.faculty-detail-personal[data-index="${index}"]`);
-    const collegeEl = document.querySelector(`.faculty-detail-college[data-index="${index}"]`);
-    const personalEmail = personalEl ? personalEl.value.trim().toLowerCase() : '';
-    const collegeEmail = collegeEl ? collegeEl.value.trim().toLowerCase() : '';
+    
+    const pEl = document.getElementById(`fac_p_email_${teacherId}`);
+    const cEl = document.getElementById(`fac_c_email_${teacherId}`);
+    const personalEmail = pEl ? pEl.value.trim().toLowerCase() : '';
+    const collegeEmail = cEl ? cEl.value.trim().toLowerCase() : '';
+    
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRe.test(personalEmail) || !emailRe.test(collegeEmail)) {
         alert('Both Personal Email and College Mail ID are compulsory and must be valid email addresses.');
         return;
     }
-    staff.personalEmail = personalEmail;
-    staff.collegeEmail = collegeEmail;
-    saveStaffDirectory();
-    renderFacultyDetailsView();
-    showToast('Faculty Details Saved', 'Your personal and college email details were saved successfully.');
+    
+    try {
+        const token = localStorage.getItem('jwt_token') || '';
+        const headers = { 
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+        };
+        
+        const getRes = await fetch(`/api/teachers/${teacherId}`, { headers });
+        if (!getRes.ok) {
+            alert('Failed to retrieve teacher for update');
+            return;
+        }
+        const teacherData = await getRes.json();
+        teacherData.personalEmail = personalEmail;
+        teacherData.collegeEmail = collegeEmail;
+        
+        const res = await fetch(`/api/teachers/${teacherId}`, {
+            method: 'PUT',
+            headers: headers,
+            body: JSON.stringify(teacherData)
+        });
+        
+        if (res.ok) {
+            showToast('Faculty Details Saved', 'Your personal and college email details were saved successfully.');
+            window.renderFacultyDetailsView();
+        } else {
+            const err = await res.text();
+            alert('Failed to update emails: ' + err);
+        }
+    } catch (e) {
+        alert('Error updating emails: ' + e);
+    }
 }
 
 async function openStudentProfileModal() {
@@ -5413,8 +5435,6 @@ window.renderClassAdvisorStudents = renderClassAdvisorStudents;
 window.openStudentDetailsModal = openStudentDetailsModal;
 window.openAddStudentFromDetails = openAddStudentFromDetails;
 window.removeStudentDetails = removeStudentDetails;
-window.renderFacultyDetailsView = renderFacultyDetailsView;
-window.saveFacultyDetailsView = saveFacultyDetailsView;
 window.openStudentProfileModal = openStudentProfileModal;
 window.adminOnly = adminOnly;
 window.loadAdminResources = loadAdminResources;
@@ -6720,8 +6740,17 @@ let facultyTtColumns = [];
 
 function loadFacultyTtColumns() {
     const saved = localStorage.getItem('faculty_tt_cols_' + _getFacultyTTKey());
+    let parsed = null;
     if (saved) {
-        facultyTtColumns = JSON.parse(saved);
+        try {
+            parsed = JSON.parse(saved);
+        } catch (e) {
+            console.error('Error parsing faculty_tt_cols', e);
+        }
+    }
+    
+    if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+        facultyTtColumns = parsed;
     } else {
         facultyTtColumns = [
             { key: 'P1', label: 'Period 1', isBreak: false, defTime: '08.40 - 09.40' },

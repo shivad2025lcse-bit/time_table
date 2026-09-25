@@ -45,10 +45,16 @@ public class TeacherController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     public ResponseEntity<Teacher> updateTeacher(@PathVariable Long id, @RequestBody Teacher teacherDetails) {
         return teacherService.getTeacherById(id)
                 .map(existing -> {
+                    org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                    boolean isFaculty = authentication != null && authentication.getAuthorities().stream()
+                            .anyMatch(a -> a.getAuthority().equals("ROLE_FACULTY"));
+                    if (isFaculty && (existing.getUser() == null || !existing.getUser().getUsername().equals(authentication.getName()))) {
+                        throw new RuntimeException("Faculty can only update their own profile");
+                    }
                     if (teacherDetails.getEmployeeId() != null && !teacherDetails.getEmployeeId().isEmpty()) {
                         existing.setEmployeeId(teacherDetails.getEmployeeId());
                     }
@@ -62,6 +68,12 @@ public class TeacherController {
                     if (teacherDetails.getDepartment() != null) {
                         existing.setDepartment(teacherDetails.getDepartment());
                     }
+                    
+                    // Also update the linked User if it exists (since emails might be mapped there)
+                    if (existing.getUser() != null) {
+                        existing.getUser().setEmail(teacherDetails.getCollegeEmail());
+                    }
+                    
                     return ResponseEntity.ok(teacherService.saveTeacher(existing));
                 })
                 .orElse(ResponseEntity.notFound().build());
