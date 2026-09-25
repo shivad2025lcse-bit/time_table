@@ -133,10 +133,5 @@ public class QuizController {
         return ResponseEntity.ok(quizService.getStudentQuizHistory(studentId));
     }
 
-    // Faculty: Delete a quiz completely
-    @DeleteMapping("/{quizId}")
-    public ResponseEntity<Void> deleteQuiz(@PathVariable Long quizId) {
-        quizService.deleteQuiz(quizId);
-        return ResponseEntity.noContent().build();
-    }
+
 }

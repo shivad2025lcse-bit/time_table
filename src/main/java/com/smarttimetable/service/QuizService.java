@@ -179,12 +179,7 @@ public class QuizService {
             .collect(Collectors.toList());
     }
 
-    @Transactional
-    public void deleteQuiz(Long quizId) {
-        Quiz quiz = quizRepository.findById(quizId)
-            .orElseThrow(() -> new RuntimeException("Quiz not found with id: " + quizId));
-        quizRepository.delete(quiz); // cascades to questions, submissions, answers
-    }
+
 
     @Transactional
     public void deleteQuizSubmission(Long submissionId) {
@@ -201,15 +196,26 @@ public class QuizService {
         return submissionRepository.findByStudentId(studentId);
     }
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     @Transactional
     public void deleteQuiz(Long quizId) {
         Quiz quiz = quizRepository.findById(quizId)
             .orElseThrow(() -> new RuntimeException("Quiz not found with id: " + quizId));
         
-        // Use direct JPQL to avoid any Hibernate cascade / flush ordering issues with foreign keys
-        answerRepository.deleteByQuizId(quizId);
-        submissionRepository.deleteByQuizId(quizId);
-        
+        List<QuizSubmission> submissions = submissionRepository.findByQuizId(quizId);
+        for (QuizSubmission sub : submissions) {
+            // Explicitly delete answers for each submission
+            answerRepository.deleteAll(sub.getAnswers());
+        }
+        answerRepository.flush(); // Force execution of DELETE FROM student_answers
+
+        // Explicitly delete submissions
+        submissionRepository.deleteAll(submissions);
+        submissionRepository.flush(); // Force execution of DELETE FROM quiz_submissions
+
+        // Now safe to delete quiz and its questions
         quizRepository.delete(quiz);
     }
 }
