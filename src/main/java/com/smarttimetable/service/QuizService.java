@@ -186,11 +186,30 @@ public class QuizService {
         quizRepository.delete(quiz); // cascades to questions, submissions, answers
     }
 
+    @Transactional
+    public void deleteQuizSubmission(Long submissionId) {
+        QuizSubmission submission = submissionRepository.findById(submissionId)
+            .orElseThrow(() -> new RuntimeException("Submission not found with id: " + submissionId));
+        submissionRepository.delete(submission); // Cascades to answers
+    }
+
     public java.util.Optional<QuizSubmission> getSubmissionForStudent(Long quizId, Long studentId) {
         return submissionRepository.findByQuizIdAndStudentId(quizId, studentId);
     }
 
     public List<QuizSubmission> getStudentQuizHistory(Long studentId) {
         return submissionRepository.findByStudentId(studentId);
+    }
+
+    @Transactional
+    public void deleteQuiz(Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+            .orElseThrow(() -> new RuntimeException("Quiz not found with id: " + quizId));
+        
+        // Use direct JPQL to avoid any Hibernate cascade / flush ordering issues with foreign keys
+        answerRepository.deleteByQuizId(quizId);
+        submissionRepository.deleteByQuizId(quizId);
+        
+        quizRepository.delete(quiz);
     }
 }

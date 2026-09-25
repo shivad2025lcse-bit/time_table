@@ -2146,6 +2146,7 @@ function switchRole(role, silent = false) {
 
     renderNotificationStatus();
     toggleSubstitutionUI();
+    if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
 
     const resetBtn = document.getElementById('resetTimetableBtn');
     if (resetBtn) resetBtn.classList.toggle('d-none', role !== 'ADMIN');
@@ -2820,43 +2821,79 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
                 <form onsubmit="window.handleClassAdvisorAddStudent(event, '${section}')">
                     <div class="row g-2 mb-2">
                         <div class="col-md-4">
-                            <label class="form-label small mb-1">Roll No</label>
-                            <input type="text" id="caStdRoll" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. 24CS062" required />
+                            <label class="form-label small mb-1">First Name <span class="text-danger">*</span></label>
+                            <input type="text" id="caStdFirstName" class="form-control form-control-sm bg-dark text-white border-secondary" required />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label small mb-1">Student Name</label>
-                            <input type="text" id="caStdName" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Mithil Pranav" required />
+                            <label class="form-label small mb-1">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" id="caStdLastName" class="form-control form-control-sm bg-dark text-white border-secondary" required />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label small mb-1">Section</label>
-                            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" value="${section}" disabled />
+                            <label class="form-label small mb-1">Register Number <span class="text-danger">*</span></label>
+                            <input type="text" id="caStdRoll" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. 71812423001" required />
                         </div>
                     </div>
                     <div class="row g-2 mb-2">
-                        <div class="col-md-6">
-                            <label class="form-label small mb-1">Personal Email Address</label>
-                            <input type="email" id="caStdEmail" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="student@gmail.com" required />
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Personal Email <span class="text-danger">*</span></label>
+                            <input type="email" id="caStdEmail" class="form-control form-control-sm bg-dark text-white border-secondary" required />
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small mb-1">College Mail ID <span class="text-danger">*</span></label>
-                            <input type="email" id="caStdCollegeEmail" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="student@sece.ac.in" required />
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">College Email <span class="text-danger">*</span></label>
+                            <input type="email" id="caStdCollegeEmail" class="form-control form-control-sm bg-dark text-white border-secondary" required />
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small mb-1">Student Mobile Number</label>
-                            <input type="tel" id="caStdPhone" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="9876543210" pattern="[0-9]{10}" required />
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Mobile Number <span class="text-danger">*</span></label>
+                            <input type="tel" id="caStdPhone" class="form-control form-control-sm bg-dark text-white border-secondary" required pattern="[0-9]{10}" />
                         </div>
                     </div>
                     <div class="row g-2 mb-2">
-                        <div class="col-md-6">
-                            <label class="form-label small mb-1">Parent Mobile 1 <span class="text-danger">*</span></label>
-                            <input type="tel" id="caStdParent1" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="9876543210" pattern="[0-9]{10}" required />
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Parent 1 Mobile <span class="text-danger">*</span></label>
+                            <input type="tel" id="caStdParent1" class="form-control form-control-sm bg-dark text-white border-secondary" required pattern="[0-9]{10}" />
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small mb-1">Parent Mobile 2 <span class="text-muted">(optional)</span></label>
-                            <input type="tel" id="caStdParent2" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="9876543210" pattern="[0-9]{10}" />
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Parent 2 Mobile <span class="text-muted">(Optional)</span></label>
+                            <input type="tel" id="caStdParent2" class="form-control form-control-sm bg-dark text-white border-secondary" pattern="[0-9]{10}" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Resident Type <span class="text-danger">*</span></label>
+                            <select id="caStdResidentType" class="form-select form-select-sm bg-dark text-white border-secondary" required onchange="const el = document.getElementById('caHostelFields'); if (el) el.classList.toggle('d-none', this.value !== 'Hosteller');">
+                                <option value="">Select...</option>
+                                <option value="Hosteller">Hosteller</option>
+                                <option value="Day Scholar">Day Scholar</option>
+                            </select>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-sm btn-warning font-semibold"><i class="fa-solid fa-check me-1"></i> Save Student</button>
+                    <div id="caHostelFields" class="row g-2 mb-2 d-none">
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1">Hostel Block</label>
+                            <input type="text" id="caStdHostelBlock" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. A Block" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1">Room Number</label>
+                            <input type="text" id="caStdRoomNumber" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. 204" />
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Department <span class="text-danger">*</span></label>
+                            <input type="text" id="caStdDept" list="deptDatalist" class="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. CSE" autocomplete="off" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Class <span class="text-danger">*</span></label>
+                            <input type="text" id="caStdCourse" list="courseDatalist" class="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. BTECH-CSE" autocomplete="off" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Section <span class="text-danger">*</span></label>
+                            <input type="text" id="caStdSection" list="sectionDatalist" class="form-control form-control-sm bg-dark text-white border-secondary" required value="${section}" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Semester <span class="text-danger">*</span></label>
+                            <input type="number" id="caStdSemester" class="form-control form-control-sm bg-dark text-white border-secondary" required min="1" max="8" value="3" />
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary font-semibold w-100"><i class="fa-solid fa-plus me-1"></i> Add Student</button>
                 </form>
             </div>
 
@@ -2889,35 +2926,28 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
     }
 };
 
-window.handleClassAdvisorAddStudent = async function (e, section) {
+window.handleClassAdvisorAddStudent = async function (e, prefilledSection) {
     e.preventDefault();
     const roll = document.getElementById('caStdRoll').value.trim();
-    const name = document.getElementById('caStdName').value.trim();
+    const firstName = document.getElementById('caStdFirstName').value.trim();
+    const lastName = document.getElementById('caStdLastName').value.trim();
     const email = document.getElementById('caStdEmail').value.trim();
     const collegeEmail = document.getElementById('caStdCollegeEmail').value.trim();
     const phone = document.getElementById('caStdPhone').value.trim();
     const parentPhone1 = document.getElementById('caStdParent1').value.trim();
     const parentPhone2 = document.getElementById('caStdParent2').value.trim();
+    const residentType = document.getElementById('caStdResidentType').value.trim();
+    const hostelBlock = residentType === 'Hosteller' ? document.getElementById('caStdHostelBlock').value.trim() : null;
+    const roomNumber = residentType === 'Hosteller' ? document.getElementById('caStdRoomNumber').value.trim() : null;
+    const deptId = document.getElementById('caStdDept').value.trim();
+    const courseId = document.getElementById('caStdCourse').value.trim();
+    const secId = document.getElementById('caStdSection').value.trim();
+    const semester = document.getElementById('caStdSemester').value;
 
     if (!collegeEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(collegeEmail)) {
         alert('College Mail ID is required and must be a valid email.');
         return;
     }
-
-    // Derive department and course from section (must match DataInitializerService seeds)
-    const sectionDeptMap = {
-        'II CSE A': { dept: 'Computer Science & Engineering', course: 'B.E. Computer Science and Engineering' },
-        'II CSE B': { dept: 'Computer Science & Engineering', course: 'B.E. Computer Science and Engineering' },
-        'II CSE C': { dept: 'Computer Science & Engineering', course: 'B.E. Computer Science and Engineering' },
-        'II IT A': { dept: 'Information Technology', course: 'B.Tech Information Technology' },
-        'II AI&DS A': { dept: 'Artificial Intelligence & Data Science', course: 'B.Tech AI & Data Science' }
-    };
-    const deptInfo = sectionDeptMap[section] || { dept: 'Computer Science & Engineering', course: 'B.E. Computer Science and Engineering' };
-
-    // Ensure lastName is never empty (required field in DB)
-    const nameParts = name.trim().split(/\s+/);
-    const firstName = nameParts[0] || name;
-    const lastName = nameParts.slice(1).join(' ') || nameParts[0] || name;
 
     const payload = {
         registerNumber: roll,
@@ -2928,10 +2958,13 @@ window.handleClassAdvisorAddStudent = async function (e, section) {
         phone: phone,
         parentPhone1: parentPhone1,
         parentPhone2: parentPhone2 || null,
-        semester: 3,
-        department: { name: deptInfo.dept },
-        course: { name: deptInfo.course },
-        section: { sectionName: section }
+        residentType: residentType,
+        hostelBlock: hostelBlock,
+        roomNumber: roomNumber,
+        semester: parseInt(semester),
+        department: { name: deptId },
+        course: { name: courseId },
+        section: { sectionName: secId }
     };
 
     try {
@@ -2940,10 +2973,10 @@ window.handleClassAdvisorAddStudent = async function (e, section) {
             body: JSON.stringify(payload)
         });
         if (res.ok) {
-            showToast('Student Added', `${name} has been enrolled in ${section}.`);
+            showToast('Student Added', `${firstName} ${lastName} has been enrolled in ${prefilledSection}.`);
             // Reload the view
-            const faculty = staffDirectory.find(s => s.classAdvisorFor === section);
-            if (faculty) window.renderClassAdvisorStudents(section, faculty);
+            const faculty = staffDirectory.find(s => s.classAdvisorFor === prefilledSection);
+            if (faculty) window.renderClassAdvisorStudents(prefilledSection, faculty);
         } else {
             const errText = await res.text().catch(() => res.status);
             alert('Failed to add student: ' + errText);
@@ -4218,22 +4251,33 @@ function safetyNormalizePhone(value) {
     return String(value || '').replace(/\D/g, '');
 }
 
-// Download Timetable as High-Resolution PNG Image
 function downloadTimetablePNG() {
-    showToast('Generating Timetable PNG...', 'Capturing high-resolution image of Sri Eshwar Timetable.');
-    const element = document.getElementById('timetableCaptureArea');
+    showToast('Generating Timetable PNG...', 'Capturing high-resolution image...');
+    let element = document.getElementById('timetableCaptureArea');
+    let fileName = `SRI_ESHWAR_TIMETABLE_${currentSection}_2026.png`;
+
+    if (currentUserRole === 'FACULTY' && (!element || !element.offsetParent)) {
+        element = document.getElementById('facultyPersonalTTArea');
+        const uname = String(localStorage.getItem('sece_logged_in_user') || 'faculty').toUpperCase();
+        fileName = `FACULTY_TIMETABLE_${uname}_2026.png`;
+    }
+
+    if (!element) {
+        showToast('Download Error', 'No timetable visible to capture.');
+        return;
+    }
 
     html2canvas(element, {
         backgroundColor: '#0b0f17',
         scale: 2
     }).then(canvas => {
         const link = document.createElement('a');
-        link.download = `SRI_ESHWAR_TIMETABLE_${currentSection}_2026.png`;
+        link.download = fileName;
         link.href = canvas.toDataURL('image/png');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        showToast('PNG Downloaded!', `Saved SRI_ESHWAR_TIMETABLE_${currentSection}_2026.png to your device.`);
+        showToast('PNG Downloaded!', `Saved ${fileName} to your device.`);
     }).catch(err => {
         console.error(err);
         showToast('Download Error', 'Could not generate PNG image.');
@@ -4241,28 +4285,7 @@ function downloadTimetablePNG() {
 }
 
 // Export Timetable as CSV
-function exportTimetableCSV() {
-    let csv = 'Day,Period 1,Period 2,Period 3,Period 4,Period 5,Period 6,Period 7\n';
-    const data = timetableData[currentSection] || timetableData['II CSE C'];
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-    days.forEach(day => {
-        const periods = data[day] || [];
-        const row = [day, ...periods.map(p => `"${p.sub} (${p.faculty} - ${p.venue})"`)];
-        csv += row.join(',') + '\n';
-    });
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `SECE_Timetable_${currentSection}.csv`);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-    showToast('CSV Downloaded!', `Saved SECE_Timetable_${currentSection}.csv spreadsheet.`);
-}
+/* replaced */
 
 // =============================================
 // PERIOD NOTIFICATIONS â€” Backend API Storage
@@ -4666,8 +4689,6 @@ window.parseStudentDisplayData = function(s) {
 };
 
 async function loadRecentStudents() {
-    const list = document.getElementById('manageStudentsList');
-    if (!list) return;
     try {
         const res = await apiFetch('/api/students');
         if (res.ok) {
@@ -4678,8 +4699,12 @@ async function loadRecentStudents() {
                 studentsRoster = data.map(s => ({
                     id: s.id,
                     roll: s.registerNumber,
+                    registerNumber: s.registerNumber,
                     name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+                    firstName: s.firstName,
+                    lastName: s.lastName,
                     sec: s.section ? (s.section.sectionName || s.section.id) : '',
+                    section: s.section,
                     email: s.email,
                     collegeEmail: s.collegeEmail,
                     phone: s.phone,
@@ -4688,20 +4713,25 @@ async function loadRecentStudents() {
                     residentType: s.residentType,
                     hostelBlock: s.hostelBlock,
                     roomNumber: s.roomNumber,
-                    username: s.user ? s.user.username : ''
+                    username: s.user ? s.user.username : '',
+                    semester: s.semester,
+                    department: s.department,
+                    course: s.course
                 }));
                 window.studentsRoster = studentsRoster;
             }
 
             renderStudentsRoster();
 
-            list.innerHTML = '';
-            const displayData = data.length > 0 ? data : (window.studentsRoster || []);
-            if (displayData.length === 0) {
-                list.innerHTML = '<tr><td colspan="14" class="text-center text-muted py-2">No students added yet.</td></tr>';
-                return;
-            }
-            displayData.reverse().forEach((s, idx) => {
+            const list = document.getElementById('manageStudentsList');
+            if (list) {
+                list.innerHTML = '';
+                const displayData = data.length > 0 ? data : (window.studentsRoster || []);
+                if (displayData.length === 0) {
+                    list.innerHTML = '<tr><td colspan="14" class="text-center text-muted py-2">No students added yet.</td></tr>';
+                    return;
+                }
+                displayData.reverse().forEach((s, idx) => {
                 const tr = document.createElement('tr');
                 const roll = s.registerNumber || s.roll || '-';
                 const fName = s.firstName || s.name || '';
@@ -4746,10 +4776,12 @@ async function loadRecentStudents() {
                 `;
                 list.appendChild(tr);
             });
+            }
         }
     } catch (err) {
         console.error(err);
-        list.innerHTML = '<tr><td colspan="14" class="text-center text-danger py-2">Error loading students.</td></tr>';
+        const list = document.getElementById('manageStudentsList');
+        if (list) list.innerHTML = '<tr><td colspan="14" class="text-center text-danger py-2">Error loading students.</td></tr>';
     }
 }
 
@@ -4908,6 +4940,10 @@ document.getElementById('manageFacultyModal')?.addEventListener('show.bs.modal',
 document.getElementById('manageStudentsModal')?.addEventListener('show.bs.modal', () => {
     loadRecentStudents();
     populateStudentFormDataLists();
+});
+
+document.getElementById('manageRosterModal')?.addEventListener('show.bs.modal', () => {
+    loadRecentStudents();
 });
 
 // Populate Department, Course & Section datalists from the API
@@ -5349,150 +5385,10 @@ function _getFacultyTTKey() {
     return 'faculty_personal_tt_' + uname;
 }
 
-window.renderMyTimetable = function() {
-    const tbody = document.getElementById('myTimetableBody');
-    if (!tbody) return;
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-    // Load saved data from localStorage
-    let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch(e) {}
-
-    // Restore saved time header values into modal header inputs
-    const headers = saved._headers || {};
-    const headerMap = {
-        P1:    { id: 'myTtP1',    def: '08.40 - 09.40' },
-        P2:    { id: 'myTtP2',    def: '09.40 - 10.40' },
-        P3:    { id: 'myTtP3',    def: '11.00 - 12.00' },
-        Tea:   { id: 'myTtTea',   def: '12.00 - 12.15' },
-        P4:    { id: 'myTtP4',    def: '12.15 - 01.15' },
-        P5:    { id: 'myTtP5',    def: '01.15 - 02.00' },
-        Lunch: { id: 'myTtLunch', def: '02.00 - 02.40' },
-        Act:   { id: 'myTtAct',   def: '02.40 - 03.30' },
-        P6:    { id: 'myTtP6',    def: '03.30 - 04.20' },
-        P7:    { id: 'myTtP7',    def: '04.20 - 05.10' },
-    };
-    Object.entries(headerMap).forEach(([key, { id, def }]) => {
-        const el = document.getElementById(id);
-        if (el) el.value = headers[key] || def;
-    });
-
-    let html = '';
-    days.forEach(day => {
-        const d = saved[day] || {};
-        const esc = v => String(v || '').replace(/"/g, '&quot;');
-        html += `
-        <tr>
-            <td class="align-middle text-white fw-bold">${day}</td>
-            <td><input type="text" id="myTt_${day}_P1" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P1)}" /></td>
-            <td><input type="text" id="myTt_${day}_P2" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P2)}" /></td>
-            <td><input type="text" id="myTt_${day}_P3" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P3)}" /></td>
-            <td class="align-middle text-muted small text-center">TEA</td>
-            <td><input type="text" id="myTt_${day}_P4" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P4)}" /></td>
-            <td><input type="text" id="myTt_${day}_P5" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P5)}" /></td>
-            <td class="align-middle text-muted small text-center">LUNCH</td>
-            <td><input type="text" id="myTt_${day}_ACT" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.ACT)}" /></td>
-            <td><input type="text" id="myTt_${day}_P6" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P6)}" /></td>
-            <td><input type="text" id="myTt_${day}_P7" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d.P7)}" /></td>
-        </tr>
-        `;
-    });
-    tbody.innerHTML = html;
-};
+/* replaced */
 
 // Render the saved faculty personal TT as a read-only panel in the faculty dashboard
-window.renderFacultyPersonalTT = function() {
-    const container = document.getElementById('facultyPersonalTTPanel');
-    if (!container) return;
-
-    let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch(e) {}
-
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const periods = [
-        { key: 'P1', label: '1' },
-        { key: 'P2', label: '2' },
-        { key: 'P3', label: '3' },
-        { key: 'TEA', label: 'TEA', isBreak: true },
-        { key: 'P4', label: '4' },
-        { key: 'P5', label: '5' },
-        { key: 'LUNCH', label: 'LUNCH', isBreak: true },
-        { key: 'ACT', label: 'ACT' },
-        { key: 'P6', label: '6' },
-        { key: 'P7', label: '7' },
-    ];
-    const headers = saved._headers || {};
-    const periodTimes = {
-        P1:  headers.P1    || '08.40-09.40',
-        P2:  headers.P2    || '09.40-10.40',
-        P3:  headers.P3    || '11.00-12.00',
-        P4:  headers.P4    || '12.15-01.15',
-        P5:  headers.P5    || '01.15-02.00',
-        ACT: headers.Act   || '02.40-03.30',
-        P6:  headers.P6    || '03.30-04.20',
-        P7:  headers.P7    || '04.20-05.10',
-    };
-
-    const hasData = days.some(d => {
-        const day = saved[d];
-        return day && Object.values(day).some(v => v && v.trim());
-    });
-
-    if (!hasData) {
-        container.innerHTML = `
-            <div class="text-center py-4 text-muted">
-                <i class="fa-solid fa-calendar-xmark fs-2 mb-2 d-block opacity-50"></i>
-                <p class="mb-1">No personal timetable saved yet.</p>
-                <small>Click <strong class="text-info">YOUR TIMETABLE</strong> in the top bar to feed your schedule.</small>
-            </div>`;
-        return;
-    }
-
-    let thead = '<tr><th style="width:70px" class="text-muted">Day</th>';
-    periods.forEach(p => {
-        if (p.isBreak) {
-            thead += `<th class="text-warning text-center" style="font-size:0.65rem;padding:2px 4px">${p.label}</th>`;
-        } else {
-            thead += `<th class="text-center" style="min-width:65px">${p.label}<br><small class="text-muted" style="font-size:0.6rem">${periodTimes[p.key] || ''}</small></th>`;
-        }
-    });
-    thead += '</tr>';
-
-    let tbody = '';
-    days.forEach(day => {
-        const d = saved[day] || {};
-        tbody += `<tr><td class="fw-bold text-white-50 small">${day.slice(0,3)}</td>`;
-        periods.forEach(p => {
-            if (p.isBreak) {
-                tbody += `<td class="text-warning text-center small bg-dark" style="padding:2px 4px">${p.label}</td>`;
-            } else {
-                const val = d[p.key] || '';
-                const parts = val.split(',').map(s => s.trim());
-                const subj = parts[0] || '';
-                const cls  = parts[1] || '';
-                const venue = parts[2] || '';
-                if (subj) {
-                    tbody += `<td class="text-center p-1" style="font-size:0.72rem">
-                        <div class="fw-bold text-info" style="line-height:1.2">${subj}</div>
-                        ${cls   ? `<div class="text-warning" style="font-size:0.6rem">${cls}</div>`   : ''}
-                        ${venue ? `<div class="text-success" style="font-size:0.6rem">${venue}</div>` : ''}
-                    </td>`;
-                } else {
-                    tbody += `<td class="text-center text-muted" style="font-size:0.65rem">FREE</td>`;
-                }
-            }
-        });
-        tbody += '</tr>';
-    });
-
-    container.innerHTML = `
-        <div class="table-responsive">
-            <table class="table table-dark table-bordered border-secondary table-sm mb-0 align-middle" style="font-size:0.78rem">
-                <thead class="table-active">${thead}</thead>
-                <tbody>${tbody}</tbody>
-            </table>
-        </div>`;
-};
+/* replaced */
 
 window.searchUserCredentials = async function() {
     const input = document.getElementById('credentialSearchInput');
@@ -5804,13 +5700,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1000);
 });
 
-window.editPersistentStudent = function(id) {
+window.editPersistentStudent = async function(id) {
     let student = studentsRoster.find(s => s.id === id || s.roll === id || s.registerNumber === id);
     if (!student) {
-        alert("Student not found!");
-        return;
+        try {
+            const res = await apiFetch(`/api/students/${id}`);
+            if (res.ok) {
+                student = await res.json();
+            } else {
+                alert("Student not found on server!");
+                return;
+            }
+        } catch (e) {
+            alert("Error fetching student details!");
+            return;
+        }
     }
-    
     document.getElementById('esId').value = student.id || student.roll;
     
     const fName = student.firstName || student.name || '';
@@ -6099,50 +6004,7 @@ window.shareViaWebAPI = function() {
 };
 
 
-window.saveMyTimetable = function() {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const periods = ['P1', 'P2', 'P3', 'P4', 'P5', 'ACT', 'P6', 'P7'];
-
-    const data = {};
-
-    // Save time headers
-    data._headers = {
-        P1:    (document.getElementById('myTtP1')    || {}).value || '08.40 - 09.40',
-        P2:    (document.getElementById('myTtP2')    || {}).value || '09.40 - 10.40',
-        P3:    (document.getElementById('myTtP3')    || {}).value || '11.00 - 12.00',
-        Tea:   (document.getElementById('myTtTea')   || {}).value || '12.00 - 12.15',
-        P4:    (document.getElementById('myTtP4')    || {}).value || '12.15 - 01.15',
-        P5:    (document.getElementById('myTtP5')    || {}).value || '01.15 - 02.00',
-        Lunch: (document.getElementById('myTtLunch') || {}).value || '02.00 - 02.40',
-        Act:   (document.getElementById('myTtAct')   || {}).value || '02.40 - 03.30',
-        P6:    (document.getElementById('myTtP6')    || {}).value || '03.30 - 04.20',
-        P7:    (document.getElementById('myTtP7')    || {}).value || '04.20 - 05.10',
-    };
-
-    // Save each day's period data
-    days.forEach(day => {
-        data[day] = {};
-        periods.forEach(p => {
-            const el = document.getElementById(`myTt_${day}_${p}`);
-            data[day][p] = el ? el.value.trim() : '';
-        });
-    });
-
-    localStorage.setItem(_getFacultyTTKey(), JSON.stringify(data));
-
-    // Refresh the dashboard panel
-    if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
-
-    // Show success toast/alert and close modal
-    const toastFn = typeof showToast === 'function' ? showToast : null;
-    if (toastFn) {
-        toastFn('Saved!', 'Your personal timetable has been saved successfully.', 'success');
-    } else {
-        alert('Timetable saved successfully!');
-    }
-    const m = bootstrap.Modal.getInstance(document.getElementById('myTimetableModal'));
-    if (m) m.hide();
-};
+/* replaced */
 
 window.deptChanged = function(dept) {
     currentDept = dept;
@@ -6436,3 +6298,293 @@ window.dynamicDashboardInterval = setInterval(() => {
     }
 }, 3000);
 
+
+
+let facultyTtColumns = [];
+
+function loadFacultyTtColumns() {
+    const saved = localStorage.getItem('faculty_tt_cols_' + _getFacultyTTKey());
+    if (saved) {
+        facultyTtColumns = JSON.parse(saved);
+    } else {
+        facultyTtColumns = [
+            { key: 'P1', label: 'Period 1', isBreak: false, defTime: '08.40 - 09.40' },
+            { key: 'P2', label: 'Period 2', isBreak: false, defTime: '09.40 - 10.40' },
+            { key: 'P3', label: 'Period 3', isBreak: false, defTime: '11.00 - 12.00' },
+            { key: 'TEA', label: 'Tea Break', isBreak: true, defTime: '12.00 - 12.15' },
+            { key: 'P4', label: 'Period 4', isBreak: false, defTime: '12.15 - 01.15' },
+            { key: 'P5', label: 'Period 5', isBreak: false, defTime: '01.15 - 02.00' },
+            { key: 'LUNCH', label: 'Lunch Break', isBreak: true, defTime: '02.00 - 02.40' },
+            { key: 'ACT', label: 'Activity', isBreak: false, defTime: '02.40 - 03.30' },
+            { key: 'P6', label: 'Period 6', isBreak: false, defTime: '03.30 - 04.20' },
+            { key: 'P7', label: 'Period 7', isBreak: false, defTime: '04.20 - 05.10' }
+        ];
+    }
+}
+
+function saveFacultyTtColumns() {
+    localStorage.setItem('faculty_tt_cols_' + _getFacultyTTKey(), JSON.stringify(facultyTtColumns));
+}
+
+window.addFacultyPeriodCol = function() {
+    const newIdx = facultyTtColumns.length + 1;
+    const newKey = 'P' + newIdx + '_' + Date.now().toString().slice(-4);
+    facultyTtColumns.push({
+        key: newKey,
+        label: 'Period ' + newIdx,
+        isBreak: false,
+        defTime: '00.00 - 00.00'
+    });
+    saveFacultyTtColumns();
+    if (window.renderMyTimetable) window.renderMyTimetable();
+};
+
+window.swapFacultyCol = function(idx, dir) {
+    if (idx + dir < 0 || idx + dir >= facultyTtColumns.length) return;
+    const temp = facultyTtColumns[idx];
+    facultyTtColumns[idx] = facultyTtColumns[idx + dir];
+    facultyTtColumns[idx + dir] = temp;
+    saveFacultyTtColumns();
+    if (window.renderMyTimetable) window.renderMyTimetable();
+};
+
+window.removeFacultyCol = function(idx) {
+    if (confirm('Are you sure you want to remove this period?')) {
+        facultyTtColumns.splice(idx, 1);
+        saveFacultyTtColumns();
+        if (window.renderMyTimetable) window.renderMyTimetable();
+    }
+};
+
+window.updateFacultyColLabel = function(idx, val) {
+    facultyTtColumns[idx].label = val;
+    saveFacultyTtColumns();
+};
+
+window.renderMyTimetable = function() {
+    const tbody = document.getElementById('myTimetableBody');
+    if (!tbody) return;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch(e) {}
+    
+    loadFacultyTtColumns();
+    const thead = document.getElementById('myTimetableHead');
+    
+    let thHtml = '<tr><th style="width: 90px">Day</th>';
+    const headers = saved._headers || {};
+    
+    facultyTtColumns.forEach((col, i) => {
+        const timeVal = headers[col.key] || col.defTime;
+        if (col.isBreak && col.key !== 'ACT') {
+            thHtml += `<th class="text-warning position-relative">
+                <div class="d-flex justify-content-between px-1 mb-1">
+                   ${i > 0 ? `<i class="fa-solid fa-caret-left" style="cursor:pointer" onclick="swapFacultyCol(${i}, -1)"></i>` : `<span></span>`}
+                   ${i < facultyTtColumns.length - 1 ? `<i class="fa-solid fa-caret-right" style="cursor:pointer" onclick="swapFacultyCol(${i}, 1)"></i>` : `<span></span>`}
+                </div>
+                ${col.label}<input type="text" id="myTt${col.key}" class="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style="font-size: 0.75rem; padding: 0.2rem" value="${timeVal}" />
+            </th>`;
+        } else {
+            thHtml += `<th class="position-relative">
+                <div class="d-flex justify-content-between px-1 text-muted mb-1">
+                   ${i > 0 ? `<i class="fa-solid fa-caret-left" style="cursor:pointer" onclick="swapFacultyCol(${i}, -1)"></i>` : `<span></span>`}
+                   <i class="fa-solid fa-trash text-danger" style="cursor:pointer" onclick="removeFacultyCol(${i})"></i>
+                   ${i < facultyTtColumns.length - 1 ? `<i class="fa-solid fa-caret-right" style="cursor:pointer" onclick="swapFacultyCol(${i}, 1)"></i>` : `<span></span>`}
+                </div>
+                <input type="text" value="${col.label}" class="form-control form-control-sm bg-transparent border-0 text-white text-center p-0 mb-1" onchange="updateFacultyColLabel(${i}, this.value)" style="font-size: 0.8rem; font-weight: bold;" />
+                <input type="text" id="myTt${col.key}" class="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style="font-size: 0.75rem; padding: 0.2rem" value="${timeVal}" />
+            </th>`;
+        }
+    });
+    thHtml += '</tr>';
+    
+    if (thead) thead.innerHTML = thHtml;
+
+    let html = '';
+    days.forEach(day => {
+        const d = saved[day] || {};
+        const esc = v => String(v || '').replace(/"/g, '&quot;');
+        html += `<tr><td class="align-middle text-white fw-bold">${day}</td>`;
+        
+        facultyTtColumns.forEach(col => {
+            if (col.isBreak && col.key !== 'ACT') {
+                html += `<td class="align-middle text-muted small text-center">${col.label.toUpperCase()}</td>`;
+            } else {
+                html += `<td><input type="text" id="myTt_${day}_${col.key}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d[col.key])}" /></td>`;
+            }
+        });
+        html += `</tr>`;
+    });
+    tbody.innerHTML = html;
+};
+
+window.renderFacultyPersonalTT = function() {
+    const container = document.getElementById('facultyPersonalTTPanel');
+    if (!container) return;
+
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch(e) {}
+    
+    loadFacultyTtColumns();
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const headers = saved._headers || {};
+
+    const hasData = days.some(d => {
+        const day = saved[d];
+        return day && Object.values(day).some(v => v && v.trim());
+    });
+
+    if (!hasData) {
+        container.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="fa-solid fa-calendar-xmark fs-2 mb-2 d-block opacity-50"></i>
+                <p class="mb-1">No personal timetable saved yet.</p>
+                <small>Click <strong class="text-info">YOUR TIMETABLE</strong> in the top bar to feed your schedule.</small>
+            </div>`;
+        return;
+    }
+
+    let html = `<div class="table-responsive"><table class="table table-dark table-bordered table-sm text-center align-middle mb-0" style="table-layout: fixed;"><thead><tr><th style="width: 90px;">Day</th>`;
+    
+    facultyTtColumns.forEach(col => {
+        const timeStr = headers[col.key] || col.defTime;
+        if (col.isBreak && col.key !== 'ACT') {
+            html += `<th class="text-warning">${col.label}<br/><small class="text-muted" style="font-size: 0.75rem;">${timeStr}</small></th>`;
+        } else {
+            html += `<th>${col.label}<br/><small class="text-muted" style="font-size: 0.75rem;">${timeStr}</small></th>`;
+        }
+    });
+    html += `</tr></thead><tbody>`;
+
+    days.forEach(day => {
+        const d = saved[day] || {};
+        let rowHtml = `<tr><td class="text-white fw-bold">${day}</td>`;
+        
+        facultyTtColumns.forEach(col => {
+            if (col.isBreak && col.key !== 'ACT') {
+                rowHtml += `<td class="text-muted small">${col.label.toUpperCase()}</td>`;
+            } else {
+                const val = d[col.key] || '';
+                if (!val.trim()) {
+                    rowHtml += `<td class="text-muted" style="font-size: 0.85rem;">FREE</td>`;
+                } else {
+                    const parts = val.split(',').map(s => s.trim());
+                    if (parts.length >= 3) {
+                        rowHtml += `<td class="text-info fw-bold" style="font-size: 0.85rem;">${parts[1]}<br/><small class="text-white fw-normal">${parts[0]}</small><br/><small class="text-muted">${parts[2]}</small></td>`;
+                    } else if (parts.length === 2) {
+                        rowHtml += `<td class="text-info fw-bold" style="font-size: 0.85rem;">${parts[1]}<br/><small class="text-white fw-normal">${parts[0]}</small></td>`;
+                    } else {
+                        rowHtml += `<td class="text-info fw-bold" style="font-size: 0.85rem;">${parts[0]}</td>`;
+                    }
+                }
+            }
+        });
+        rowHtml += `</tr>`;
+        html += rowHtml;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+};
+
+window.saveMyTimetable = function() {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const data = {};
+    
+    loadFacultyTtColumns();
+
+    data._headers = {};
+    facultyTtColumns.forEach(col => {
+        data._headers[col.key] = (document.getElementById('myTt' + col.key) || {}).value || col.defTime;
+    });
+
+    days.forEach(day => {
+        data[day] = {};
+        facultyTtColumns.forEach(col => {
+            if (!col.isBreak || col.key === 'ACT') {
+                const el = document.getElementById(`myTt_${day}_${col.key}`);
+                data[day][col.key] = el ? el.value.trim() : '';
+            }
+        });
+    });
+
+    localStorage.setItem(_getFacultyTTKey(), JSON.stringify(data));
+
+    if (typeof bootstrap !== 'undefined') {
+        const modalEl = document.getElementById('myTimetableModal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+    }
+    showToast('Success', 'Your timetable has been saved.');
+    if (window.renderFacultyPersonalTT) window.renderFacultyPersonalTT();
+};
+
+
+function exportTimetableCSV() {
+    if (currentUserRole === 'FACULTY') {
+        const uname = String(localStorage.getItem('sece_logged_in_user') || 'faculty').toUpperCase();
+        const ttKey = 'faculty_personal_tt_' + uname.toLowerCase();
+        let saved = {};
+        try { saved = JSON.parse(localStorage.getItem(ttKey) || '{}'); } catch(e) {}
+        
+        loadFacultyTtColumns();
+        
+        let csv = 'Day';
+        facultyTtColumns.forEach(col => {
+            csv += ',' + col.label.replace(/,/g, '');
+        });
+        csv += '\n';
+        
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        days.forEach(day => {
+            const d = saved[day] || {};
+            let row = [day];
+            facultyTtColumns.forEach(col => {
+                if (col.isBreak && col.key !== 'ACT') {
+                    row.push('""');
+                } else {
+                    row.push(`"${(d[col.key] || '').replace(/"/g, '""')}"`);
+                }
+            });
+            csv += row.join(',') + '\n';
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('href', url);
+        a.setAttribute('download', `FACULTY_TIMETABLE_${uname}.csv`);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        showToast('CSV Downloaded!', `Saved FACULTY_TIMETABLE_${uname}.csv spreadsheet.`);
+        return;
+    }
+
+    let csv = 'Day,Period 1,Period 2,Period 3,Period 4,Period 5,Period 6,Period 7\n';
+    const data = timetableData[currentSection] || timetableData['II CSE C'];
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    days.forEach(day => {
+        const periods = data[day] || [];
+        const row = [day, ...periods.map(p => `"${p.sub} (${p.faculty} - ${p.venue})"` )];
+        csv += row.join(',') + '\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `SECE_Timetable_${currentSection}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    showToast('CSV Downloaded!', `Saved SECE_Timetable_${currentSection}.csv spreadsheet.`);
+}

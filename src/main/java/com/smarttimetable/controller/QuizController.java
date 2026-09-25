@@ -103,6 +103,16 @@ public class QuizController {
         }
     }
 
+    @DeleteMapping("/submission/{submissionId}")
+    public ResponseEntity<?> deleteQuizSubmission(@PathVariable Long submissionId) {
+        try {
+            quizService.deleteQuizSubmission(submissionId);
+            return ResponseEntity.ok(Map.of("message", "History deleted successfully."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // Faculty: get all submissions for a quiz (full student details for analytics)
     @GetMapping("/{quizId}/submissions")
     public ResponseEntity<List<QuizSubmission>> getSubmissions(@PathVariable Long quizId) {
@@ -121,5 +131,12 @@ public class QuizController {
     @GetMapping("/student/{studentId}/history")
     public ResponseEntity<List<QuizSubmission>> getStudentQuizHistory(@PathVariable Long studentId) {
         return ResponseEntity.ok(quizService.getStudentQuizHistory(studentId));
+    }
+
+    // Faculty: Delete a quiz completely
+    @DeleteMapping("/{quizId}")
+    public ResponseEntity<Void> deleteQuiz(@PathVariable Long quizId) {
+        quizService.deleteQuiz(quizId);
+        return ResponseEntity.noContent().build();
     }
 }

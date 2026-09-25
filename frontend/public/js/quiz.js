@@ -210,11 +210,16 @@ function injectQuizModals() {
 
                         <!-- RESULTS TAB -->
                         <div class="tab-pane fade" id="fqResultsTab" role="tabpanel">
-                            <div class="mb-3">
-                                <label class="cc-form-label">Select Quiz</label>
-                                <select id="fqQuizSelect" class="form-select cc-form-control" onchange="quizLoadResults(this.value)">
-                                    <option value="">-- Choose a Quiz --</option>
-                                </select>
+                            <div class="mb-3 d-flex gap-2 align-items-end">
+                                <div class="flex-grow-1">
+                                    <label class="cc-form-label">Select Quiz</label>
+                                    <select id="fqQuizSelect" class="form-select cc-form-control" onchange="quizLoadResults(this.value)">
+                                        <option value="">-- Choose a Quiz --</option>
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-outline-danger fw-bold" id="fqDeleteQuizBtn" style="height: 38px; display: none;" onclick="quizDeleteSelected()">
+                                    <i class="fa-solid fa-trash"></i> Delete
+                                </button>
                             </div>
                             <div id="fqResultsBody" class="mt-3"></div>
                         </div>
@@ -681,7 +686,16 @@ window.quizLoadFacultyList = async () => {
 // ── Faculty: Load Results for Selected Quiz ──────────────────────────────────
 window.quizLoadResults = async (quizId) => {
     const body = document.getElementById('fqResultsBody');
-    if (!quizId) { body.innerHTML = ''; return; }
+    const deleteBtn = document.getElementById('fqDeleteQuizBtn');
+    
+    if (!quizId) { 
+        body.innerHTML = ''; 
+        if (deleteBtn) deleteBtn.style.display = 'none';
+        return; 
+    }
+    
+    if (deleteBtn) deleteBtn.style.display = 'block';
+    
     body.innerHTML = '<div class="text-muted">Loading...</div>';
 
     const [allRes, weakRes] = await Promise.all([
@@ -980,31 +994,42 @@ window.openStudentQuizHistoryModal = async () => {
         listEl.innerHTML = '';
         history.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
 
+        window._quizHistoryData = history;
+        
         history.forEach(sub => {
             const quizTitle = sub.quiz ? sub.quiz.title : 'Unknown Quiz';
-            const subject = sub.quiz ? sub.quiz.subjectName : '';
+            const subject = (sub.quiz && sub.quiz.subjectName) ? sub.quiz.subjectName : '';
             const dt = new Date(sub.submittedAt).toLocaleString();
             
+            // Calculate max marks since it might not be explicitly passed
+            let calculatedMaxMarks = 0;
+            if (sub.answers && sub.answers.length > 0) {
+                calculatedMaxMarks = sub.answers.reduce((sum, ans) => sum + (ans.question ? ans.question.marks : 0), 0);
+            }
+            const displayMaxMarks = calculatedMaxMarks > 0 ? calculatedMaxMarks : '?';
+
             let badgeColor = 'bg-danger';
             if (sub.percentage >= 75) badgeColor = 'bg-success';
             else if (sub.percentage >= 50) badgeColor = 'bg-warning text-dark';
 
-            const btn = document.createElement('button');
-            btn.className = 'list-group-item list-group-item-action bg-dark text-white border-secondary mb-2 rounded';
-            btn.innerHTML = `
-                <div class="d-flex w-100 justify-content-between align-items-center">
-                    <div>
-                        <h6 class="mb-1 text-info fw-bold">${quizTitle} <small class="text-muted ms-2">${subject}</small></h6>
+            const item = document.createElement('div');
+            item.className = 'list-group-item list-group-item-action bg-dark text-white border-secondary mb-2 rounded d-flex justify-content-between align-items-center';
+            item.innerHTML = `
+                <div class="d-flex w-100 align-items-center" style="cursor:pointer;" onclick="showQuizHistoryDetailsById(${sub.id})">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1 text-info fw-bold">${quizTitle} ${subject && subject !== 'null' ? `<small class="text-muted ms-2">${subject}</small>` : ''}</h6>
                         <small class="text-muted"><i class="fa-solid fa-calendar me-1"></i> ${dt}</small>
                     </div>
-                    <div class="text-end">
-                        <span class="badge ${badgeColor} fs-6">${sub.totalScore} / ${sub.quiz ? sub.quiz.totalMarks : '-'}</span>
+                    <div class="text-end me-3">
+                        <span class="badge ${badgeColor} fs-6">${sub.totalScore} / ${displayMaxMarks}</span>
                         <div class="small mt-1">${sub.percentage ? sub.percentage.toFixed(1) : '0'}%</div>
                     </div>
                 </div>
+                <button class="btn btn-sm btn-outline-danger" title="Delete History" onclick="deleteQuizHistory(${sub.id}, event)">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
             `;
-            btn.onclick = () => showQuizHistoryDetails(sub);
-            listEl.appendChild(btn);
+            listEl.appendChild(item);
         });
     } catch (e) {
         console.error(e);
@@ -1012,20 +1037,54 @@ window.openStudentQuizHistoryModal = async () => {
     }
 };
 
+window.showQuizHistoryDetailsById = (subId) => {
+    if (!window._quizHistoryData) return;
+    const sub = window._quizHistoryData.find(s => s.id === subId);
+    if (!sub) return;
+    showQuizHistoryDetails(sub);
+};
+
+window.deleteQuizHistory = async (subId, e) => {
+    e.stopPropagation();
+    if (!confirm("Are you sure you want to delete this quiz history?")) return;
+    
+    try {
+        const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
+        const res = await fetchFn(`/api/quizzes/submission/${subId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!res.ok) throw new Error("Failed to delete history");
+        
+        // Refresh the list
+        window.openStudentQuizHistoryModal();
+    } catch (err) {
+        console.error(err);
+        alert("Error deleting quiz history.");
+    }
+};
+
 window.showQuizHistoryDetails = (sub) => {
     document.getElementById('sqHistoryListContainer').style.display = 'none';
     const detailEl = document.getElementById('sqHistoryDetailContent');
     
+    // Calculate max marks
+    let calculatedMaxMarks = 0;
+    if (sub.answers && sub.answers.length > 0) {
+        calculatedMaxMarks = sub.answers.reduce((sum, ans) => sum + (ans.question ? ans.question.marks : 0), 0);
+    }
+    const displayMaxMarks = calculatedMaxMarks > 0 ? calculatedMaxMarks : '?';
+
     let html = `
         <h5 class="text-info fw-bold mb-1">${sub.quiz ? sub.quiz.title : 'Quiz'}</h5>
         <div class="mb-3 text-muted small">Submitted: ${new Date(sub.submittedAt).toLocaleString()}</div>
         <div class="card bg-dark border-secondary mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
-                    <div><strong>Score:</strong> ${sub.totalScore} / ${sub.quiz ? sub.quiz.totalMarks : '-'}</div>
+                    <div><strong>Score:</strong> ${sub.totalScore} / ${displayMaxMarks}</div>
                     <div><strong>Percentage:</strong> ${sub.percentage ? sub.percentage.toFixed(1) : '0'}%</div>
                 </div>
-                ${sub.aiWeaknessAnalysis ? `<hr class="border-secondary"><div class="text-warning small"><strong>AI Feedback:</strong><br/>${sub.aiWeaknessAnalysis.replace(/\n/g, '<br/>')}</div>` : ''}
+                ${sub.aiWeaknessAnalysis ? `<hr class="border-secondary"><div class="text-warning small"><strong>AI Feedback:</strong><br/>${sub.aiWeaknessAnalysis.replace(/\\n/g, '<br/>')}</div>` : ''}
             </div>
         </div>
         <h6 class="fw-bold mb-3 border-bottom border-secondary pb-2">Questions & Answers</h6>
@@ -1054,4 +1113,37 @@ window.showQuizHistoryDetails = (sub) => {
 
     detailEl.innerHTML = html;
     document.getElementById('sqHistoryDetailContainer').style.display = 'block';
+};
+
+// ── Faculty: Delete Quiz ─────────────────────────────────────────────────────
+window.quizDeleteSelected = async () => {
+    const sel = document.getElementById('fqQuizSelect');
+    if (!sel) return;
+    const quizId = sel.value;
+    if (!quizId) {
+        showToast('Error', 'Please select a quiz to delete.');
+        return;
+    }
+    
+    const quizName = sel.options[sel.selectedIndex].text;
+    
+    if (!confirm('Are you sure you want to permanently delete the quiz "' + quizName + '" and ALL its results? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/quizzes/' + quizId, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Success', 'Quiz deleted successfully.');
+            // Refresh the faculty list
+            window.quizLoadFacultyList();
+            document.getElementById('fqResultsBody').innerHTML = '';
+            document.getElementById('fqDeleteQuizBtn').style.display = 'none';
+        } else {
+            showToast('Error', 'Failed to delete quiz.');
+        }
+    } catch (e) {
+        console.error('Delete quiz error:', e);
+        showToast('Error', 'Network error while deleting quiz.');
+    }
 };

@@ -34,6 +34,7 @@ export default function DashboardLayout() {
         const timer = setTimeout(() => {
             if (window.renderStaffAvailability) window.renderStaffAvailability();
             if (window.renderEnrolledStudentsRoster) window.renderEnrolledStudentsRoster();
+            if (window.renderFacultyPersonalTT) window.renderFacultyPersonalTT();
 
             // Re-apply login session so timetable and roles load correctly
             if (location.pathname !== '/login' && location.pathname !== '/') {
@@ -365,50 +366,7 @@ export default function DashboardLayout() {
                     </div>
 
 
-                    {!isAdmin && (
-                        <div className="glass-panel p-3 mb-3">
-                            <div className="row g-3 align-items-center">
 
-                                {location.pathname === "/faculty" && (
-                                    <>
-                                        <div className="col-md-3 col-sm-6" id="deptFilterWrapper">
-                                            <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-building-columns text-primary me-1"></i> Department</label>
-                                            <select id="deptSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.populateSectionSelects?.(); window.onFilterChange?.(); }} >
-                                                <option value="">-- Select Department --</option>
-                                                <option value="CSE">CSE - Computer Science & Engg</option>
-                                                <option value="IT">IT - Information Technology</option>
-                                                <option value="AIDS">AI&DS - Artificial Intelligence & Data Science</option>
-                                                <option value="ECE">ECE - Electronics & Comm Engg</option>
-                                                <option value="EEE">EEE - Electrical & Electronics Engg</option>
-                                                <option value="MECH">MECH - Mechanical Engineering</option>
-                                                <option value="CIVIL">CIVIL - Civil Engineering</option>
-                                                <option value="CSD">CSD - Computer Science & Design</option>
-                                            </select>
-                                        </div>
-
-
-                                        <div className="col-md-2 col-sm-6" id="secFilterWrapper">
-                                            <label className="form-label text-muted fw-semibold small mb-1"><i className="fa-solid fa-layer-group text-info me-1"></i> Section</label>
-                                            <select id="sectionSelect" defaultValue="" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => { window.onFilterChange?.(); }} >
-                                                <option value="CSE_C">II CSE C [SF 04]</option>
-                                                <option value="CSE_A">II CSE A [SF 02]</option>
-                                                <option value="CSE_B">II CSE B [SF 03]</option>
-                                                <option value="IT_A">II IT A [IT 101]</option>
-                                                <option value="AIDS_A">II AI&DS A [AI 201]</option>
-                                                <option value="ECE_A">II ECE A [EC 301]</option>
-                                            </select>
-                                        </div>
-                                        
-                                        <div className="col-md-2 col-sm-6 d-flex align-items-end" id="adminSubmitFilterWrapper">
-                                            <button className="btn btn-sm btn-success w-100 fw-bold" onClick={() => { window.onFilterChange?.(); window.showTtPopup?.(); }}><i className="fa-solid fa-check-circle me-1"></i> Submit</button>
-                                        </div>
-                                    </>
-                                )}
-
-
-                            </div>
-                        </div>
-                    )}
 
 
                             <div id="roleBanner" className="alert alert-info py-2 px-3 border-0 rounded-3 d-flex align-items-center justify-content-between mb-3 shadow-sm">
@@ -2280,6 +2238,9 @@ export default function DashboardLayout() {
                             <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-calendar-user me-2"></i> Feed Your Timetable</h5>
                             <div>
                                 <input type="file" id="importExcelInputFaculty" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importFacultyTimetableExcel && window.importFacultyTimetableExcel(e)} />
+                                <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => window.addFacultyPeriodCol && window.addFacultyPeriodCol()}>
+                                    <i className="fa-solid fa-plus me-1"></i> Add Period
+                                </button>
                                 <button type="button" className="btn btn-sm btn-outline-success me-3" onClick={() => document.getElementById('importExcelInputFaculty').click()}>
                                     <i className="fa-solid fa-file-excel me-1"></i> Import Excel
                                 </button>
@@ -2291,20 +2252,7 @@ export default function DashboardLayout() {
                                 <p className="small text-muted mb-2">Enter Subject / Class / Venue. Format: <code>Subject, Class, Venue</code> or just type it in. Leave blank for FREE.</p>
                                 <div className="table-responsive">
                                     <table className="table table-dark table-bordered border-secondary table-sm text-center align-middle" style={{ tableLayout: "fixed" }}>
-                                        <thead>
-                                            <tr>
-                                                <th style={{ width: "90px" }}>Day</th>
-                                                <th>Period 1<input type="text" id="myTtP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="08.40 - 09.40" /></th>
-                                                <th>Period 2<input type="text" id="myTtP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="09.40 - 10.40" /></th>
-                                                <th>Period 3<input type="text" id="myTtP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="11.00 - 12.00" /></th>
-                                                <th className="text-warning">Tea Break<input type="text" id="myTtTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="12.00 - 12.15" /></th>
-                                                <th>Period 4<input type="text" id="myTtP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="12.15 - 01.15" /></th>
-                                                <th>Period 5<input type="text" id="myTtP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="01.15 - 02.00" /></th>
-                                                <th className="text-warning">Lunch Break<input type="text" id="myTtLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="02.00 - 02.40" /></th>
-                                                <th className="text-warning">Activity<input type="text" id="myTtAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="02.40 - 03.30" /></th>
-                                                <th>Period 6<input type="text" id="myTtP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="03.30 - 04.20" /></th>
-                                                <th>Period 7<input type="text" id="myTtP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="04.20 - 05.10" /></th>
-                                            </tr>
+                                        <thead id="myTimetableHead">
                                         </thead>
                                         <tbody id="myTimetableBody">
                                             {/* Generated by JS */}
