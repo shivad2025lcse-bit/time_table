@@ -748,7 +748,9 @@ window.quizLoadResults = async (quizId) => {
     // ── Per-student row with precision/accuracy ───────────────────────────────
     const tableRows = all.map(r => {
         const pct = r.percentage != null ? r.percentage.toFixed(1) : '0.0';
-        const name = r.student ? (r.student.studentName || ('ID:' + r.student.id)) : 'Unknown';
+        const reg = r.student ? (r.student.registerNumber || r.student.id) : '?';
+        const n = r.student ? (r.student.name || r.student.studentName || r.student.firstName || 'Unknown') : 'Unknown';
+        const name = `${reg} - ${n}`;
         // Compute per-student answer accuracy
         let correct = 0, totalQ = 0;
         if (r.answers && r.answers.length > 0) {
@@ -772,13 +774,19 @@ window.quizLoadResults = async (quizId) => {
 
     // ── Class performance chart data ──────────────────────────────────────────
     const chartId = 'fqClassChart_' + quizId;
-    const studentNames = all.map(r => r.student ? (r.student.studentName || 'ID:'+r.student.id) : 'Unknown');
+    const studentNames = all.map(r => {
+        const reg = r.student ? (r.student.registerNumber || r.student.id) : '?';
+        const n = r.student ? (r.student.name || r.student.studentName || r.student.firstName || 'Unknown') : 'Unknown';
+        return `${reg} - ${n}`;
+    });
     const studentPcts  = all.map(r => +(r.percentage || 0).toFixed(1));
 
     const weakCards = weak.length === 0
         ? '<p class="text-success fw-bold"><i class="fa-solid fa-trophy me-1"></i> All students scored 50% or above!</p>'
         : weak.map(r => {
-            const name = r.student ? (r.student.studentName || ('ID:' + r.student.id)) : 'Unknown';
+            const reg = r.student ? (r.student.registerNumber || r.student.id) : '?';
+            const n = r.student ? (r.student.name || r.student.studentName || r.student.firstName || 'Unknown') : 'Unknown';
+            const name = `${reg} - ${n}`;
             const pct = r.percentage != null ? r.percentage.toFixed(1) : '0.0';
             let correct = 0, totalQ = 0;
             if (r.answers && r.answers.length > 0) {
