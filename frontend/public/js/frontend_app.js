@@ -4789,7 +4789,7 @@ window._credDataCache = [];
 window._credCurrentRole = 'STUDENT';
 
 window.renderCredentialsList = async function() {
-    const tbody = document.getElementById('credTableBody');
+    const tbody = document.getElementById('credentialsTableBody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading credentials...</td></tr>';
     
@@ -4860,7 +4860,7 @@ window.switchCredTab = function(roleType) {
 };
 
 window.filterCredentials = function() {
-    const tbody = document.getElementById('credTableBody');
+    const tbody = document.getElementById('credentialsTableBody');
     if (!tbody || !window._credDataCache) return;
     
     const input = document.getElementById('credSearchInput');
