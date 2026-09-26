@@ -152,7 +152,7 @@ async function handleRoleLogin(e) {
 
         if (res.ok) {
             const data = await res.json();
-            // Backend login success â€” store token and user info
+            // Backend login success -” store token and user info
             localStorage.setItem('jwt_token', data.token);
             localStorage.setItem('user_info', JSON.stringify(data));
             localStorage.setItem('sece_logged_in_user', username);
@@ -183,7 +183,7 @@ async function handleRoleLogin(e) {
             }
             return;
         }
-        // Backend returned 401/403 â€” fall through to local validation below
+        // Backend returned 401/403 -” fall through to local validation below
     } catch (networkErr) {
         console.warn('Backend unreachable, falling back to local auth', networkErr);
     }
@@ -457,70 +457,14 @@ function clearSavedStudents() {
     showToast('Student Records Cleared', 'All locally saved student records were removed.');
 }
 
+
 // System State
 let currentUserRole = null; // Set only after successful login
 let currentDept = localStorage.getItem('sece_last_viewed_dept') || '';
 let currentSection = localStorage.getItem('sece_last_viewed_section') || '';
 
 // Official Data Extracted from Uploaded Schedule Image (II CSE C)
-const DEFAULT_TIMETABLE_DATA = {
-    'II CSE C': {
-        'Monday': [
-            { sub: 'SE', code: 'U23IT481', faculty: 'Dr.S.K.Harikarthick', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'AIML LAB', code: 'U23AM495', faculty: 'Dr.N.Saranya / Dr.M.Praveen', venue: 'Intel AI Lab', cat: 'cat-lab' },
-            { sub: 'AIML LAB', code: 'U23AM495', faculty: 'Dr.N.Saranya / Dr.M.Praveen', venue: 'Intel AI Lab', cat: 'cat-lab' },
-            { sub: 'JAVA', code: 'U23CS491', faculty: 'Mr.M.Karthickraja', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'DAA', code: 'U23CS403', faculty: 'Mr.R.Karthick', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'DM', code: 'U23MA204', faculty: 'Dr.N.Murugavelli', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'SE', code: 'U23IT481', faculty: 'Dr.S.K.Harikarthick', venue: 'SF 04', cat: 'cat-theory' }
-        ],
-        'Tuesday': [
-            { sub: 'JAVA', code: 'U23CS491', faculty: 'Mr.M.Karthickraja', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'DBMS', code: 'U23CS404', faculty: 'Ms.E.Saranya', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'AIML', code: 'U23AM495', faculty: 'Dr.N.Saranya', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'JAVA LAB', code: 'U23CS491', faculty: 'Mr.M.Karthickraja / Mr.B.Saravanan', venue: 'Full Stack Lab', cat: 'cat-lab' },
-            { sub: 'JAVA LAB', code: 'U23CS491', faculty: 'Mr.M.Karthickraja / Mr.B.Saravanan', venue: 'Full Stack Lab', cat: 'cat-lab' },
-            { sub: 'DM', code: 'U23MA204', faculty: 'Dr.N.Murugavelli', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'UHV', code: 'U23HV101', faculty: 'Dr.M.P.Sindhu', venue: 'SF 04', cat: 'cat-theory' }
-        ],
-        'Wednesday': [
-            { sub: 'DAA', code: 'U23CS403', faculty: 'Mr.R.Karthick', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'SE LAB', code: 'U23IT481', faculty: 'Dr.S.K.Harikarthick / Mr.P.Arunprakash', venue: 'Intel AI Lab', cat: 'cat-lab' },
-            { sub: 'SE LAB', code: 'U23IT481', faculty: 'Dr.S.K.Harikarthick / Mr.P.Arunprakash', venue: 'Intel AI Lab', cat: 'cat-lab' },
-            { sub: 'ALT', code: 'U23EM753', faculty: 'Placement Team', venue: 'SF 05', cat: 'cat-alt' },
-            { sub: 'ALT', code: 'U23EM753', faculty: 'Placement Team', venue: 'SF 05', cat: 'cat-alt' },
-            { sub: 'COE', code: 'COE2026', faculty: 'Domain Experts', venue: 'COE Lab', cat: 'cat-project' },
-            { sub: 'COE', code: 'COE2026', faculty: 'Domain Experts', venue: 'COE Lab', cat: 'cat-project' }
-        ],
-        'Thursday': [
-            { sub: 'AIML', code: 'U23AM495', faculty: 'Dr.N.Saranya', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'DAA LAB', code: 'U23CS453', faculty: 'Mr.R.Karthick / Ms.Rajeswari', venue: 'Full Stack Lab', cat: 'cat-lab' },
-            { sub: 'DAA LAB', code: 'U23CS453', faculty: 'Mr.R.Karthick / Ms.Rajeswari', venue: 'Full Stack Lab', cat: 'cat-lab' },
-            { sub: 'DM', code: 'U23MA204', faculty: 'Dr.N.Murugavelli', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'SS', code: 'U23SS101', faculty: 'Placement Team', venue: 'SF 04', cat: 'cat-alt' },
-            { sub: 'DBMS LAB', code: 'U23CS454', faculty: 'Ms.E.Saranya / Dr.K.Suresh kumar', venue: 'Cloud & DevOps Lab', cat: 'cat-lab' },
-            { sub: 'DBMS LAB', code: 'U23CS454', faculty: 'Ms.E.Saranya / Dr.K.Suresh kumar', venue: 'Cloud & DevOps Lab', cat: 'cat-lab' }
-        ],
-        'Friday': [
-            { sub: 'DM', code: 'U23MA204', faculty: 'Dr.N.Murugavelli', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'LIB', code: 'LIB101', faculty: 'Librarian', venue: 'Library', cat: 'cat-theory' },
-            { sub: 'JAVA', code: 'U23CS491', faculty: 'Mr.M.Karthickraja', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'DAA LAB', code: 'U23CS453', faculty: 'Mr.R.Karthick / Ms.Rajeswari', venue: 'Full Stack Lab', cat: 'cat-lab' },
-            { sub: 'DAA LAB', code: 'U23CS453', faculty: 'Mr.R.Karthick / Ms.Rajeswari', venue: 'Full Stack Lab', cat: 'cat-lab' },
-            { sub: 'DM', code: 'U23MA204', faculty: 'Dr.N.Murugavelli', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'DBMS', code: 'U23CS404', faculty: 'Ms.E.Saranya', venue: 'SF 04', cat: 'cat-theory' }
-        ],
-        'Saturday': [
-            { sub: 'DBMS', code: 'U23CS404', faculty: 'Ms.E.Saranya', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'JAVA PROJECT', code: 'U23CS491', faculty: 'Mr.M.Karthickraja', venue: 'Full Stack Lab', cat: 'cat-project' },
-            { sub: 'JAVA PROJECT', code: 'U23CS491', faculty: 'Mr.M.Karthickraja', venue: 'Full Stack Lab', cat: 'cat-project' },
-            { sub: 'DAA', code: 'U23CS403', faculty: 'Mr.R.Karthick', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'TWM', code: 'U23TWM01', faculty: 'Wellness Dept', venue: 'SF 04', cat: 'cat-theory' },
-            { sub: 'AIML Project', code: 'U23AM495', faculty: 'Dr.N.Saranya', venue: 'Intel AI Lab', cat: 'cat-project' },
-            { sub: 'AIML Project', code: 'U23AM495', faculty: 'Dr.N.Saranya', venue: 'Intel AI Lab', cat: 'cat-project' }
-        ]
-    }
-};
+const DEFAULT_TIMETABLE_DATA = {};
 
 // =========================
 // PERSISTENT TIMETABLE EDITS
@@ -613,7 +557,7 @@ const courseReferenceList = [
     { short: 'DVT', code: 'P23CS513 Data Visualization Techniques', faculty: 'Dr.A.Anandaraj, AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
     { short: 'BDA', code: 'P23CS521 Big Data Analytics', faculty: 'Dr.A.Sarfaraz Ahmed,AP/CSE', venue: '1CloudHub', cat: 'PE', credits: 3, hrs: '4' },
     { short: 'TQM', code: 'P23CS507 Total Quality Management', faculty: 'Dr.R.K.Suresh, Prof/MECH', venue: '1CloudHub', cat: 'OE', credits: 3, hrs: '3' },
-    { short: 'PW', code: 'P23CS602 Project Work Ã¢â‚¬â€œ Phase I', faculty: 'Dr.S.Ananthi, AP/CSE', venue: '1CloudHub', cat: 'PW', credits: 6, hrs: '14+7*' },
+    { short: 'PW', code: 'P23CS602 Project Work -œ Phase I', faculty: 'Dr.S.Ananthi, AP/CSE', venue: '1CloudHub', cat: 'PW', credits: 6, hrs: '14+7*' },
     { short: 'LIB', code: 'Library Hour', faculty: '-', venue: 'Library', cat: '-', credits: '-', hrs: '1*' },
     { short: 'TWM', code: 'Tutor Ward Meeting', faculty: 'Dr.S.Ananthi, AP/CSE', venue: '1CloudHub', cat: '-', credits: '-', hrs: '1' }
 ];
@@ -789,7 +733,7 @@ function substitutionKey(dateStr, section, day, pIdx) {
 }
 
 // Only returns a substitution if "day" is today's actual weekday AND the stored
-// date is today's exact date Ã¢â‚¬â€ so it naturally stops applying tomorrow, and next
+// date is today's exact date - so it naturally stops applying tomorrow, and next
 // week's occurrence of the same weekday is unaffected.
 function getSubstitutionFor(section, day, pIdx) {
     if (day !== getTodayDayName()) return null;
@@ -905,7 +849,8 @@ function populateSubPeriodOptions() {
     dayData.forEach((p, idx) => {
         const opt = document.createElement('option');
         opt.value = idx;
-        opt.text = `Period ${idx + 1} Ã¢â‚¬â€ ${p.sub} (${p.faculty})`;
+        const subName = p.sub && p.sub.trim() !== '' && p.sub !== '-' ? p.sub.trim() : `FREE (Period ${idx + 1})`;
+        opt.text = subName;
         select.appendChild(opt);
     });
     onSubPeriodChange();
@@ -937,7 +882,7 @@ async function handleArrangeSubstitution(e) {
     }
     const todayName = getTodayDayName();
     if (todayName === 'Sunday') {
-        alert('No classes scheduled on Sunday Ã¢â‚¬â€ nothing to substitute.');
+        alert('No classes scheduled on Sunday - nothing to substitute.');
         return;
     }
     const pIdx = parseInt(document.getElementById('subPeriodSelect').value);
@@ -1016,7 +961,7 @@ function renderTodaysSubstitutions() {
 
     list.innerHTML = relevant.map(([key, s]) => `
         <li class="list-group-item bg-dark text-white d-flex justify-content-between align-items-center small">
-            <span>Period ${s.pIdx + 1}: <strong>${s.substituteFaculty}</strong> covering for ${s.originalFaculty}${s.reason ? ' Ã¢â‚¬â€ ' + s.reason : ''}</span>
+            <span>Period ${s.pIdx + 1}: <strong class='text-danger'>${s.originalFaculty} is Absent</strong>. <strong class='text-success'>${s.substituteFaculty}</strong> is substituted.${s.reason ? ' - ' + s.reason : ''}</span>
             ${canManageSubstitutions() ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="cancelSubstitution('${key}')">Cancel</button>` : ''}
         </li>
     `).join('');
@@ -1184,9 +1129,9 @@ async function markStaffOnLeave(name, reason) {
         period: p.pIdx + 1,
         section: p.section,
         originalFaculty: name,
-        staff: 'Ã¢â‚¬â€ (Coverage Needed)',
-        subject: reason + ' Ã¢â‚¬â€ Period open for substitution.',
-        reason: reason + ' Ã¢â‚¬â€ Period open for substitution.',
+        staff: '- (Coverage Needed)',
+        subject: reason + ' - Period open for substitution.',
+        reason: reason + ' - Period open for substitution.',
         source: 'leave'
     })));
 
@@ -1197,7 +1142,7 @@ async function markStaffOnLeave(name, reason) {
 
     showToast('Marked as On Leave',
         periods.length
-            ? `${name} is on leave today. ${periods.length} period(s) flagged for coverage Ã¢â‚¬â€ other staff have been notified.`
+            ? `${name} is on leave today. ${periods.length} period(s) flagged for coverage - other staff have been notified.`
             : `${name} is marked on leave today (no periods scheduled).`
     );
 }
@@ -1422,7 +1367,7 @@ function renderCoverageRequests() {
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                 <div>
                     ${isMyLeave ? '<span class="badge bg-warning text-dark me-1">You</span>' : ''}
-                    <strong>${r.absentStaff}</strong> is on leave Ã¢â‚¬â€ Period ${r.pIdx + 1} (${r.subject}), ${r.section}, ${r.venue}.
+                    <strong>${r.absentStaff}</strong> is on leave - Period ${r.pIdx + 1} (${r.subject}), ${r.section}, ${r.venue}.
                     ${r.reason ? '<br><span class="text-muted">Reason: ' + r.reason + '</span>' : ''}
                 </div>
                 <div class="text-end">${statusBadge}<br>${actions}${cancelBtn}</div>
@@ -1445,7 +1390,7 @@ window.addEventListener('storage', (e) => {
             const oldReq = oldData[key];
             const newReq = newData[key];
             if (!oldReq && newReq && newReq.status === 'OPEN') {
-                showToast('Staff Leave Alert', `${newReq.absentStaff} is on leave today Ã¢â‚¬â€ Period ${newReq.pIdx + 1} (${newReq.subject}), ${newReq.section} needs coverage.`);
+                showToast('Staff Leave Alert', `${newReq.absentStaff} is on leave today - Period ${newReq.pIdx + 1} (${newReq.subject}), ${newReq.section} needs coverage.`);
             } else if (oldReq && newReq && oldReq.status !== newReq.status) {
                 if (newReq.status === 'REQUESTED' && newReq.absentStaff === myName) {
                     showToast('Coverage Request Received', `${newReq.requestedBy} wants to cover your Period ${newReq.pIdx + 1} (${newReq.subject}) today. Please accept or decline.`);
@@ -1490,14 +1435,83 @@ function renderAdminLeaveNotifications() {
     if (!list) return;
 
     const dateStr = todayDateStr();
-
     const todaysLeaves = {};
-    Object.values(coverageRequests).forEach(req => {
-        if (req.date === dateStr && req.absentStaff) {
-            if (!todaysLeaves[req.absentStaff]) todaysLeaves[req.absentStaff] = [];
-            todaysLeaves[req.absentStaff].push(req);
-        }
-    });
+
+    // 1. Load from coverageRequests
+    if (typeof coverageRequests !== 'undefined') {
+        Object.values(coverageRequests).forEach(req => {
+            if (req.date === dateStr && req.absentStaff) {
+                if (!todaysLeaves[req.absentStaff]) todaysLeaves[req.absentStaff] = [];
+                todaysLeaves[req.absentStaff].push({
+                    pIdx: req.pIdx,
+                    section: req.section,
+                    status: req.status,
+                    requestedBy: req.requestedBy
+                });
+            }
+        });
+    }
+
+    // 2. Load from substitutions (direct admin edits)
+    if (typeof substitutions !== 'undefined') {
+        Object.values(substitutions).forEach(sub => {
+            if (sub.date === dateStr && sub.originalFaculty) {
+                if (!todaysLeaves[sub.originalFaculty]) todaysLeaves[sub.originalFaculty] = [];
+                const exists = todaysLeaves[sub.originalFaculty].find(r => parseInt(r.pIdx) === parseInt(sub.pIdx) && r.section === sub.section);
+                if (!exists) {
+                    todaysLeaves[sub.originalFaculty].push({
+                        pIdx: sub.pIdx,
+                        section: sub.section,
+                        status: 'ACCEPTED',
+                        requestedBy: sub.substituteFaculty
+                    });
+                } else {
+                    exists.status = 'ACCEPTED';
+                    exists.requestedBy = sub.substituteFaculty;
+                }
+            }
+        });
+    }
+
+    // 3. Load from periodNotifications (API fallback)
+    if (typeof loadPeriodNotifications === 'function') {
+        const notifs = loadPeriodNotifications().filter(n => n.date === dateStr);
+        notifs.forEach(n => {
+            // Even if originalFaculty is missing (e.g. manual entry without absent staff), we want to show it.
+            let fac = n.originalFaculty;
+            if (!fac || fac.trim() === '') {
+                const pIdx = parseInt(n.period) - 1;
+                const sec = n.section || (typeof currentSection !== 'undefined' ? currentSection : 'II CSE C');
+                let dayName = n.day;
+                if (!dayName) {
+                    const daysArr = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    const dObj = new Date(n.date);
+                    if (!isNaN(dObj.getTime())) dayName = daysArr[dObj.getDay()];
+                }
+                
+                if (sec && dayName && timetableData[sec] && timetableData[sec][dayName] && timetableData[sec][dayName][pIdx]) {
+                    fac = timetableData[sec][dayName][pIdx].faculty;
+                }
+                if (!fac || fac.trim() === '' || fac === '-') {
+                    fac = 'Unknown/Vacant Faculty';
+                }
+            }
+            if (!todaysLeaves[fac]) todaysLeaves[fac] = [];
+            const pIdxVal = parseInt(n.period) - 1;
+            const exists = todaysLeaves[fac].find(r => parseInt(r.pIdx) === pIdxVal && (r.section === n.section || !n.section));
+            if (!exists) {
+                todaysLeaves[fac].push({
+                    pIdx: pIdxVal,
+                    section: n.section || 'All',
+                    status: n.staff ? 'ACCEPTED' : 'OPEN',
+                    requestedBy: n.staff
+                });
+            } else if (n.staff) {
+                exists.status = 'ACCEPTED';
+                exists.requestedBy = n.staff;
+            }
+        });
+    }
 
     const staffNames = Object.keys(todaysLeaves);
     if (staffNames.length === 0) {
@@ -1507,10 +1521,29 @@ function renderAdminLeaveNotifications() {
 
     let html = '<ul class="list-group list-group-flush">';
     staffNames.forEach(staff => {
-        const periods = todaysLeaves[staff].map(r => `Period ${parseInt(r.pIdx) + 1} (${r.section})`).join(', ');
+        // deduplicate identical periods for the same staff
+        const uniquePeriods = [];
+        todaysLeaves[staff].forEach(r => {
+            if (!uniquePeriods.find(x => x.pIdx === r.pIdx && x.section === r.section)) {
+                uniquePeriods.push(r);
+            }
+        });
+
+        const periodsDetails = uniquePeriods.sort((a,b) => parseInt(a.pIdx) - parseInt(b.pIdx)).map(r => {
+            let detail = `Period ${parseInt(r.pIdx) + 1} (${r.section})`;
+            if (r.status === 'ACCEPTED' && r.requestedBy) {
+                detail += ` - <span class="text-success fw-bold">Substituted by ${r.requestedBy}</span>`;
+            } else if (r.status === 'REQUESTED' && r.requestedBy) {
+                detail += ` - <span class="text-warning">Requested by ${r.requestedBy}</span>`;
+            } else {
+                detail += ` - <span class="text-danger">Pending Substitution</span>`;
+            }
+            return detail;
+        }).join('<br>');
+
         html += `<li class="list-group-item bg-dark text-white border-secondary">
             <strong class="text-danger"><i class="fa-solid fa-user-xmark me-2"></i> ${staff}</strong><br>
-            <small class="text-muted">Absent for: ${periods}</small>
+            <div class="mt-2 small">${periodsDetails}</div>
         </li>`;
     });
     html += '</ul>';
@@ -1519,9 +1552,70 @@ function renderAdminLeaveNotifications() {
 
 function renderTimetableGrid() {
     const tbody = document.getElementById('ttGridBody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    // --- Custom Manual Override for Student Timetable ---
+    let secString = typeof currentSection !== 'undefined' ? currentSection.replace(/_/g, ' ') : '';
+    if (!secString) {
+        let thText = document.getElementById('ttTitleHeader')?.innerText || '';
+        let match = thText.match(/\(([^)]+)\)/);
+        if (match) secString = match[1].split('-')[0].trim();
+    }
+    
+    if (secString) {
+        try {
+            const manualData = JSON.parse(localStorage.getItem('class_tt_' + secString));
+            const manualCols = JSON.parse(localStorage.getItem('mc_tt_cols_' + secString));
+            if (manualData && manualCols) {
+                // We have a manual override grid! Let's render it directly and return.
+                
+                // Update headers if any
+                const thead = tbody.parentElement.querySelector('thead tr');
+                if (thead && manualCols.length > 0) {
+                    let thHtml = '<th style="width: 100px">Day Order</th>';
+                    manualCols.forEach(col => {
+                        const val = manualData._headers ? manualData._headers[col.key] || col.defTime : col.defTime;
+                        if (col.isBreak && col.key !== 'ACT') {
+                            thHtml += `<th class="text-warning text-center" style="width: 35px; line-height: 1.2; padding: 0.25rem">${val.replace(' - ', '<br/>-<br/>')}</th>`;
+                        } else {
+                            thHtml += `<th>${col.label}<br /><small class="text-dim">${val}</small></th>`;
+                        }
+                    });
+                    thead.innerHTML = thHtml;
+                }
+                
+                let html = '';
+                days.forEach(day => {
+                    html += `<tr><td class="fw-bold">${day}</td>`;
+                    const dayData = manualData[day] || {};
+                    manualCols.forEach(col => {
+                        if (col.isBreak && col.key !== 'ACT') {
+                            html += `<td class="text-warning small align-middle vertical-text" style="writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: 2px;">${col.label.toUpperCase()}</td>`;
+                        } else {
+                            const val = dayData[col.key] || 'FREE';
+                            let cssClass = 'text-dim';
+                            if (val !== 'FREE') {
+                                if (val.includes('Lab') || val.includes('LAB')) cssClass = 'text-info';
+                                else cssClass = 'text-success';
+                            }
+                            html += `<td>
+                                <div class="fw-bold ${cssClass}">${val}</div>
+                            </td>`;
+                        }
+                    });
+                    html += `</tr>`;
+                });
+                tbody.innerHTML = html;
+                return; // SKIP the rest of the function!
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    }
+    // --- End Custom Manual Override ---
 
     let data = {};
     if (window.currentTimetableEntries && window.currentTimetableEntries.length > 0) {
@@ -1745,7 +1839,7 @@ function createCell(day, pIdx, pData) {
             <span class="slot-badge">${pData.sub}</span>
             <span class="slot-subtext">${sub.substituteFaculty}</span>
             <span class="slot-venue">${pData.venue}</span>
-            <span class="substituted-badge">Substitute Ã¢â‚¬â€ Today Only</span>
+            <span class="substituted-badge">Substitute - Today Only</span>
             ${isEditable ? '<button class="btn btn-outline-warning btn-sm mt-2 py-0 px-2" style="font-size: 0.75rem; border-radius: 4px;" onclick="openEditPeriodModal(\'' + day + '\', ' + pIdx + ', ' + JSON.stringify(pData).replace(/"/g, '&quot;') + ')"><i class="fa-solid fa-pen-to-square me-1"></i>Edit</button>' : ''}
         `;
     } else {
@@ -1781,6 +1875,7 @@ function resetTimetableEdits() {
 // Render Course Reference Table
 function renderCourseRefTable() {
     const tbody = document.getElementById('courseRefBody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     courseReferenceList.forEach(item => {
@@ -1954,7 +2049,7 @@ function switchRole(role, silent = false) {
         if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.add('d-none');
         if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
     } else { // STUDENT
-        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.remove('d-none');
+        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.add('d-none');
         if (referenceTableArea) referenceTableArea.classList.add('d-none');
         if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.remove('d-none');
         if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
@@ -2124,6 +2219,7 @@ function switchRole(role, silent = false) {
         if (ayEditIcon) ayEditIcon.classList.add('d-none');
     }
 
+    const targetSec = currentSection || "";
     window.updateBannerHeaders(targetSec);
 
     // Standard dashboard updates
@@ -2300,7 +2396,10 @@ function savePeriodChanges() {
         showToast('Temporary Override Saved!', `Assigned ${faculty} to Period ${pIdx + 1} today only. SMS sent to students.`);
     } else {
         if (!timetableData[currentSection]) {
-            timetableData[currentSection] = JSON.parse(JSON.stringify(DEFAULT_TIMETABLE_DATA['II CSE C']));
+            timetableData[currentSection] = {};
+            ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].forEach(day => {
+                timetableData[currentSection][day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
+            });
         }
         const originalSlot = timetableData[currentSection][day] && timetableData[currentSection][day][pIdx]
             ? JSON.parse(JSON.stringify(timetableData[currentSection][day][pIdx])) : null;
@@ -2795,7 +2894,7 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
     const subtitle = document.getElementById('classAdvisorViewSubtitle');
     if (!body || !subtitle) return;
 
-    subtitle.innerText = `${faculty.displayName || faculty.name} â€” Class Advisor for ${section}`;
+    subtitle.innerText = `${faculty.displayName || faculty.name} -” Class Advisor for ${section}`;
     body.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-info" role="status"></div></div>';
 
     try {
@@ -4165,7 +4264,7 @@ function handleNotificationRegister(e) {
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
 
-    showToast('Registration Saved!', `${name} will get alerts at ${email} & ${phone}. Saved â€” visible next time you log in.`);
+    showToast('Registration Saved!', `${name} will get alerts at ${email} & ${phone}. Saved -” visible next time you log in.`);
 }
 
 // Render the "My Notifications" status panel + bell button label
@@ -4189,7 +4288,7 @@ function renderNotificationStatus() {
         if (record.prefs?.wednesdayALT) activePrefs.push('Wednesday ALT reminder');
         panel.className = 'alert alert-success py-2 px-3 border-0 rounded-3 mb-3 shadow-sm small';
         panel.innerHTML = `<i class="fa-solid fa-bell-on me-2"></i>
-            <strong>Notifications ON</strong> for ${record.name} â€” ${record.email} / ${record.phone}.
+            <strong>Notifications ON</strong> for ${record.name} -” ${record.email} / ${record.phone}.
             ${activePrefs.length ? 'Subscribed: ' + activePrefs.join(', ') + '.' : ''}
             <a href="#" class="ms-2" onclick="event.preventDefault(); openNotificationModal();">Update</a>`;
     } else {
@@ -4310,7 +4409,7 @@ function downloadTimetablePNG() {
 /* replaced */
 
 // =============================================
-// PERIOD NOTIFICATIONS â€” Backend API Storage
+// PERIOD NOTIFICATIONS -” Backend API Storage
 // Data is persisted to the database so ALL
 // users (students, faculty, admin) see updates.
 // =============================================
@@ -4453,16 +4552,41 @@ async function renderPeriodNotifications() {
         const isLeave = n.source === 'leave';
         const canRemove = (currentUserRole === 'ADMIN' || currentUserRole === 'FACULTY');
 
-        let facDisplay = '';
-        if (isLeave) {
-            facDisplay = `<span class="text-danger fw-bold">${n.originalFaculty}<br><span class="badge bg-danger mt-1">On Leave</span></span>`;
-        } else if (n.source === 'manual') {
-            facDisplay = `<strong>${n.staff || '-'}</strong>`;
-        } else {
-            facDisplay = `<span class="text-muted text-decoration-line-through">${n.originalFaculty || 'Unknown'}</span><br><i class="fa-solid fa-arrow-down text-warning my-1"></i><br><strong class="text-success">${n.staff}</strong>`;
+        const secStr = n.section || (typeof currentSection !== 'undefined' ? currentSection : 'II CSE C') || '-';
+        let dayName = n.day;
+        if (!dayName) {
+            const daysArr = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dObj = new Date(n.date);
+            if (!isNaN(dObj.getTime())) dayName = daysArr[dObj.getDay()];
+        }
+        const pIdx = parseInt(n.period) - 1;
+        let actualSubject = n.subject || n.reason || '-';
+        let actualFaculty = n.originalFaculty;
+
+        if (secStr !== '-' && dayName && timetableData[secStr] && timetableData[secStr][dayName] && timetableData[secStr][dayName][pIdx]) {
+            const slot = timetableData[secStr][dayName][pIdx];
+            if (!actualFaculty || actualFaculty === 'Unknown') actualFaculty = slot.faculty;
+            if (actualSubject === 'Substitution' || actualSubject === '-' || actualSubject.includes('Faculty/Admin changed')) {
+                actualSubject = slot.sub;
+            }
         }
 
-        const secStr = n.section || currentSection || '-';
+        if (!actualFaculty || actualFaculty === '-') actualFaculty = 'Unknown/Vacant Faculty';
+
+        let facDisplay = '';
+        const staffLogin = n.staff && typeof buildGeneratedUsername === 'function' ? buildGeneratedUsername(n.staff) : '';
+        const staffDisp = n.staff ? `${n.staff} <br><small class="text-muted" style="font-size:0.7rem;">(ID: ${staffLogin})</small>` : '-';
+
+        if (actualFaculty === 'Unknown/Vacant Faculty') {
+            facDisplay = `<span class="text-success fw-bold">Period Handled By:<br>${staffDisp}</span>`;
+        } else if (isLeave) {
+            facDisplay = `<span class="text-danger fw-bold">${actualFaculty}<br><span class="badge bg-danger mt-1">On Leave / Absent</span></span>`;
+        } else if (n.source === 'manual') {
+            facDisplay = `<strong>${staffDisp}</strong>`;
+        } else {
+            facDisplay = `<span class="text-danger fw-bold">${actualFaculty}<br><span class="badge bg-danger mt-1">Absent</span></span><br><i class="fa-solid fa-arrow-down text-warning my-1"></i><br><span class="text-success fw-bold">Substituted By:<br>${staffDisp}</span>`;
+        }
+
         let year = '-', dept = '-', sec = '-';
         if (secStr !== '-' && secStr !== 'All') {
             const parts = secStr.split(' ');
@@ -4484,7 +4608,7 @@ async function renderPeriodNotifications() {
         <tr class="align-middle">
             <td class="fw-bold">${n.day}<br><small class="text-muted">${n.date}</small></td>
             <td><strong>${n.period}</strong></td>
-            <td>${n.subject || n.reason || '-'}</td>
+            <td>${actualSubject}</td>
             <td>${facDisplay}</td>
             <td>${dept}</td>
             <td>${year}</td>
@@ -4655,16 +4779,13 @@ window.setAsWednesdayALT = setAsWednesdayALT;
 window.savePeriodChanges = savePeriodChanges;
 window.quickAssignWednesdayALT = quickAssignWednesdayALT;
 window.showTtPopup = function() {
-    if (!currentSection || currentSection === '') {
-        alert('Please select a Department and Section from the dropdowns first.');
-        return;
-    }
     const wrapper = document.getElementById('ttPopupOverlayWrapper');
-    const closeBtn = document.getElementById('closeTtPopupBtn');
-    if (wrapper && closeBtn) {
+    if (wrapper) {
         wrapper.classList.remove('d-none');
-        wrapper.classList.add('tt-fullscreen-modal');
-        closeBtn.classList.remove('d-none');
+        wrapper.classList.remove('tt-fullscreen-modal'); // ensure it's inline
+        // Hide the fixed close button since we will add an inline one
+        const closeBtn = document.getElementById('closeTtPopupBtn');
+        if (closeBtn) closeBtn.classList.add('d-none');
     }
 };
 window.closeTtPopup = function() {
@@ -4673,8 +4794,8 @@ window.closeTtPopup = function() {
     if (wrapper && closeBtn) {
         wrapper.classList.remove('tt-fullscreen-modal');
         closeBtn.classList.add('d-none');
-        const role = getEffectiveRole();
-        if (role !== 'STUDENT') {
+        const role = typeof getEffectiveRole === 'function' ? getEffectiveRole() : 'STUDENT';
+        if (role === 'STUDENT') {
             wrapper.classList.add('d-none');
         }
     }
@@ -5031,8 +5152,8 @@ window._renderAdminFacultyTable = function(facultyList) {
                 </td>
                 <td class="align-middle">
                     <div class="d-flex flex-column justify-content-center h-100">
-                        <span class="fw-bold text-light">${dept}</span>
-                        <span class="text-muted small mt-1"><i class="fa-solid fa-book text-warning me-1"></i>${t.subjectHandling || 'N/A'}</span>
+                        <span class="fw-bold text-warning" title="Department"><i class="fa-solid fa-building-columns me-1 text-warning opacity-75" style="font-size:0.75rem;"></i>${dept}</span>
+                        <span class="text-info small mt-1" title="Subject Handling"><i class="fa-solid fa-book me-1" style="font-size:0.75rem;"></i>${t.subjectHandling || 'N/A'}</span>
                     </div>
                 </td>
                 <td>
@@ -5830,16 +5951,35 @@ window.searchAdminFacultyDetails = async function() {
         
         return `
         <tr>
-            <td><strong>${name}</strong><br><small class="text-warning">${f.employeeId || ''}</small></td>
-            <td><span class="badge bg-primary">${dept}</span></td>
-            <td>${f.subjectHandling || '-'}</td>
-            <td><small>${f.personalEmail || f.email || '-'}</small></td>
-            <td><small>${f.collegeEmail || '-'}</small></td>
-            <td>${f.phone1 || f.phone || '-'}</td>
-            <td>${f.phone2 || f.altPhone || '-'}</td>
-            <td>
-                <button class="btn btn-sm btn-outline-warning me-1" onclick="window.editPersistentFaculty(${f.id || `'${f.name}'`})" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentFaculty(${f.id || `'${f.name}'`})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+            <td class="align-middle">
+                <div class="d-flex flex-column align-items-center">
+                    <strong class="text-info">${name}</strong>
+                    <small class="badge bg-secondary mt-1">${f.employeeId || ''}</small>
+                </div>
+            </td>
+            <td class="align-middle">
+                <div class="d-flex flex-column">
+                    <span class="fw-bold text-warning"><i class="fa-solid fa-building-columns me-1" style="font-size:0.75rem;"></i>${dept}</span>
+                    <small class="text-info mt-1"><i class="fa-solid fa-book me-1" style="font-size:0.75rem;"></i>${f.subjectHandling || 'N/A'}</small>
+                </div>
+            </td>
+            <td class="align-middle">
+                <div class="d-flex flex-column gap-1">
+                    <small title="College Email"><i class="fa-solid fa-envelope text-primary me-1"></i>${f.collegeEmail || '-'}</small>
+                    <small class="text-muted" title="Personal Email"><i class="fa-regular fa-envelope me-1"></i>${f.personalEmail || f.email || '-'}</small>
+                </div>
+            </td>
+            <td class="align-middle">
+                <div class="d-flex flex-column gap-1">
+                    <small title="Primary Mobile"><i class="fa-solid fa-phone text-success me-1"></i>${f.phone1 || f.phone || '-'}</small>
+                    ${f.phone2 || f.altPhone ? `<small class="text-muted" title="Secondary Mobile"><i class="fa-solid fa-mobile-screen me-1"></i>${f.phone2 || f.altPhone}</small>` : ''}
+                </div>
+            </td>
+            <td class="align-middle">
+                <div class="d-flex gap-2 justify-content-center">
+                    <button class="btn btn-sm btn-outline-warning py-1 px-2" onclick="window.editPersistentFaculty(${f.id || `'${f.name}'`})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger py-1 px-2" onclick="window.deletePersistentFaculty(${f.id || `'${f.name}'`})" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
             </td>
         </tr>
     `}).join('');
@@ -5851,7 +5991,88 @@ function updateAnnouncementTicker() {
     const marquee = document.getElementById('announcementMarquee');
     if (!container || !marquee) return;
 
-    const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
+    let announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
+    let badgeCount = 0;
+
+    if (typeof loadPeriodNotifications === 'function') {
+        const role = typeof getEffectiveRole === 'function' ? getEffectiveRole() : '';
+        const today = typeof todayDateStr === 'function' ? todayDateStr() : new Date().toISOString().split('T')[0];
+        const allNotifs = loadPeriodNotifications().filter(n => n.date === today);
+        
+        if (role === 'STUDENT') {
+            let studentSec = window.currentSection;
+            if (typeof currentStudentRecord === 'function') {
+                const rec = currentStudentRecord();
+                if (rec && rec.sec) studentSec = rec.sec;
+            }
+            
+            // For the badge: match the modal logic which shows all relevant notifications
+            const classNotifs = allNotifs.filter(n => !n.section || n.section === studentSec || n.section === 'All');
+            badgeCount = classNotifs.length;
+            
+            // For the marquee: only show specific class substitutions
+            const exactClassNotifs = allNotifs.filter(n => n.section === window.currentSection);
+            exactClassNotifs.forEach(n => {
+                let msg = '';
+                if (n.originalFaculty) msg += `Faculty ${n.originalFaculty} is absent. `;
+                msg += `Substitution Alert: Period ${n.period} will be handled by ${n.staff}.`;
+                announcements.push({ text: msg });
+            });
+        } else if (role === 'ADMIN' || role === 'FACULTY') {
+            allNotifs.forEach(n => {
+                let msg = `Substitution (${n.section}): `;
+                if (n.originalFaculty) msg += `Faculty ${n.originalFaculty} is absent, `;
+                msg += `Period ${n.period} handled by ${n.staff}.`;
+                announcements.push({ text: msg });
+            });
+            
+            // For the badge: match the adminAbsentNotifModal logic (unique absent faculties)
+            const todaysLeaves = {};
+            if (typeof coverageRequests !== 'undefined') {
+                Object.values(coverageRequests).forEach(req => {
+                    if (req.date === today && req.absentStaff) todaysLeaves[req.absentStaff] = true;
+                });
+            }
+            if (typeof substitutions !== 'undefined') {
+                Object.values(substitutions).forEach(sub => {
+                    if (sub.date === today && sub.originalFaculty) todaysLeaves[sub.originalFaculty] = true;
+                });
+            }
+            allNotifs.forEach(n => {
+                let fac = n.originalFaculty;
+            if (!fac || fac.trim() === '') {
+                const pIdx = parseInt(n.period) - 1;
+                const sec = n.section || (typeof currentSection !== 'undefined' ? currentSection : 'II CSE C');
+                let dayName = n.day;
+                if (!dayName) {
+                    const daysArr = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    const dObj = new Date(n.date);
+                    if (!isNaN(dObj.getTime())) dayName = daysArr[dObj.getDay()];
+                }
+                
+                if (sec && dayName && timetableData[sec] && timetableData[sec][dayName] && timetableData[sec][dayName][pIdx]) {
+                    fac = timetableData[sec][dayName][pIdx].faculty;
+                }
+                if (!fac || fac.trim() === '' || fac === '-') {
+                    fac = 'Unknown/Vacant Faculty';
+                }
+            }
+                todaysLeaves[fac] = true;
+            });
+            badgeCount = Object.keys(todaysLeaves).length;
+        }
+    }
+
+    // Update the notification badge on the bell icon
+    const badge = document.getElementById('headerNotifBadge');
+    if (badge) {
+        if (badgeCount > 0) {
+            badge.innerText = badgeCount;
+            badge.style.display = 'block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
 
     if (announcements.length === 0) {
         container.style.display = 'none';
@@ -6310,9 +6531,71 @@ window.avtDeptChanged = function(deptName) {
         sections.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
 };
 
+let builderTtColumns = [];
+
+function loadBuilderTtColumns() {
+    const parsed = JSON.parse(localStorage.getItem('builder_tt_cols') || 'null');
+    if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+        builderTtColumns = parsed;
+    } else {
+        builderTtColumns = [
+            { key: 'P1', label: 'Period 1', isBreak: false, defTime: '08.40 - 09.40' },
+            { key: 'P2', label: 'Period 2', isBreak: false, defTime: '09.40 - 10.40' },
+            { key: 'P3', label: 'Period 3', isBreak: false, defTime: '11.00 - 12.00' },
+            { key: 'TEA', label: 'Tea Break', isBreak: true, defTime: '12.00 - 12.15' },
+            { key: 'P4', label: 'Period 4', isBreak: false, defTime: '12.15 - 01.15' },
+            { key: 'P5', label: 'Period 5', isBreak: false, defTime: '01.15 - 02.00' },
+            { key: 'LUNCH', label: 'Lunch Break', isBreak: true, defTime: '02.00 - 02.40' },
+            { key: 'ACT', label: 'Activity', isBreak: false, defTime: '02.40 - 03.30' },
+            { key: 'P6', label: 'Period 6', isBreak: false, defTime: '03.30 - 04.20' },
+            { key: 'P7', label: 'Period 7', isBreak: false, defTime: '04.20 - 05.10' }
+        ];
+    }
+}
+
+function saveBuilderTtColumns() {
+    localStorage.setItem('builder_tt_cols', JSON.stringify(builderTtColumns));
+}
+
+window.addBuilderPeriodCol = function() {
+    const newIdx = builderTtColumns.length + 1;
+    const newKey = 'P' + newIdx + '_' + Date.now().toString().slice(-4);
+    builderTtColumns.push({
+        key: newKey,
+        label: 'Period ' + newIdx,
+        isBreak: false,
+        defTime: '00.00 - 00.00'
+    });
+    saveBuilderTtColumns();
+    if (window.currentTimetableSection) window.renderTimetableBuilderGrid(window.currentTimetableSection);
+};
+
+window.swapBuilderCol = function(idx, dir) {
+    if (idx + dir < 0 || idx + dir >= builderTtColumns.length) return;
+    const temp = builderTtColumns[idx];
+    builderTtColumns[idx] = builderTtColumns[idx + dir];
+    builderTtColumns[idx + dir] = temp;
+    saveBuilderTtColumns();
+    if (window.currentTimetableSection) window.renderTimetableBuilderGrid(window.currentTimetableSection);
+};
+
+window.removeBuilderCol = function(idx) {
+    if (confirm('Are you sure you want to remove this period column?')) {
+        builderTtColumns.splice(idx, 1);
+        saveBuilderTtColumns();
+        if (window.currentTimetableSection) window.renderTimetableBuilderGrid(window.currentTimetableSection);
+    }
+};
+
+window.updateBuilderColLabel = function(idx, val) {
+    builderTtColumns[idx].label = val;
+    saveBuilderTtColumns();
+};
+
 window.renderTimetableBuilderGrid = function(section) {
+    const thead = document.getElementById('ttBuilderHead');
     const tbody = document.getElementById('ttBuilderGrid');
-    if (!tbody) return;
+    if (!tbody || !thead) return;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
     const savedDataStr = localStorage.getItem(`sece_tt_built_${section}`);
@@ -6324,20 +6607,38 @@ window.renderTimetableBuilderGrid = function(section) {
     document.getElementById('ttBuildAdvisor').value = (savedData && savedData.advisor) ? savedData.advisor : '';
     document.getElementById('ttBuildTutors').value = (savedData && savedData.tutors) ? savedData.tutors : '';
 
+    loadBuilderTtColumns();
+    const headers = (savedData && savedData.headers) ? savedData.headers : {};
+
+    let headHtml = `<tr><th style="width: 90px;">Day</th>`;
+    builderTtColumns.forEach((col, i) => {
+        const val = headers[col.key] || col.defTime;
+        const colorClass = (col.isBreak && col.key !== 'ACT') ? 'text-warning' : '';
+        
+        headHtml += `<th class="${colorClass}">
+            <input type="text" style="background:transparent; border:none; color:inherit; text-align:center; font-weight:bold; width:100%; margin-top:8px" value="${col.label.replace(/"/g, '&quot;')}" onchange="updateBuilderColLabel(${i}, this.value)" />
+            <div class="d-flex justify-content-between px-1 mb-1 mt-1 text-muted" style="font-size: 0.75rem;">
+                ${i > 0 ? `<i class="fa-solid fa-caret-left" style="cursor:pointer" onclick="swapBuilderCol(${i}, -1)"></i>` : `<span></span>`}
+                <i class="fa-solid fa-trash text-danger" style="cursor:pointer" onclick="removeBuilderCol(${i})"></i>
+                ${i < builderTtColumns.length - 1 ? `<i class="fa-solid fa-caret-right" style="cursor:pointer" onclick="swapBuilderCol(${i}, 1)"></i>` : `<span></span>`}
+            </div>
+            <input type="text" id="ttBuildHdr_${col.key}" class="form-control form-control-sm bg-dark text-white border-secondary text-center ${colorClass}" style="font-size: 0.75rem; padding: 0.2rem" value="${val.replace(/"/g, '&quot;')}" />
+        </th>`;
+    });
+    headHtml += `</tr>`;
+    thead.innerHTML = headHtml;
+
     let html = '';
     days.forEach(day => {
         html += `<tr><td class="align-middle text-white fw-bold">${day}</td>`;
-        for (let p = 1; p <= 7; p++) {
-            if (p === 4) html += `<td class="align-middle text-muted small text-center">TEA</td>`;
-            if (p === 6) {
-                html += `<td class="align-middle text-muted small text-center">LUNCH</td>`;
-                const actVal = (savedData && savedData.grid && savedData.grid[day] && savedData.grid[day].act) ? savedData.grid[day].act : '';
-                html += `<td><input type="text" id="ttb_${day}_act" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${actVal.replace(/"/g, '&quot;')}" /></td>`;
+        builderTtColumns.forEach(col => {
+            if (col.isBreak && col.key !== 'ACT') {
+                html += `<td class="align-middle text-muted small text-center">${col.label.toUpperCase()}</td>`;
+            } else {
+                const val = (savedData && savedData.grid && savedData.grid[day] && savedData.grid[day][col.key]) ? savedData.grid[day][col.key] : '';
+                html += `<td><input type="text" id="ttb_${day}_${col.key}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${val.replace(/"/g, '&quot;')}" /></td>`;
             }
-            
-            const val = (savedData && savedData.grid && savedData.grid[day] && savedData.grid[day][`P${p}`]) ? savedData.grid[day][`P${p}`] : '';
-            html += `<td><input type="text" id="ttb_${day}_P${p}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${val.replace(/"/g, '&quot;')}" /></td>`;
-        }
+        });
         html += `</tr>`;
     });
     tbody.innerHTML = html;
@@ -6355,21 +6656,28 @@ window.saveTimetableBuilder = function() {
             year: window.currentTimetableYear || '2',
             semester: window.currentTimetableSemester || '3'
         },
+        headers: {},
         grid: {}
     };
+    
+    loadBuilderTtColumns();
+    builderTtColumns.forEach(col => {
+        const hEl = document.getElementById(`ttBuildHdr_${col.key}`);
+        if (hEl) data.headers[col.key] = hEl.value.trim();
+    });
+
     days.forEach(day => {
         data.grid[day] = {};
-        for (let p = 1; p <= 7; p++) {
-            const val = document.getElementById(`ttb_${day}_P${p}`).value.trim();
-            data.grid[day][`P${p}`] = val;
-        }
-        const actVal = document.getElementById(`ttb_${day}_act`).value.trim();
-        data.grid[day].act = actVal;
+        builderTtColumns.forEach(col => {
+            if (!col.isBreak || col.key === 'ACT') {
+                const el = document.getElementById(`ttb_${day}_${col.key}`);
+                if (el) data.grid[day][col.key] = el.value.trim();
+            }
+        });
     });
     
     localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
     
-    // Attempt to save to backend MySQL database as requested
     fetch('/api/timetable/save-manual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -6631,6 +6939,13 @@ window.fetchStudentDynamicDashboard = async function() {
         // Populate Profile Info
         if (data.student && document.getElementById("dynStudentProfile")) {
             document.getElementById("dynStudentProfile").innerHTML = `<i class="fa-solid fa-graduation-cap me-1"></i>${data.student.year} Yr ${data.student.department} - Sec ${data.student.section}`;
+            
+            // Set currentSection to the full section name so timetable renders correctly
+            const secName = data.student.fullSectionName || data.student.section;
+            if (secName) {
+                window.currentSection = secName;
+                localStorage.setItem('sece_last_viewed_section', secName);
+            }
         }
         
         // Handle HOLIDAY or AFTER/BEFORE college
@@ -7033,3 +7348,342 @@ function exportTimetableCSV() {
     window.URL.revokeObjectURL(url);
     showToast('CSV Downloaded!', `Saved SECE_Timetable_${currentSection}.csv spreadsheet.`);
 }
+
+
+// --- Manage Class Timetable Logic ---
+
+let mcTtColumns = [];
+
+function loadMcTtColumns(sectionKey) {
+    const defaultCols = [
+        { label: '1', key: 'P1', defTime: '08.40 - 09.40' },
+        { label: '2', key: 'P2', defTime: '09.40 - 10.40' },
+        { label: '3', key: 'P3', defTime: '11.00 - 12.00' },
+        { label: 'Tea Break', key: 'Tea', isBreak: true, defTime: '12.00 - 12.15' },
+        { label: '4', key: 'P4', defTime: '12.15 - 01.15' },
+        { label: '5', key: 'P5', defTime: '01.15 - 02.00' },
+        { label: 'Lunch Break', key: 'Lunch', isBreak: true, defTime: '02.00 - 02.40' },
+        { label: 'Activity', key: 'ACT', isBreak: true, defTime: '02.40 - 03.30' },
+        { label: '6', key: 'P6', defTime: '03.30 - 04.20' },
+        { label: '7', key: 'P7', defTime: '04.20 - 05.10' }
+    ];
+    let savedCols = null;
+    try {
+        savedCols = JSON.parse(localStorage.getItem('mc_tt_cols_' + sectionKey));
+    } catch(e){}
+    
+    if (savedCols && Array.isArray(savedCols) && savedCols.length > 0) {
+        mcTtColumns = savedCols;
+    } else {
+        mcTtColumns = defaultCols;
+    }
+}
+
+function saveMcTtColumns(sectionKey) {
+    localStorage.setItem('mc_tt_cols_' + sectionKey, JSON.stringify(mcTtColumns));
+}
+
+window.initManageClassTt = function() {
+    // Automatically load the default selected class timetable when the modal opens
+    document.getElementById('mcTtGridContainer').classList.remove('d-none');
+    if (window.loadManageClassTt) {
+        window.loadManageClassTt();
+    }
+};
+
+window.mcSwapCol = function(idx, dir) {
+    if (idx + dir < 0 || idx + dir >= mcTtColumns.length) return;
+    const temp = mcTtColumns[idx];
+    mcTtColumns[idx] = mcTtColumns[idx + dir];
+    mcTtColumns[idx + dir] = temp;
+    const sectionKey = _getMcSectionKey();
+    saveMcTtColumns(sectionKey);
+    window.renderManageClassTt(sectionKey);
+};
+
+window.mcRemoveCol = function(idx) {
+    if (confirm('Are you sure you want to remove this period?')) {
+        mcTtColumns.splice(idx, 1);
+        const sectionKey = _getMcSectionKey();
+        saveMcTtColumns(sectionKey);
+        window.renderManageClassTt(sectionKey);
+    }
+};
+
+window.mcUpdateColLabel = function(idx, val) {
+    mcTtColumns[idx].label = val;
+    const sectionKey = _getMcSectionKey();
+    saveMcTtColumns(sectionKey);
+};
+
+window.mcAddPeriodCol = function() {
+    const keyStr = "P" + (new Date().getTime().toString().substring(8));
+    mcTtColumns.push({ label: 'New', key: keyStr, defTime: '00.00 - 00.00' });
+    const sectionKey = _getMcSectionKey();
+    saveMcTtColumns(sectionKey);
+    window.renderManageClassTt(sectionKey);
+};
+
+function _getMcSectionKey() {
+    const yr = document.getElementById('mcYearSelect').value;
+    const dept = document.getElementById('mcDeptSelect').value;
+    const sec = document.getElementById('mcSecSelect').value;
+    return `${yr} ${dept} ${sec}`;
+}
+
+window.loadManageClassTt = function() {
+    const sectionKey = _getMcSectionKey();
+    document.getElementById('mcTtTitle').innerText = 'Editing: ' + sectionKey;
+    document.getElementById('mcTtGridContainer').classList.remove('d-none');
+    window.renderManageClassTt(sectionKey);
+};
+
+window.renderManageClassTt = async function(sectionKey) {
+    const tbody = document.getElementById('mcTtBody');
+    if (!tbody) return;
+    
+    loadMcTtColumns(sectionKey);
+    
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    let saved = {};
+    let hasSavedData = false;
+    try { 
+        let raw = localStorage.getItem('class_tt_' + sectionKey);
+        if (raw) {
+            saved = JSON.parse(raw);
+            hasSavedData = true;
+        }
+    } catch(e) {}
+    
+    // If no saved data in localStorage, fetch from backend API
+    if (!hasSavedData) {
+        try {
+            const secRes = await fetch('/api/sections', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sece_token') } });
+            if (secRes.ok) {
+                const sections = await secRes.json();
+                let q1 = sectionKey.toUpperCase();
+                let q2 = sectionKey.replace(/ /g, '_').toUpperCase();
+                let matchSec = sections.find(s => {
+                    let sn = (s.sectionName || '').toUpperCase();
+                    return sn === q1 || sn === q2 || sn.includes(q1) || sn.includes(q2);
+                });
+                
+                if (matchSec) {
+                    const ttRes = await fetch('/api/timetable/section/' + matchSec.id, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sece_token') } });
+                    if (ttRes.ok) {
+                        const sectionEntries = await ttRes.json();
+                        days.forEach(day => {
+                            saved[day] = {};
+                            mcTtColumns.forEach(col => { if (!col.isBreak || col.key === 'ACT') saved[day][col.key] = 'FREE'; });
+                        });
+                        sectionEntries.forEach(entry => {
+                            let day = entry.day;
+                            if (saved[day]) {
+                                let slotToKeyMap = { 1: 'P1', 2: 'P2', 3: 'P3', 4: 'P4', 5: 'P5', 6: 'P6', 7: 'P7' };
+                                let colKey = slotToKeyMap[entry.slotNumber];
+                                if (colKey) {
+                                    saved[day][colKey] = entry.subjectName || entry.subjectCode || 'FREE';
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        } catch(e) { console.error("Error fetching section timetable", e); }
+    }
+    
+    const thead = document.getElementById('mcTtHead');
+    let thHtml = '<tr><th>Day</th>';
+    const headers = saved._headers || {};
+    
+    mcTtColumns.forEach((col, i) => {
+        const timeVal = headers[col.key] || col.defTime;
+        if (col.isBreak && col.key !== 'ACT') {
+            thHtml += `<th class="text-warning" style="position: relative;">
+                <div style="position:absolute; top:2px; left:2px; right:2px; display:flex; justify-content:space-between; font-size: 0.7rem; opacity: 0.7">
+                   ${i > 0 ? `<i class="fa-solid fa-caret-left" style="cursor:pointer" onclick="mcSwapCol(${i}, -1)"></i>` : `<span></span>`}
+                   ${i < mcTtColumns.length - 1 ? `<i class="fa-solid fa-caret-right" style="cursor:pointer" onclick="mcSwapCol(${i}, 1)"></i>` : `<span></span>`}
+                </div>
+                <br/>
+                ${col.label.toUpperCase()}
+                <br/><input type="text" id="mcTtHeader${col.key}" style="background:transparent; border:none; color:inherit; text-align:center; font-size:0.7rem; width:100%" value="${timeVal}" />
+            </th>`;
+        } else {
+            thHtml += `<th style="position: relative;">
+                <div style="position:absolute; top:2px; left:2px; right:2px; display:flex; justify-content:space-between; font-size: 0.7rem; opacity: 0.5">
+                   ${i > 0 ? `<i class="fa-solid fa-caret-left" style="cursor:pointer" onclick="mcSwapCol(${i}, -1)"></i>` : `<span></span>`}
+                   <i class="fa-solid fa-trash text-danger" style="cursor:pointer" onclick="mcRemoveCol(${i})"></i>
+                   ${i < mcTtColumns.length - 1 ? `<i class="fa-solid fa-caret-right" style="cursor:pointer" onclick="mcSwapCol(${i}, 1)"></i>` : `<span></span>`}
+                </div>
+                <input type="text" id="mcTtLabel${col.key}" style="background:transparent; border:none; color:inherit; text-align:center; font-weight:bold; width:100%; margin-top:8px" value="${col.label}" onchange="mcUpdateColLabel(${i}, this.value)" />
+                <br/><input type="text" id="mcTtHeader${col.key}" style="background:transparent; border:none; color:var(--bs-gray-500); text-align:center; font-size:0.75rem; width:100%" value="${timeVal}" />
+            </th>`;
+        }
+    });
+    thHtml += '</tr>';
+    thead.innerHTML = thHtml;
+    
+    let html = '';
+    days.forEach(day => {
+        let dayData = saved[day] || {};
+        html += `<tr><td class="fw-bold">${day}</td>`;
+        mcTtColumns.forEach(col => {
+            if (col.isBreak && col.key !== 'ACT') {
+                html += `<td class="text-warning small align-middle">${col.label.toUpperCase()}</td>`;
+            } else {
+                const cellData = dayData[col.key] || 'FREE';
+                let val = typeof cellData === 'object' ? cellData.value : cellData;
+                let type = typeof cellData === 'object' ? cellData.type : 'Permanent';
+                
+                html += `<td style="min-width: 120px; vertical-align: middle;">
+                    <input type="text" id="mcTtCell_${day}_${col.key}" style="background:transparent; border:none; outline:none; text-align:center; width:100%; font-weight:700;" class="${val !== 'FREE' ? 'text-info' : 'text-secondary'}" value="${val}" />
+                    <div class="mt-1 d-flex justify-content-center">
+                        <select id="mcTtType_${day}_${col.key}" style="background:transparent; border:1px solid rgba(255,255,255,0.1); border-radius:3px; outline:none; text-align:center; font-size: 0.65rem;" class="${type==='Temporary'?'text-warning':'text-muted'}">
+                            <option style="background:#212529" value="Permanent" ${type==='Permanent'?'selected':''}>Perm</option>
+                            <option style="background:#212529" value="Temporary" ${type==='Temporary'?'selected':''}>Temp</option>
+                        </select>
+                    </div>
+                </td>`;
+            }
+        });
+        html += '</tr>';
+    });
+    tbody.innerHTML = html;
+};
+
+window.saveManageClassTt = function() {
+    const sectionKey = _getMcSectionKey();
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    let data = { _headers: {} };
+    
+    mcTtColumns.forEach(col => {
+        const hInput = document.getElementById(`mcTtHeader${col.key}`);
+        if (hInput) data._headers[col.key] = hInput.value;
+    });
+    
+    days.forEach(day => {
+        data[day] = {};
+        mcTtColumns.forEach(col => {
+            if (col.isBreak && col.key !== 'ACT') return;
+            const input = document.getElementById(`mcTtCell_${day}_${col.key}`);
+            const typeSel = document.getElementById(`mcTtType_${day}_${col.key}`);
+            if (input) {
+                let v = input.value || 'FREE';
+                let t = typeSel ? typeSel.value : 'Permanent';
+                data[day][col.key] = { value: v, type: t };
+            }
+        });
+    });
+    
+    localStorage.setItem('class_tt_' + sectionKey, JSON.stringify(data));
+    showToast('Success', 'Class timetable saved successfully!', 'success');
+    bootstrap.Modal.getInstance(document.getElementById('manageClassTtModal')).hide();
+    
+    if (typeof renderTimetableGrid === 'function') {
+        renderTimetableGrid();
+    }
+};
+
+
+window.handleChangePasswordSubmit = async function(e) {
+    e.preventDefault();
+    const cpCurrent = document.getElementById('cpCurrentPassword').value;
+    const cpNew = document.getElementById('cpNewPassword').value;
+    const cpConfirm = document.getElementById('cpConfirmPassword').value;
+
+    if (cpNew !== cpConfirm) {
+        alert("New passwords do not match.");
+        return;
+    }
+
+    try {
+        const formData = new URLSearchParams();
+        formData.append('currentPassword', cpCurrent);
+        formData.append('newPassword', cpNew);
+
+        const res = await apiFetch('/api/auth/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        });
+
+        if (res.ok) {
+            alert("Password updated successfully!");
+            document.getElementById('changePasswordForm').reset();
+            const modalEl = document.getElementById('changePasswordModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+        } else {
+            const err = await res.text();
+            alert("Failed to change password: " + err);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("An error occurred while changing password.");
+    }
+};
+
+
+
+window.openFacultyProfileModal = async function() {
+    if (currentUserRole !== 'FACULTY') { alert('This profile is available only to Faculty accounts.'); return; }
+
+    const body = document.getElementById('facultyProfileBody');
+    if (!body) return;
+    
+    let username = localStorage.getItem('sece_logged_in_user');
+    try {
+        const userInfo = JSON.parse(localStorage.getItem('user_info'));
+        if (userInfo && userInfo.username) username = userInfo.username;
+    } catch (e) {}
+
+    try {
+        body.innerHTML = '<div class="text-center py-2"><div class="spinner-border text-info" role="status"></div></div>';
+        const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
+        const res = await fetchFn('/api/teachers');
+        if (res.ok) {
+            const facultyList = await res.json();
+            const f = facultyList.find(st => st.user && String(st.user.username).toLowerCase() === String(username).toLowerCase());
+            
+            if (f) {
+                const computedUsername = f.user ? f.user.username : username;
+                const password = getStoredPassword(computedUsername) || 'faculty123';
+                const deptName = f.department ? f.department.name : '-';
+                const personalEmail = f.user ? (f.user.personalEmail || '-') : '-';
+                const collegeEmail = f.user ? (f.user.email || '-') : '-';
+                
+                body.innerHTML = `
+                    <div class="row g-3 small">
+                        <div class="col-12 text-center mb-3">
+                            <i class="fa-solid fa-user-tie fa-4x text-info mb-2"></i>
+                            <h4 class="text-white fw-bold mb-0">${f.displayName || f.name || '-'}</h4>
+                            <span class="badge bg-secondary mt-1">${deptName}</span>
+                        </div>
+                        <div class="col-12"><hr class="border-secondary my-1"></div>
+                        <div class="col-12"><strong>Faculty Name:</strong><br>${f.name || '-'}</div>
+                        <div class="col-6"><strong>Display Name:</strong><br>${f.displayName || '-'}</div>
+                        <div class="col-6"><strong>Department:</strong><br>${deptName}</div>
+                        <div class="col-6"><strong>Personal Email:</strong><br>${personalEmail}</div>
+                        <div class="col-6"><strong>College Email:</strong><br>${collegeEmail}</div>
+                        <div class="col-12"><hr class="border-secondary my-1"></div>
+                        <div class="col-6"><strong>Username:</strong><br><code>${computedUsername}</code></div>
+                        <div class="col-6"><strong>Password:</strong><br><code class="text-warning">${password}</code></div>
+                    </div>`;
+            } else {
+                body.innerHTML = '<div class="alert alert-warning">Your faculty record could not be found.</div>';
+            }
+        } else {
+            body.innerHTML = '<div class="alert alert-danger">Failed to fetch faculty details.</div>';
+        }
+    } catch (e) {
+        console.error('Error fetching faculty profile from backend:', e);
+        body.innerHTML = '<div class="alert alert-danger">Error connecting to server.</div>';
+    }
+
+    const modalEl = document.getElementById('facultyProfileModal');
+    if (modalEl) {
+        new bootstrap.Modal(modalEl).show();
+    }
+};

@@ -763,11 +763,34 @@ window.quizLoadResults = async (quizId) => {
                       parseFloat(pct) >= 35 ? {label:'Developing',cls:'warning'} :
                       {label:'Needs Help',cls:'danger'};
         const badgePct = `<span class="badge bg-${level.cls}">${pct}%</span>`;
+        // --- Timing fields ---
+        let submittedDisplay = '<span class="text-muted small">—</span>';
+        let timeTakenDisplay = '<span class="text-muted small">—</span>';
+        if (r.submittedAt) {
+            const subDate = new Date(r.submittedAt);
+            submittedDisplay = `<span class="text-info small" title="${subDate.toLocaleString()}">
+                <i class="fa-solid fa-clock me-1"></i>${subDate.toLocaleDateString()} ${subDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+            </span>`;
+            if (r.startedAt) {
+                const startDate = new Date(r.startedAt);
+                const diffMs = subDate - startDate;
+                if (diffMs >= 0) {
+                    const totalSec = Math.floor(diffMs / 1000);
+                    const mins = Math.floor(totalSec / 60);
+                    const secs = totalSec % 60;
+                    timeTakenDisplay = `<span class="badge" style="background:#1e3a5f;color:#7dd3fc;">
+                        <i class="fa-solid fa-stopwatch me-1"></i>${mins}m ${secs}s
+                    </span>`;
+                }
+            }
+        }
         return `<tr>
             <td class="fw-bold">${name}</td>
             <td>${r.totalScore ?? 0}</td>
             <td>${badgePct}</td>
             <td>${correct}/${totalQ} <span class="text-muted small">(${accuracy}%)</span></td>
+            <td>${submittedDisplay}</td>
+            <td>${timeTakenDisplay}</td>
             <td><span class="badge bg-${level.cls}">${level.label}</span></td>
         </tr>`;
     }).join('');
@@ -856,6 +879,8 @@ window.quizLoadResults = async (quizId) => {
                         <th>Score</th>
                         <th>Percentage</th>
                         <th>Accuracy (Q)</th>
+                        <th><i class="fa-solid fa-calendar-check me-1 text-info"></i>Submitted At</th>
+                        <th><i class="fa-solid fa-stopwatch me-1 text-warning"></i>Time Taken</th>
                         <th>Level</th>
                     </tr>
                 </thead>

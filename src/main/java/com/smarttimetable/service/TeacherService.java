@@ -13,6 +13,7 @@ import com.smarttimetable.repository.TimetableRepository;
 import com.smarttimetable.repository.FacultyAvailabilityRepository;
 import com.smarttimetable.repository.UserRepository;
 import com.smarttimetable.service.QuizService;
+import com.smarttimetable.entity.Department;
 
 @Service
 public class TeacherService {

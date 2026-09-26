@@ -421,16 +421,7 @@ public class DataInitializerService implements CommandLineRunner {
     }
 
     private void addTT(String day, int slotIndex, String subjectName, Section section, String yr, Department dept) {
-        TimeSlot ts = timeSlotRepository.findById((long) slotIndex).orElseThrow();
-        Subject subject = subjectRepository.findAll().stream()
-                .filter(s -> s.getSubjectName().contains("(" + subjectName + ")") || s.getSubjectName().contains(subjectName))
-                .findFirst()
-                .orElseGet(() -> subjectRepository.save(new Subject("NEW_" + subjectName.replaceAll("\\s+",""), subjectName, dept, null, 3, 3, 3, SubjectType.THEORY)));
-        Teacher teacher = subject.getAssignedTeacher();
-        if (teacher == null) {
-            teacher = teacherRepository.findAll().get(0); // Fallback to first teacher to avoid DB constraint violation
-        }
-        timetableRepository.save(new TimetableEntry(day, ts, subject, teacher, null, null, section, 3, yr));
+        return;
     }
 
     private void createTestStudent(String username, String firstName, String lastName, String email, Department dept, Course course, Section section) {

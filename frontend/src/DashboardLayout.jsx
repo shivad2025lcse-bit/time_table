@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import "./index.css";
 
@@ -8,6 +8,8 @@ export default function DashboardLayout() {
     const isAdmin = location.pathname === "/admin";
     const isStudent = location.pathname === "/student";
     const isFaculty = location.pathname === "/faculty";
+    const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 992);
+
     useEffect(() => {
         // Guard against double-injection: React 19 StrictMode double-fires
         // effects in dev, and every route ("/login", "/admin", "/faculty",
@@ -19,8 +21,7 @@ export default function DashboardLayout() {
             return;
         }
         window.__seceLegacyScriptsLoaded = true;
-
-        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js?v=3", "/js/charts.js", "/js/reports.js", "/js/quiz.js?v=2"];
+        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js?v=46", "/js/charts.js", "/js/reports.js", "/js/quiz.js?v=3"];
         scripts.forEach(src => {
             const script = document.createElement("script");
             script.src = src + '?v=' + new Date().getTime();
@@ -156,162 +157,195 @@ export default function DashboardLayout() {
 
 
             <div id="applicationShell" style={{ display: isLoginPage ? "none" : "block" }}>
-                <header className="inst-header no-print">
-                    <div className="container-fluid px-4">
-                        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <header className="inst-header no-print sticky-top" style={{ zIndex: 1050, backgroundColor: 'var(--sece-bg, #0b0f17)', borderBottom: '1px solid rgba(255,255,255,0.1)', height: '60px' }}>
+                    <div className="container-fluid px-3 h-100">
+                        <div className="d-flex align-items-center justify-content-between h-100">
                             <div className="d-flex align-items-center gap-3">
-                                <img src="/images/sece-logo.png" alt="SECE Logo" style={{ width: "45px", height: "45px", objectFit: "contain" }} />
-                                <div>
-                                    <h1 className="h5 mb-0 fw-bold text-white tracking-tight">SRI ESHWAR COLLEGE OF ENGINEERING</h1>
-                                    <div className="d-flex align-items-center gap-2 mt-1 flex-wrap">
-
-                                    </div>
+                                <button className="btn btn-sm text-white fs-5 border-0 px-2 shadow-none" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+                                    <i className="fa-solid fa-bars"></i>
+                                </button>
+                                <div className="d-flex align-items-center gap-2">
+                                    <img src="/images/sece-logo.png" alt="SECE Logo" style={{ width: "32px", height: "32px", objectFit: "contain" }} className="d-none d-sm-block" />
+                                    <h1 className="h6 mb-0 fw-bold text-white tracking-tight d-none d-sm-block">Smart Class and Timetable Scheduler</h1>
+                                    <h1 className="h6 mb-0 fw-bold text-white tracking-tight d-block d-sm-none">Timetable Scheduler</h1>
                                 </div>
                             </div>
 
-
-                            <div className="d-flex align-items-center gap-2 flex-wrap">
-
-                                <div className="d-flex align-items-center gap-2 border border-secondary rounded px-2 py-1 bg-dark">
-                                    <i className="fa-solid fa-user-shield text-info"></i>
-                                    <span id="currentRoleLabel" className="text-white small">Role: {isAdmin ? 'ADMIN' : isFaculty ? 'FACULTY' : isStudent ? 'STUDENT' : 'ADMIN'}</span>
-                                    <small id="loggedInUsernameLabel" className="text-muted ms-1"></small>
-                                </div>
-
-                                <button className="btn btn-sm btn-info d-flex align-items-center gap-1" type="button" data-bs-toggle="modal" data-bs-target="#adminAbsentNotifModal" onClick={() => window.renderAdminLeaveNotifications?.()}>
-                                    <i className="fa-solid fa-bell"></i> Notifications
+                            <div className="d-flex align-items-center gap-2 gap-md-3">
+                                <button className="btn btn-sm text-warning fs-5 border-0 px-2 shadow-none position-relative" type="button" data-bs-toggle="modal" data-bs-target={isAdmin || isFaculty ? "#adminAbsentNotifModal" : "#studentDayNotificationModal"} onClick={() => { if (isAdmin || isFaculty) { window.renderAdminLeaveNotifications?.(); } else { window.renderPeriodNotifications?.(); } }}>
+                                    <i className="fa-solid fa-bell"></i>
+                                    <span id="headerNotifBadge" className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style={{ fontSize: '0.65rem', display: 'none' }}>0</span>
                                 </button>
-
-                                <button className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
-                                    type="button" onClick={() => window.logoutUser()} >
-                                    <i className="fa-solid fa-right-from-bracket"></i> Logout
-                                </button>
-
-
-                                <button className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal">
-                                    <i className="fa-solid fa-key"></i> Forgot Password
-                                </button>
-
-
-                                <button id="themeToggleBtn" className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" onClick={() => window.toggleTheme()} >
-                                    <i className="fa-solid fa-moon" id="themeIcon"></i> Theme
-                                </button>
-
-                                {!isAdmin && (
-                                    <button id="notifBellBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" style={{ display: "none" }} onClick={() => window.openNotificationModal()} >
-                                        <i className="fa-solid fa-bell text-warning"></i> <span id="notifBellLabel">Register SMS / Email Alerts</span>
-                                    </button>
-                                )}
-
-
-
-
-                                <button id="manageStudentsBtn" className="btn btn-sm btn-outline-success d-flex align-items-center gap-1"
-                                    type="button" data-bs-toggle="modal" data-bs-target="#manageStudentsModal" style={{ display: "none" }}>
-                                    <i className="fa-solid fa-users"></i> <span id="manageStudentsBtnText">Add Students</span>
-                                </button>
-
-                                <button id="manageFacultyBtn" className="btn btn-sm btn-outline-success d-flex align-items-center gap-1"
-                                    type="button" data-bs-toggle="modal" data-bs-target="#manageFacultyModal" style={{ display: "none" }}>
-                                    <i className="fa-solid fa-chalkboard-user"></i> Add Faculty
-                                </button>
-
-                                <button id="manageAnnouncementsBtn" className={`btn btn-sm btn-outline-success align-items-center gap-1 ${isAdmin || isFaculty ? 'd-flex' : 'd-none'}`}
-                                    type="button" data-bs-toggle="modal" data-bs-target="#manageAnnouncementsModal" onClick={() => window.renderManageAnnouncementsList && window.renderManageAnnouncementsList()}>
-                                    <i className="fa-solid fa-bullhorn"></i> Manage Announcements
-                                </button>
-
-                                <button id="assignTaskBtn" className={`btn btn-sm btn-outline-primary align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`}
-                                    type="button" data-bs-toggle="modal" data-bs-target="#assignTaskModal" onClick={() => window.renderAssignTaskList && window.renderAssignTaskList()}>
-                                    <i className="fa-solid fa-list-check"></i> Assign Task
-                                </button>
-
-                                <button id="adminViewFacultyBtn" className={`btn btn-sm btn-outline-info align-items-center gap-1 ${isAdmin ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#adminViewFacultyModal">
-                                    <i className="fa-solid fa-address-card"></i> View Full Faculty Details
-                                </button>
-
-
-                                <button id="studentProfileBtn" className={`btn btn-sm btn-outline-success align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openStudentProfileModal()} >
-                                    <i className="fa-solid fa-id-card"></i> My Student Details
-                                </button>
-
-                                <button id="studentTasksBtn" className={`btn btn-sm btn-outline-warning align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#studentTasksModal" onClick={() => window.renderStudentTasks && window.renderStudentTasks()}>
-                                    <i className="fa-solid fa-list-check"></i> My Class Tasks
-                                </button>
-
-                                <button id="manageSectionsBtn" className={`btn btn-sm btn-outline-warning align-items-center gap-1 style-btn ${isAdmin || isFaculty ? 'd-flex' : 'd-none'}`} data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()}>
-                                    <i className="fa-solid fa-folder-tree"></i> <span id="manageSectionsBtnText">Manage Sections</span>
-                                </button>
-                                <button id="manageRosterBtn" className={`btn btn-sm btn-indigo align-items-center gap-1 style-btn ${isAdmin || isFaculty ? 'd-flex' : 'd-none'}`} style={{ background: "var(--sece-indigo)" }} data-bs-toggle="modal" data-bs-target="#manageRosterModal">
-                                    <i className="fa-solid fa-users-gear"></i> <span id="manageRosterBtnText">Manage Students Roster</span>
-                                </button>
-                                
-                                <button id="addStudentDirectBtn" className={`btn btn-sm btn-success align-items-center gap-1 style-btn ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openAddStudentDirectly()} >
-                                    <i className="fa-solid fa-user-plus"></i> <span id="addStudentDirectBtnText">Add New Student</span>
-                                </button>
-
-                                <button id="classAdvisorBtn" className={`btn btn-sm btn-outline-warning align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#classAdvisorLoginModal">
-                                    <i className="fa-solid fa-user-tie"></i> Class Advisor View
-                                </button>
-
-                                <button id="facultyDetailsBtn" className={`btn btn-sm btn-outline-primary align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" data-bs-toggle="modal" data-bs-target="#facultyDetailsModal" onClick={() => window.renderFacultyDetailsView && window.renderFacultyDetailsView()}>
-                                    <i className="fa-solid fa-chalkboard-user"></i> Faculty Details
-                                </button>
-
-                                <button id="studentDayNotificationBtn" className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" type="button" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal"><i className="fa-solid fa-bell"></i> Period Notifications</button>
-
-                                <button id="facultyQuizBtn" className={`btn btn-sm btn-outline-danger align-items-center gap-1 ${isFaculty ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openFacultyQuizModal && window.openFacultyQuizModal()}>
-                                    <i className="fa-solid fa-clipboard-question"></i> Manage Quizzes
-                                </button>
-                                
-                                <button id="studentQuizBtn" className={`btn btn-sm btn-outline-danger align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openStudentQuizModal && window.openStudentQuizModal()}>
-                                    <i className="fa-solid fa-pen-to-square"></i> Take Quiz
-                                </button>
-                                
-                                <button id="studentQuizHistoryBtn" className={`btn btn-sm btn-outline-info align-items-center gap-1 ${isStudent ? 'd-flex' : 'd-none'}`} type="button" onClick={() => window.openStudentQuizHistoryModal && window.openStudentQuizHistoryModal()}>
-                                    <i className="fa-solid fa-clock-rotate-left"></i> Quiz History
-                                </button>
-
-
-                                {(!isAdmin && !isStudent) && (
-                                    <button id="substitutionBtn" className="btn btn-sm btn-outline-info d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#substitutionModal" onClick={() => window.initSubstitutionModal && window.initSubstitutionModal()}>
-                                        <i className="fa-solid fa-people-arrows"></i> Staff Availability / Substitution
-                                    </button>
-                                )}
-
-                                {(!isAdmin && !isStudent) && (
-                                    <button id="myTimetableBtn" className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 style-btn" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => { window.renderMyTimetable && window.renderMyTimetable(); }}>
-                                        <i className="fa-solid fa-calendar-user"></i> YOUR TIMETABLE
-                                    </button>
-                                )}
 
                                 <div className="dropdown">
-                                    <button className="btn btn-sm btn-success dropdown-toggle fw-bold d-flex align-items-center gap-1" type="button" id="downloadDropdown" data-bs-toggle="dropdown">
-                                        <i className="fa-solid fa-download"></i> DOWNLOAD TT
+                                    <button className="btn btn-sm border-0 dropdown-toggle d-flex align-items-center gap-2 shadow-none px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" style={{ background: 'transparent' }}>
+                                        <i className="fa-solid fa-circle-user fs-4 text-info"></i>
+                                        <span id="loggedInUsernameLabel" className="d-none d-md-block text-white small fw-bold"></span>
                                     </button>
-                                    <ul className="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow">
-                                        <li><h6 className="dropdown-header"><i className="fa-solid fa-file-arrow-down me-1"></i> Export Options</h6></li>
-                                        <li><a className="dropdown-item" href="#" onClick={() => window.downloadTimetablePNG()} ><i className="fa-solid fa-file-image me-2 text-info"></i> Download PNG Image</a></li>
-                                        <li><a className="dropdown-item" href="#" onClick={() => window.exportTimetableCSV()} ><i className="fa-solid fa-file-csv me-2 text-success"></i> Download CSV Spreadsheet</a></li>
-                                        <li><a className="dropdown-item" href="#" onClick={() => window.print()} ><i className="fa-solid fa-file-pdf me-2 text-danger"></i> Print / Save as PDF</a></li>
+                                    <ul className="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow border-secondary" style={{ minWidth: '220px' }}>
+                                        <li className="px-3 py-2">
+                                            <div className="small text-muted mb-1">Role</div>
+                                            <div className="fw-bold text-white">{isAdmin ? 'ADMIN' : isFaculty ? 'FACULTY' : 'STUDENT'}</div>
+                                        </li>
+                                        <li><hr className="dropdown-divider border-secondary" /></li>
+                                        <li>
+                                            <button className="dropdown-item py-2 d-flex align-items-center gap-2" onClick={() => {
+                                                if (isAdmin) {
+                                                    // Add admin profile if needed
+                                                } else if (isFaculty) {
+                                                    const btn = document.getElementById('facultyDetailsBtn');
+                                                    if (btn) btn.click();
+                                                    else if (window.openFacultyProfileModal) window.openFacultyProfileModal();
+                                                } else if (isStudent) {
+                                                    window.openStudentProfileModal && window.openStudentProfileModal();
+                                                }
+                                            }}>
+                                                <i className="fa-solid fa-user text-info"></i> My Profile
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button className="dropdown-item py-2 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                                                <i className="fa-solid fa-lock text-warning"></i> Change Password
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button className="dropdown-item py-2 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#adminAbsentNotifModal" onClick={() => window.renderAdminLeaveNotifications?.()}>
+                                                <i className="fa-solid fa-bell text-success"></i> Notifications
+                                            </button>
+                                        </li>
+                                        <li><hr className="dropdown-divider border-secondary" /></li>
+                                        <li>
+                                            <button className="dropdown-item py-2 text-danger d-flex align-items-center gap-2" onClick={() => window.logoutUser()}>
+                                                <i className="fa-solid fa-right-from-bracket"></i> Logout
+                                            </button>
+                                        </li>
                                     </ul>
                                 </div>
+                                <button className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 ms-1 ms-md-2" type="button" onClick={() => window.logoutUser()}>
+                                    <i className="fa-solid fa-right-from-bracket"></i> <span className="d-none d-md-block">Logout</span>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </header>
 
-                <div id="announcementTickerContainer" className="w-100 bg-success text-white py-1 marquee-l2r-container" style={{ borderBottom: "2px solid #198754" }}>
+                <div id="announcementTickerContainer" className="w-100 bg-success text-white py-1 marquee-l2r-container" style={{ borderBottom: "2px solid #198754", zIndex: 1040, position: 'relative' }}>
                     <div id="announcementMarquee" className="marquee-l2r-content mb-0 fw-bold fs-6" style={{ letterSpacing: "0.5px" }}></div>
                 </div>
 
+                <div className="app-layout">
+                    {/* Sidebar Drawer / Menu */}
+                    <aside className={`app-sidebar d-flex flex-column p-3 ${isSidebarOpen ? 'open-mobile' : 'closed-desktop'}`}>
+                        <div className="text-muted text-uppercase small fw-bold mb-3 px-2" style={{ letterSpacing: '1px' }}>Navigation</div>
+                        <nav className="d-flex flex-column gap-2 flex-grow-1">
+                            {isAdmin && (
+                                <>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageStudentsModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
+                                        <i className="fa-solid fa-users fa-fw me-3" style={{color: '#a855f7'}}></i> Add Students
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageAnnouncementsModal" onClick={() => { window.renderManageAnnouncementsList && window.renderManageAnnouncementsList(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-bullhorn fa-fw me-3 text-success"></i> Announcements
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageRosterModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
+                                        <i className="fa-solid fa-users-gear fa-fw me-3" style={{color: 'var(--sece-indigo)'}}></i> Manage Roster
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminAbsentNotifModal" onClick={() => { window.renderAdminLeaveNotifications?.(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-bell fa-fw me-3 text-warning"></i> Notifications
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminViewFacultyModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
+                                        <i className="fa-solid fa-address-card fa-fw me-3 text-info"></i> View Faculty Details
+                                    </button>
+                                </>
+                            )}
 
-                    <main className="container-fluid px-4 py-3">
+                            {isFaculty && (
+                                <>
+                                    <button className="sidebar-nav-link" onClick={() => { window.openAddStudentDirectly(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-user-plus fa-fw me-3 text-success"></i> Add New Student
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageAnnouncementsModal" onClick={() => { window.renderManageAnnouncementsList && window.renderManageAnnouncementsList(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-bullhorn fa-fw me-3 text-success"></i> Announcements
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#assignTaskModal" onClick={() => { window.renderAssignTaskList && window.renderAssignTaskList(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-list-check fa-fw me-3 text-primary"></i> Assign Task
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#substitutionModal" onClick={() => { window.initSubstitutionModal && window.initSubstitutionModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-people-arrows fa-fw me-3 text-info"></i> Availability / Sub
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => { window.renderSectionsList && window.renderSectionsList(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-school fa-fw me-3 text-success"></i> Classes
+                                    </button>
+                                    <button className="sidebar-nav-link" onClick={() => { window.openFacultyQuizModal && window.openFacultyQuizModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-clipboard-question fa-fw me-3 text-danger"></i> Manage Quizzes
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminAbsentNotifModal" onClick={() => { window.renderAdminLeaveNotifications?.(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-bell fa-fw me-3 text-warning"></i> Notifications
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => { window.renderMyTimetable && window.renderMyTimetable(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-regular fa-calendar fa-fw me-3 text-primary"></i> Timetable
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onClick={() => { window.initAdminViewEditTimetableModal && window.initAdminViewEditTimetableModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-users-rectangle fa-fw me-3 text-primary"></i> View Timetable
+                                    </button>
+
+                                    <div className="mt-2 pt-2 border-top border-secondary">
+                                        <button className="sidebar-nav-link text-warning" data-bs-toggle="modal" data-bs-target="#classAdvisorLoginModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
+                                            <i className="fa-solid fa-user-tie fa-fw me-3 text-warning"></i> Class Advisor View
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {isStudent && (
+                                <>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#studentTasksModal" onClick={() => { window.renderStudentTasks && window.renderStudentTasks(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-list-check fa-fw me-3 text-warning"></i> My Class Tasks
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
+                                        <i className="fa-solid fa-bell fa-fw me-3 text-warning"></i> Period Notifications
+                                    </button>
+                                    <button className="sidebar-nav-link" onClick={() => { window.openStudentQuizHistoryModal && window.openStudentQuizHistoryModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-clock-rotate-left fa-fw me-3 text-info"></i> Quiz History
+                                    </button>
+                                    <button className="sidebar-nav-link" onClick={() => { window.openStudentQuizModal && window.openStudentQuizModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-pen-to-square fa-fw me-3 text-danger"></i> Take Quiz
+                                    </button>
+                                    <button className="sidebar-nav-link" onClick={() => { window.showTtPopup && window.showTtPopup(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-regular fa-calendar fa-fw me-3 text-primary"></i> Timetable
+                                    </button>
+                                </>
+                            )}
+                        </nav>
+                        
+                        {/* Download TT - Shared */}
+                        <div className="px-2 mb-3 dropdown">
+                            <button className="btn btn-sm btn-success dropdown-toggle fw-bold d-flex align-items-center justify-content-center gap-2 w-100" type="button" data-bs-toggle="dropdown">
+                                <i className="fa-solid fa-download"></i> Download TT
+                            </button>
+                            <ul className="dropdown-menu dropdown-menu-dark shadow w-100">
+                                <li><a className="dropdown-item" href="#" onClick={() => { window.downloadTimetablePNG(); window.innerWidth <= 992 && setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-image me-2 text-info"></i> PNG Image</a></li>
+                                <li><a className="dropdown-item" href="#" onClick={() => { window.exportTimetableCSV(); window.innerWidth <= 992 && setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-csv me-2 text-success"></i> CSV Spreadsheet</a></li>
+                                <li><a className="dropdown-item" href="#" onClick={() => { window.print(); window.innerWidth <= 992 && setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-pdf me-2 text-danger"></i> Print / PDF</a></li>
+                            </ul>
+                        </div>
+                        
+                        <div className="mt-auto pt-3 border-top border-secondary">
+                            <button className="sidebar-nav-link text-danger" onClick={() => window.logoutUser()}>
+                                <i className="fa-solid fa-right-from-bracket fa-fw me-3"></i> Logout
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* Mobile Overlay */}
+                    <div className={`sidebar-overlay ${isSidebarOpen ? 'open-mobile' : ''}`} onClick={() => setIsSidebarOpen(false)}></div>
+
+                    {/* Main Workspace */}
+                    <main className="app-main container-fluid px-4 py-3">
                         {/* Student Dashboard Dynamic Current Period Card */}
-                        <div id="studentDynamicDashboard" className="d-none mb-4 row justify-content-center">
+                        <div id="studentDynamicDashboard" className="d-none mb-4 row justify-content-start">
                             
                             {/* Current Period Card */}
-                            <div className="col-lg-5 col-md-6 mb-3">
+                            <div className="col-lg-4 col-md-5 col-sm-8 mb-3">
                                 <div className="card bg-dark text-white border-secondary shadow-sm h-100" style={{borderRadius: "10px", overflow: "hidden"}}>
                                     <div className="card-header border-secondary bg-primary bg-gradient py-2">
                                         <h6 className="mb-0 fw-bold small"><i className="fa-solid fa-clock me-2"></i>CURRENT PERIOD</h6>
@@ -341,19 +375,6 @@ export default function DashboardLayout() {
                                 </div>
                             </div>
                             
-                            {/* Today's Timetable List */}
-                            <div className="col-lg-6 col-md-6 mb-3">
-                                <div className="card bg-dark text-white border-secondary shadow-sm h-100" style={{borderRadius: "10px", overflow: "hidden"}}>
-                                    <div className="card-header border-secondary py-2">
-                                        <h6 className="mb-0 fw-bold text-light small"><i className="fa-solid fa-calendar-day me-2"></i>TODAY'S TIMETABLE</h6>
-                                    </div>
-                                    <div className="card-body p-0" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                                        <ul className="list-group list-group-flush" id="dynTodayTimetableList">
-                                            <li className="list-group-item bg-dark text-muted text-center py-2 border-secondary" style={{fontSize: "0.85rem"}}>Loading schedule...</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
                         {/* Student Upcoming Class Alert (Legacy) */}
@@ -406,15 +427,20 @@ export default function DashboardLayout() {
                                     <div className="panel-header">
                                     <h2 className="panel-title d-flex align-items-center gap-2">
                                         <i className="fa-solid fa-calendar-days text-info"></i>
-                                        <span id="ttTitleHeader" style={{ outline: "none", padding: "2px 5px", borderRadius: "4px", border: "1px dashed transparent" }}>Class Timetable - Academic Schedule (II CSE C - Classroom SF 04)</span>
+                                        <span id="ttTitleHeader" style={{ outline: "none", padding: "2px 5px", borderRadius: "4px", border: "1px dashed transparent" }}>Class Timetable - Academic Schedule</span>
                                         <i id="ttTitleEditIcon" className="fa-solid fa-pencil text-muted d-none" style={{ fontSize: "0.8rem", cursor: "pointer" }} title="Edit Title"></i>
                                     </h2>
                                     <div className="d-flex align-items-center gap-2">
                                         <span className="badge bg-dark border border-secondary text-muted">Version 3.0 (19.01.2026)</span>
+                                        {isStudent && (
+                                            <button className="btn btn-sm btn-outline-danger ms-2" onClick={() => document.getElementById('ttPopupOverlayWrapper')?.classList.add('d-none')} title="Close Timetable">
+                                                <i className="fa-solid fa-xmark"></i>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="p-3 tt-table-wrapper">
-                                    <table className="tt-table">
+                                    <table className={`tt-table ${isStudent ? 'student-view-tt' : ''}`}>
                                         <thead>
                                             <tr>
                                                 <th style={{ width: "100px" }}>Day Order</th>
@@ -436,7 +462,6 @@ export default function DashboardLayout() {
                                     </table>
                                 </div>
                             </div>
-
 
                             {!isFaculty && (
                                 <div className="glass-panel" id="referenceTableArea">
@@ -515,37 +540,6 @@ export default function DashboardLayout() {
                             <h4 className="text-info fw-bold mb-4"><i className="fa-solid fa-shield-halved me-2"></i> {isAdmin ? 'Admin Control Panel' : 'Faculty Control Panel'}</h4>
                             <div className="row g-4">
                                 {isAdmin && (
-                                <div className="col-md-4 col-sm-6">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminResourcesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,188,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-database text-info mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Manage Subjects</h5>
-                                            <p className="text-muted small mb-0">Add, edit, or remove subjects and timetable defaults.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                )}
-                                {isAdmin && (
-                                <div className="col-md-4 col-sm-6">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminVenuesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(25,200,100,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-map-location-dot text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Manage Venues</h5>
-                                            <p className="text-muted small mb-0">Configure classrooms, laboratories, and lecture halls.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                )}
-                                <div className="col-md-4 col-sm-6">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageRosterModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(130,100,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-users-gear mb-3" style={{ fontSize: "2.5rem", color: "var(--sece-indigo, #7c6fe0)" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Sections &amp; Students</h5>
-                                            <p className="text-muted small mb-0">Manage section rosters and student data.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                {isAdmin && (
                                 <div className="col-lg-4 col-md-6 col-sm-12">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminFacultyDetailsModal" onClick={() => window.renderAdminFacultyDetails && window.renderAdminFacultyDetails()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -556,6 +550,59 @@ export default function DashboardLayout() {
                                     </div>
                                 </div>
                                 )}
+                                {isAdmin && (
+                                <div className="col-lg-4 col-md-6 col-sm-12">
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => { window.renderSectionsList && window.renderSectionsList(); }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(40,167,69,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                            <i className="fa-solid fa-school text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                            <h5 className="text-light fw-bold mb-2">Manage Classes</h5>
+                                            <p className="text-muted small mb-0">Create and manage departments, years, and sections.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                )}
+                                {isAdmin && (
+                                <div className="col-lg-4 col-md-6 col-sm-12">
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageFacultyModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(220,53,69,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                            <i className="fa-solid fa-chalkboard-user text-danger mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                            <h5 className="text-light fw-bold mb-2">Manage Faculty</h5>
+                                            <p className="text-muted small mb-0">Register and manage faculty members.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                )}
+                                {isAdmin && (
+                                <div className="col-lg-4 col-md-6 col-sm-12">
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminResourcesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,188,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                            <i className="fa-solid fa-database text-info mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                            <h5 className="text-light fw-bold mb-2">Manage Subjects</h5>
+                                            <p className="text-muted small mb-0">Add, edit, or remove subjects and timetable defaults.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                )}
+                                {isAdmin && (
+                                <div className="col-lg-4 col-md-6 col-sm-12">
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminVenuesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(25,200,100,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                            <i className="fa-solid fa-map-location-dot text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                            <h5 className="text-light fw-bold mb-2">Manage Venues</h5>
+                                            <p className="text-muted small mb-0">Configure classrooms, laboratories, and lecture halls.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                )}
+                                <div className="col-lg-4 col-md-6 col-sm-12">
+                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageRosterModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(130,100,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                            <i className="fa-solid fa-users-gear mb-3" style={{ fontSize: "2.5rem", color: "var(--sece-indigo, #7c6fe0)" }}></i>
+                                            <h5 className="text-light fw-bold mb-2">Sections &amp; Students</h5>
+                                            <p className="text-muted small mb-0">Manage section rosters and student data.</p>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div className="col-lg-4 col-md-6 col-sm-12">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onClick={() => window.initAdminViewEditTimetableModal && window.initAdminViewEditTimetableModal()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,100,200,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -565,16 +612,7 @@ export default function DashboardLayout() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageStudentsModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(13,110,253,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-users text-primary mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Student Directory</h5>
-                                            <p className="text-muted small mb-0">View comprehensive list of all enrolled students.</p>
-                                        </div>
-                                    </div>
-                                </div>
-
+                                
                                 <div className="col-lg-4 col-md-6 col-sm-12">
                                     <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(230,100,50,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
                                         <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -600,6 +638,7 @@ export default function DashboardLayout() {
                         )}
 
                 </main>
+            </div>
             </div>
 
 
@@ -1237,6 +1276,21 @@ export default function DashboardLayout() {
                         <div className="modal-body" id="studentProfileBody"></div>
                     </div>
                 </div>
+
+            <div className="modal fade" id="facultyProfileModal" tabIndex="-1">
+                <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-chalkboard-user me-2"></i> My Faculty Details</h5>
+                            <div>
+                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                        </div>
+                        <div className="modal-body" id="facultyProfileBody"></div>
+                    </div>
+                </div>
+            </div>
+
             </div>
 
 
@@ -2042,6 +2096,9 @@ export default function DashboardLayout() {
                         <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
                             <h5 className="modal-title text-primary fw-bold"><i className="fa-solid fa-table me-2"></i> Timetable Builder</h5>
                             <div>
+                                <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => window.addBuilderPeriodCol && window.addBuilderPeriodCol()}>
+                                    <i className="fa-solid fa-plus me-1"></i> Add Period
+                                </button>
                                 <input type="file" id="importImageInput" accept=".png, .jpg, .jpeg" style={{ display: "none" }} onChange={(e) => window.importTimetableImage && window.importTimetableImage(e)} />
                                 <button type="button" className="btn btn-sm btn-outline-info me-2" onClick={() => document.getElementById('importImageInput').click()}>
                                     <i className="fa-solid fa-image me-1"></i> Scan Image with AI
@@ -2068,20 +2125,7 @@ export default function DashboardLayout() {
                                 <p className="small text-muted mb-2">Enter Subject / Staff / Venue. Format: <code>Subject, Staff, Venue</code> or just type it in. Leave blank for FREE.</p>
                                 <div className="table-responsive">
                                     <table className="table table-dark table-bordered border-secondary table-sm text-center align-middle" style={{ tableLayout: "fixed" }}>
-                                        <thead>
-                                            <tr>
-                                                <th style={{ width: "90px" }}>Day</th>
-                                                <th>Period 1<input type="text" id="ttBuildP1" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="08.40 - 09.40" /></th>
-                                                <th>Period 2<input type="text" id="ttBuildP2" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="09.40 - 10.40" /></th>
-                                                <th>Period 3<input type="text" id="ttBuildP3" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="11.00 - 12.00" /></th>
-                                                <th className="text-warning">Tea Break<input type="text" id="ttBuildTea" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="12.00 - 12.15" /></th>
-                                                <th>Period 4<input type="text" id="ttBuildP4" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="12.15 - 01.15" /></th>
-                                                <th>Period 5<input type="text" id="ttBuildP5" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="01.15 - 02.00" /></th>
-                                                <th className="text-warning">Lunch Break<input type="text" id="ttBuildLunch" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="02.00 - 02.40" /></th>
-                                                <th className="text-warning">Activity<input type="text" id="ttBuildAct" className="form-control form-control-sm bg-dark text-white border-secondary text-center text-warning mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="02.40 - 03.30" /></th>
-                                                <th>Period 6<input type="text" id="ttBuildP6" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="03.30 - 04.20" /></th>
-                                                <th>Period 7<input type="text" id="ttBuildP7" className="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style={{ fontSize: "0.75rem", padding: "0.2rem" }} defaultValue="04.20 - 05.10" /></th>
-                                            </tr>
+                                        <thead id="ttBuilderHead">
                                         </thead>
                                         <tbody id="ttBuilderGrid">
                                             {/* Generated by JS */}
@@ -2238,11 +2282,11 @@ export default function DashboardLayout() {
                                 <table className="table table-dark table-striped table-hover align-middle mb-0 text-center">
                                     <thead className="sticky-top" style={{ backgroundColor: "#1e1e1e" }}>
                                         <tr>
-                                            <th>Faculty Profile</th>
-                                            <th>Academic Role</th>
-                                            <th>Email Addresses</th>
-                                            <th>Contact Numbers</th>
-                                            <th>Action</th>
+                                            <th><i className="fa-solid fa-id-card me-1 text-info"></i>Faculty Profile</th>
+                                            <th><i className="fa-solid fa-building-columns me-1 text-warning"></i>Department & Subject</th>
+                                            <th><i className="fa-solid fa-envelope me-1 text-primary"></i>Email Addresses</th>
+                                            <th><i className="fa-solid fa-phone me-1 text-success"></i>Contact Numbers</th>
+                                            <th><i className="fa-solid fa-gear me-1 text-secondary"></i>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="adminFacultyDetailsBody">
@@ -2395,9 +2439,117 @@ export default function DashboardLayout() {
                         </div>
                     </div>
                 </div>
+            
+            <div className="modal fade" id="manageClassTtModal" tabIndex="-1">
+                <div className="modal-dialog modal-xl modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
+                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-users-rectangle me-2"></i> Manage Student Class Timetable</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body p-4">
+                            <div className="row mb-4 align-items-end">
+                                <div className="col-md-3">
+                                    <label className="form-label text-muted small">Year</label>
+                                    <select id="mcYearSelect" className="form-select bg-dark text-white border-secondary" onChange={() => window.loadManageClassTt && window.loadManageClassTt()}>
+                                        <option value="I">I</option>
+                                        <option value="II" selected>II</option>
+                                        <option value="III">III</option>
+                                        <option value="IV">IV</option>
+                                    </select>
+                                </div>
+                                <div className="col-md-3">
+                                    <label className="form-label text-muted small">Department</label>
+                                    <select id="mcDeptSelect" className="form-select bg-dark text-white border-secondary" onChange={() => window.loadManageClassTt && window.loadManageClassTt()}>
+                                        <option value="CSE" selected>CSE</option>
+                                        <option value="IT">IT</option>
+                                        <option value="ECE">ECE</option>
+                                        <option value="EEE">EEE</option>
+                                        <option value="MECH">MECH</option>
+                                        <option value="AIML">AIML</option>
+                                        <option value="AIDS">AIDS</option>
+                                        <option value="CSBS">CSBS</option>
+                                    </select>
+                                </div>
+                                <div className="col-md-3">
+                                    <label className="form-label text-muted small">Section</label>
+                                    <select id="mcSecSelect" className="form-select bg-dark text-white border-secondary" onChange={() => window.loadManageClassTt && window.loadManageClassTt()}>
+                                        <option value="A">A</option>
+                                        <option value="B">B</option>
+                                        <option value="C" selected>C</option>
+                                    </select>
+                                </div>
+                                <div className="col-md-3">
+                                    <button className="btn btn-outline-info w-100" onClick={() => window.loadManageClassTt && window.loadManageClassTt()}>
+                                        <i className="fa-solid fa-magnifying-glass me-1"></i> Load Timetable
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div id="mcTtGridContainer" className="d-none">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 className="text-warning mb-0" id="mcTtTitle">Editing: II CSE C</h6>
+                                    <div>
+                                        <button className="btn btn-sm btn-outline-primary me-2" onClick={() => window.mcAddPeriodCol && window.mcAddPeriodCol()}>
+                                            <i className="fa-solid fa-plus me-1"></i> Add Period
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="table-responsive">
+                                    <table className="table table-dark table-bordered border-secondary text-center align-middle" id="mcTtTable">
+                                        <thead id="mcTtHead">
+                                        </thead>
+                                        <tbody id="mcTtBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="modal-footer border-secondary">
+                            <button type="button" className="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" className="btn btn-warning fw-bold" onClick={() => window.saveManageClassTt && window.saveManageClassTt()}>
+                                <i className="fa-solid fa-floppy-disk me-1"></i> Save Class Timetable
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+</div>
+
+        
+
+            {/* ===== Change Password Modal (Authenticated Users) ===== */}
+            <div className="modal fade" id="changePasswordModal" tabIndex="-1">
+                <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title fw-bold text-warning"><i className="fa-solid fa-lock me-2"></i> Change Password</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body p-4">
+                            <form id="changePasswordForm" onSubmit={(e) => { e.preventDefault(); window.handleChangePasswordSubmit && window.handleChangePasswordSubmit(e); }}>
+                                <div className="mb-3">
+                                    <label className="form-label text-muted small">Current Password</label>
+                                    <input type="password" id="cpCurrentPassword" className="form-control bg-dark text-white border-secondary" required />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label text-muted small">New Password</label>
+                                    <input type="password" id="cpNewPassword" className="form-control bg-dark text-white border-secondary" required />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label text-muted small">Confirm New Password</label>
+                                    <input type="password" id="cpConfirmPassword" className="form-control bg-dark text-white border-secondary" required />
+                                </div>
+                                <div className="d-grid mt-4">
+                                    <button type="submit" className="btn btn-warning fw-bold">Update Password</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-        </>
+</>
     );
 }
 
