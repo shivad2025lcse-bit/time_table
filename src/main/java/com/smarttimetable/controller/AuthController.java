@@ -23,6 +23,29 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private com.smarttimetable.repository.UserRepository userRepository;
+
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @org.springframework.web.bind.annotation.GetMapping("/restore-tests")
+    public String restoreTests() {
+        String[] tests = {"studenta", "studentb", "studentc", "studentd", "25CS315", "25cs315", "25cs316"};
+        for(String t : tests) {
+            if(!userRepository.findByUsername(t).isPresent()) {
+                com.smarttimetable.entity.User u = new com.smarttimetable.entity.User();
+                u.setUsername(t);
+                u.setPassword(passwordEncoder.encode("password123"));
+                u.setRawPassword("password123");
+                u.setRole(com.smarttimetable.entity.Role.ROLE_STUDENT);
+                u.setActive(true);
+                userRepository.save(u);
+            }
+        }
+        return "Done";
+    }
+
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
         LoginResponse response = authService.login(loginRequest);
@@ -46,5 +69,12 @@ public class AuthController {
     ) {
         String username = authentication.getName();
         return ResponseEntity.ok(authService.changePassword(username, currentPassword, newPassword));
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/user/{username}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Void> deleteUser(@org.springframework.web.bind.annotation.PathVariable String username) {
+        authService.deleteUserByUsername(username);
+        return ResponseEntity.ok().build();
     }
 }

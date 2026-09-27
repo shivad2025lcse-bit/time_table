@@ -4963,12 +4963,14 @@ window.renderCredentialsList = async function() {
                 if (s) {
                     extra.name = s.name || s.studentName || s.firstName || '-';
                     extra.sectionDept = s.section ? s.section.sectionName : (s.department ? s.department.name : '-');
+                    extra.entityId = s.id || s.registerNumber || s.roll || `'${s.roll}'`;
                 }
             } else if (c.role === 'ROLE_FACULTY') {
                 const t = teachers.find(x => (x.user && x.user.username === c.username) || x.username === c.username);
                 if (t) {
                     extra.name = t.displayName || t.name || t.firstName || '-';
                     extra.sectionDept = t.department ? (t.department.name || t.department) : (t.dept || '-');
+                    extra.entityId = t.id || t.employeeId || `'${t.employeeId}'`;
                     if (t.classAdvisorFor && t.classAdvisorFor.trim() !== '') {
                         extra.isAdvisor = true;
                     }
@@ -4987,16 +4989,27 @@ window.renderCredentialsList = async function() {
 
 window.switchCredTab = function(roleType) {
     window._credCurrentRole = roleType;
-    document.getElementById('credTabStudents')?.classList.remove('active', 'text-white');
-    document.getElementById('credTabFaculty')?.classList.remove('active', 'text-white');
-    document.getElementById('credTabAdvisor')?.classList.remove('active', 'text-white');
+    document.getElementById('credTabStudents')?.classList.remove('active', 'text-white', 'text-dark');
+    document.getElementById('credTabFaculty')?.classList.remove('active', 'text-white', 'text-dark');
+    document.getElementById('credTabAdvisor')?.classList.remove('active', 'text-white', 'text-dark');
+    
+    // reset unselected to their normal colors
+    document.getElementById('credTabStudents')?.classList.add('text-info');
+    document.getElementById('credTabFaculty')?.classList.add('text-info');
+    document.getElementById('credTabAdvisor')?.classList.add('text-warning');
     
     if (roleType === 'STUDENT') {
-        document.getElementById('credTabStudents')?.classList.add('active', 'text-white');
+        const el = document.getElementById('credTabStudents');
+        el?.classList.remove('text-info');
+        el?.classList.add('active', 'text-dark', 'fw-bold');
     } else if (roleType === 'FACULTY') {
-        document.getElementById('credTabFaculty')?.classList.add('active', 'text-white');
+        const el = document.getElementById('credTabFaculty');
+        el?.classList.remove('text-info');
+        el?.classList.add('active', 'text-dark', 'fw-bold');
     } else if (roleType === 'CLASS_ADVISOR') {
-        document.getElementById('credTabAdvisor')?.classList.add('active', 'text-white');
+        const el = document.getElementById('credTabAdvisor');
+        el?.classList.remove('text-warning');
+        el?.classList.add('active', 'text-dark', 'fw-bold');
     }
     
     window.filterCredentials();
@@ -5040,9 +5053,27 @@ window.filterCredentials = function() {
             <td class="font-monospace text-warning">${c.rawPassword}</td>
             <td>${c.active === 'true' ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-danger">Inactive</span>'}</td>
             <td>
-                <button class="btn btn-sm btn-outline-warning py-0 px-2" onclick="window.adminResetPassword('${c.username}')" title="Reset Password">
-                    <i class="fa-solid fa-key"></i> Reset
-                </button>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-warning py-0 px-2" onclick="window.adminResetPassword('${c.username}')" title="Reset Password">
+                        <i class="fa-solid fa-key"></i> Reset
+                    </button>
+                    ${c.role === 'ROLE_STUDENT' ? `
+                    <button class="btn btn-sm btn-outline-info py-0 px-2" onclick="window.editPersistentStudent(${typeof c.entityId === 'string' ? `'${c.entityId}'` : (c.entityId || `'${c.username}'`)})" title="Edit Student">
+                        <i class="fa-solid fa-pen"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="window.deletePersistentStudent(${typeof c.entityId === 'string' ? `'${c.entityId}'` : (c.entityId || `'${c.username}'`)})" title="Delete Student">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                    ` : ''}
+                    ${c.role === 'ROLE_FACULTY' ? `
+                    <button class="btn btn-sm btn-outline-info py-0 px-2" onclick="window.editPersistentFaculty(${typeof c.entityId === 'string' ? `'${c.entityId}'` : (c.entityId || `'${c.username}'`)})" title="Edit Faculty">
+                        <i class="fa-solid fa-pen"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="window.deletePersistentFaculty(${typeof c.entityId === 'string' ? `'${c.entityId}'` : (c.entityId || `'${c.username}'`)})" title="Delete Faculty">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                    ` : ''}
+                </div>
             </td>
         </tr>
     `).join('');
@@ -5314,11 +5345,15 @@ window.saveEditFaculty = async function() {
 window.deletePersistentFaculty = async function (id) {
     if (!confirm('Are you sure you want to delete this faculty member?')) return;
     try {
-        const res = await apiFetch(`/api/teachers/${id}`, { method: 'DELETE' });
+        const url = typeof id === 'string' ? `/api/auth/user/${id}` : `/api/teachers/${id}`;
+        const res = await apiFetch(url, { method: 'DELETE' });
         if (res.ok) {
             alert('Faculty deleted.');
             if (window.loadAdminFullFaculty) loadAdminFullFaculty();
             if (window.renderAdminFacultyDetails) renderAdminFacultyDetails();
+            if (window.renderCredentialsList && document.getElementById('viewCredentialsModal')?.classList.contains('show')) {
+                window.renderCredentialsList();
+            }
         } else {
             alert('Failed to delete faculty.');
         }
@@ -5513,31 +5548,33 @@ window.submitAddFacultyForm = async function (e) {
 window.deletePersistentStudent = async function (id) {
     if (!confirm('Are you sure you want to delete this student permanently?')) return;
     try {
-        const res = await apiFetch(`/api/students/${id}`, { method: 'DELETE' });
+        const url = typeof id === 'string' ? `/api/auth/user/${id}` : `/api/students/${id}`;
+        const res = await apiFetch(url, { method: 'DELETE' });
         if (res.ok) {
             alert('Student deleted.');
-            loadRecentStudents();
-            const idx = studentsRoster.findIndex(st => st.id === id);
-            if (idx !== -1) {
-                studentsRoster.splice(idx, 1);
-                saveStudents();
+            if (typeof id !== 'string') {
+                loadRecentStudents();
+                const idx = studentsRoster.findIndex(st => st.id === id);
+                if (idx !== -1) {
+                    studentsRoster.splice(idx, 1);
+                    saveStudents();
+                }
+                renderStudentsRoster();
+                // Refresh Class Advisor Modal if open
+                if (document.getElementById('studentDetailsOnlyBody')) {
+                    const sec = document.getElementById('classAdvisorClassSelect')?.value;
+                    if (sec) openClassAdvisorModal(sec);
+                }
             }
-            renderStudentsRoster();
-            // Refresh Class Advisor Modal if open
-            if (document.getElementById('studentDetailsOnlyBody')) {
-                const sec = document.getElementById('classAdvisorClassSelect')?.value;
-                if (sec) openClassAdvisorModal(sec);
+            if (window.renderCredentialsList && document.getElementById('viewCredentialsModal')?.classList.contains('show')) {
+                window.renderCredentialsList();
             }
         } else {
             alert('Failed to delete student.');
         }
     } catch (err) {
-        console.error(err);
+        alert('Error connecting to server.');
     }
-}
-
-window.showAdminLeaveNotif = function () {
-    showToast('Notifications', 'This notification will alert concerned staff about the faculty substitution or leave.');
 };
 window.onFilterChange = onFilterChange;
 window.currentStudentRecord = currentStudentRecord;
@@ -7685,5 +7722,164 @@ window.openFacultyProfileModal = async function() {
     const modalEl = document.getElementById('facultyProfileModal');
     if (modalEl) {
         new bootstrap.Modal(modalEl).show();
+    }
+};
+
+
+
+
+window.staffDirectory = staffDirectory;
+window.saveStaffDirectory = saveStaffDirectory;
+
+
+
+
+window.renderManageClassAdvisors = async function() {
+    const selFac = document.getElementById('advisorSelectFaculty');
+    const selClass = document.getElementById('advisorSelectClass');
+    const tbody = document.getElementById('classAdvisorsTbody');
+
+    if (selFac) selFac.innerHTML = '<option value="">-- Loading Faculty --</option>';
+    if (selClass) selClass.innerHTML = '<option value="">-- Loading Classes --</option>';
+    if (tbody) tbody.innerHTML = '<tr><td colSpan="3" class="text-center text-muted">Loading...</td></tr>';
+
+    // Fetch faculties from API
+    let faculties = [];
+    try {
+        const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
+        const res = await fetchFn('/api/teachers');
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) faculties = data;
+        }
+    } catch (e) {
+        console.error("Error fetching teachers:", e);
+    }
+
+    if (!faculties || faculties.length === 0) {
+        faculties = window.staffDirectory || [];
+    }
+
+    if (selFac) {
+        const facOptions = faculties.map(f => {
+            const val = f.employeeId || f.name || f.displayName || f.username || f.firstName;
+            const disp = f.displayName || f.name || (f.firstName ? f.firstName + ' ' + (f.lastName || '') : val);
+            const dept = f.department ? (f.department.name || f.department) : (f.dept || '-');
+            return `<option value="${val}">${disp} (${dept})</option>`;
+        }).join('');
+        selFac.innerHTML = '<option value="">-- Choose Faculty --</option>' + facOptions;
+    }
+
+    // Use activeSections for classes, matching the View Sections modal
+    let sections = (typeof activeSections !== 'undefined' && Array.isArray(activeSections)) 
+                   ? activeSections.map(s => s.name) 
+                   : [];
+
+    if (!sections || sections.length === 0) {
+        if (window.studentsData && window.studentsData.length > 0) {
+            sections = [...new Set(window.studentsData.map(s => s.sec).filter(s => s && s.trim() !== ''))];
+        } else {
+            const ttSections = Object.keys(window.timetableData || {}).filter(k => k !== 'null' && k !== '');
+            sections = [...new Set([...ttSections, 'II CSE C', 'II CSE D', 'II IT A', 'II AI&DS A'])];
+        }
+    }
+    
+    sections = [...new Set(sections)].sort();
+
+    if (selClass) {
+        selClass.innerHTML = '<option value="">-- Choose Class --</option>' + sections.map(s => 
+            `<option value="${s}">${s}</option>`
+        ).join('');
+    }
+
+    if (tbody) {
+        // Find advisors based on our updated faculties list or staffDirectory
+        const allFaculties = [...(window.staffDirectory || []), ...faculties];
+        // filter unique by name/val
+        const uniqueFacs = [];
+        const seen = new Set();
+        for (let f of allFaculties) {
+            const val = f.employeeId || f.name || f.displayName || f.username || f.firstName;
+            if (val && !seen.has(val)) {
+                seen.add(val);
+                uniqueFacs.push(f);
+            }
+        }
+        
+        const advisors = uniqueFacs.filter(s => s.classAdvisorFor && s.classAdvisorFor.trim() !== '');
+        
+        if (advisors.length === 0) {
+            tbody.innerHTML = '<tr><td colSpan="3" class="text-center text-muted">No class advisors assigned yet.</td></tr>';
+        } else {
+            tbody.innerHTML = advisors.map(a => {
+                const val = a.employeeId || a.name || a.displayName || a.username || a.firstName;
+                const disp = a.displayName || a.name || (a.firstName ? a.firstName + ' ' + (a.lastName || '') : val);
+                return `
+                <tr>
+                    <td>${disp}</td>
+                    <td><span class="badge bg-success">${a.classAdvisorFor}</span></td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.removeClassAdvisor('${val}')" title="Remove Advisor">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `}).join('');
+        }
+    }
+};
+
+window.assignClassAdvisor = function() {
+    const facName = document.getElementById('advisorSelectFaculty').value;
+    const className = document.getElementById('advisorSelectClass').value;
+    
+    if (!facName || !className) {
+        alert('Please select both faculty and class.');
+        return;
+    }
+
+    const existing = window.staffDirectory.find(s => s.classAdvisorFor === className);
+    if (existing && existing.name !== facName) {
+        if (!confirm(`Class ${className} is already assigned to ${existing.displayName || existing.name}. Reassign?`)) {
+            return;
+        }
+        existing.classAdvisorFor = '';
+    }
+
+    let fac = window.staffDirectory.find(s => s.name === facName);
+    if (!fac) {
+        const selFac = document.getElementById('advisorSelectFaculty');
+        const text = selFac.options[selFac.selectedIndex].text;
+        let dept = 'Unknown';
+        if (text.includes('(') && text.includes(')')) {
+            dept = text.split('(')[1].split(')')[0];
+        }
+        fac = { name: facName, displayName: facName, dept: dept, status: 'Available' };
+        window.staffDirectory.push(fac);
+    }
+    
+    fac.classAdvisorFor = className;
+    window.saveStaffDirectory();
+    window.renderManageClassAdvisors();
+    showToast('Assigned', `${fac.displayName || fac.name} is now the Class Advisor for ${className}.`);
+    
+    if (window.renderCredentialsList && document.getElementById('viewCredentialsModal').classList.contains('show')) {
+        window.renderCredentialsList();
+    }
+};
+
+window.removeClassAdvisor = function(facName) {
+    if (!confirm('Are you sure you want to remove this Class Advisor?')) return;
+    const fac = window.staffDirectory.find(s => s.name === facName);
+    if (fac) {
+        fac.classAdvisorFor = '';
+        window.saveStaffDirectory();
+        window.renderManageClassAdvisors();
+        showToast('Removed', `Class Advisor role removed for ${fac.displayName || fac.name}.`);
+        
+        // Refresh credentials list if it's open
+        if (window.renderCredentialsList && document.getElementById('viewCredentialsModal').classList.contains('show')) {
+            window.renderCredentialsList();
+        }
     }
 };

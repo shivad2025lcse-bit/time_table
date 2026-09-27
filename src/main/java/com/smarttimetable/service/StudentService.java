@@ -1,6 +1,7 @@
 package com.smarttimetable.service;
 
 import com.smarttimetable.entity.Student;
+import com.smarttimetable.entity.User;
 import com.smarttimetable.repository.StudentRepository;
 import org.springframework.stereotype.Service;
 import com.smarttimetable.repository.DepartmentRepository;
@@ -119,6 +120,13 @@ public class StudentService {
     }
 
     public void deleteStudent(Long id) {
-        studentRepository.deleteById(id);
+        Student student = studentRepository.findById(id).orElse(null);
+        if (student != null) {
+            User user = student.getUser();
+            studentRepository.deleteById(id);
+            if (user != null) {
+                userRepository.delete(user);
+            }
+        }
     }
 }

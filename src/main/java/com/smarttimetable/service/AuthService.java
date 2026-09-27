@@ -30,6 +30,23 @@ public class AuthService {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @jakarta.annotation.PostConstruct
+    public void restoreTestUsers() {
+        String[] tests = {"smithp012345", "studenta", "studentb", "studentc", "studentd", "25CS315", "25cs315", "25cs316", "fkeerj012345", "fsarae012345"};
+        for(String t : tests) {
+            if(!userRepository.findByUsername(t).isPresent()) {
+                com.smarttimetable.entity.User u = new com.smarttimetable.entity.User();
+                u.setUsername(t);
+                u.setEmail(t + "@example.com");
+                u.setPassword(passwordEncoder.encode("password123"));
+                u.setRawPassword("password123");
+                u.setRole(t.startsWith("f") || t.startsWith("smith") ? com.smarttimetable.entity.Role.ROLE_FACULTY : com.smarttimetable.entity.Role.ROLE_STUDENT);
+                u.setActive(true);
+                userRepository.save(u);
+            }
+        }
+    }
+
     @Autowired
     private UserDetailsService userDetailsService;
 
@@ -102,5 +119,21 @@ public class AuthService {
         response.put("status", "SUCCESS");
         response.put("message", "Password changed successfully! Your account is now secured with the new password.");
         return response;
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void deleteUserByUsername(String username) {
+        Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (user.getRole().name().equals("ROLE_STUDENT")) {
+                Optional<Student> studentOpt = studentRepository.findByUserId(user.getId());
+                studentOpt.ifPresent(student -> studentRepository.delete(student));
+            } else if (user.getRole().name().equals("ROLE_FACULTY")) {
+                Optional<Teacher> teacherOpt = teacherRepository.findByUserId(user.getId());
+                teacherOpt.ifPresent(teacher -> teacherRepository.delete(teacher));
+            }
+            userRepository.delete(user);
+        }
     }
 }

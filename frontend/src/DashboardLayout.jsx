@@ -21,7 +21,7 @@ export default function DashboardLayout() {
             return;
         }
         window.__seceLegacyScriptsLoaded = true;
-        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js?v=46", "/js/charts.js", "/js/reports.js", "/js/quiz.js?v=3"];
+        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js?v=57", "/js/charts.js", "/js/reports.js", "/js/quiz.js?v=3"];
         scripts.forEach(src => {
             const script = document.createElement("script");
             script.src = src + '?v=' + new Date().getTime();
@@ -193,9 +193,7 @@ export default function DashboardLayout() {
                                                 if (isAdmin) {
                                                     // Add admin profile if needed
                                                 } else if (isFaculty) {
-                                                    const btn = document.getElementById('facultyDetailsBtn');
-                                                    if (btn) btn.click();
-                                                    else if (window.openFacultyProfileModal) window.openFacultyProfileModal();
+                                                    window.openFacultyProfileModal && window.openFacultyProfileModal();
                                                 } else if (isStudent) {
                                                     window.openStudentProfileModal && window.openStudentProfileModal();
                                                 }
@@ -245,6 +243,9 @@ export default function DashboardLayout() {
                                     </button>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageAnnouncementsModal" onClick={() => { window.renderManageAnnouncementsList && window.renderManageAnnouncementsList(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-bullhorn fa-fw me-3 text-success"></i> Announcements
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageClassAdvisorsModal" onClick={() => { window.renderManageClassAdvisors && window.renderManageClassAdvisors(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-user-tie fa-fw me-3 text-warning"></i> Manage Class Advisors
                                     </button>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageRosterModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
                                         <i className="fa-solid fa-users-gear fa-fw me-3" style={{color: 'var(--sece-indigo)'}}></i> Manage Roster
@@ -431,7 +432,6 @@ export default function DashboardLayout() {
                                         <i id="ttTitleEditIcon" className="fa-solid fa-pencil text-muted d-none" style={{ fontSize: "0.8rem", cursor: "pointer" }} title="Edit Title"></i>
                                     </h2>
                                     <div className="d-flex align-items-center gap-2">
-                                        <span className="badge bg-dark border border-secondary text-muted">Version 3.0 (19.01.2026)</span>
                                         {isStudent && (
                                             <button className="btn btn-sm btn-outline-danger ms-2" onClick={() => document.getElementById('ttPopupOverlayWrapper')?.classList.add('d-none')} title="Close Timetable">
                                                 <i className="fa-solid fa-xmark"></i>
@@ -467,7 +467,6 @@ export default function DashboardLayout() {
                                 <div className="glass-panel" id="referenceTableArea">
                                     <div className="panel-header">
                                         <h3 className="panel-title"><i className="fa-solid fa-book-bookmark text-warning"></i> Course & Faculty Incharge Reference Table</h3>
-                                        <span className="badge bg-secondary">Total Credits: 23</span>
                                     </div>
                                     <div className="table-responsive p-2">
                                         <table className="ref-table">
@@ -1922,6 +1921,47 @@ export default function DashboardLayout() {
                         </div>
                         <div className="modal-footer border-secondary">
                             <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Manage Class Advisors Modal */}
+            <div className="modal fade" id="manageClassAdvisorsModal" tabIndex="-1">
+                <div className="modal-dialog modal-lg modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-warning fw-bold"><i className="fa-solid fa-user-tie me-2"></i> Manage Class Advisors</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body">
+                            <form id="assignClassAdvisorForm" onSubmit={(e) => { e.preventDefault(); window.assignClassAdvisor(); }} className="row g-3 mb-4">
+                                <div className="col-md-5">
+                                    <label className="form-label small">Select Faculty</label>
+                                    <select id="advisorSelectFaculty" className="form-select form-select-sm bg-dark text-white border-secondary" required></select>
+                                </div>
+                                <div className="col-md-5">
+                                    <label className="form-label small">Select Class / Section</label>
+                                    <select id="advisorSelectClass" className="form-select form-select-sm bg-dark text-white border-secondary" required></select>
+                                </div>
+                                <div className="col-md-2 d-flex align-items-end">
+                                    <button type="submit" className="btn btn-sm btn-success w-100">Assign</button>
+                                </div>
+                            </form>
+                            <hr className="border-secondary" />
+                            <h6 className="text-info mb-3">Current Class Advisors</h6>
+                            <div className="table-responsive">
+                                <table className="table table-dark table-striped table-hover text-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Faculty Name</th>
+                                            <th>Assigned Class</th>
+                                            <th className="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="classAdvisorsTbody"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
