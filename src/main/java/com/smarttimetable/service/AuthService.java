@@ -32,7 +32,10 @@ public class AuthService {
 
     @jakarta.annotation.PostConstruct
     public void restoreTestUsers() {
-        String[] tests = {"smithp012345", "studenta", "studentb", "studentc", "studentd", "25CS315", "25cs315", "25cs316", "fkeerj012345", "fsarae012345"};
+        String[] tests = {
+            "shiva25012007", "smithp012345", "studenta", "studentb", "studentc", "studentd", "25CS315", "25cs315", "25cs316",
+            "fkeerj012345", "fsh012345", "fmk012345", "fns012345", "frk012345", "fes012345", "fnm012345", "fms012345", "fbs012345", "fpa012345", "frr012345"
+        };
         for(String t : tests) {
             if(!userRepository.findByUsername(t).isPresent()) {
                 com.smarttimetable.entity.User u = new com.smarttimetable.entity.User();
@@ -40,7 +43,11 @@ public class AuthService {
                 u.setEmail(t + "@example.com");
                 u.setPassword(passwordEncoder.encode("password123"));
                 u.setRawPassword("password123");
-                u.setRole(t.startsWith("f") || t.startsWith("smith") ? com.smarttimetable.entity.Role.ROLE_FACULTY : com.smarttimetable.entity.Role.ROLE_STUDENT);
+                if (t.equals("shiva25012007")) {
+                    u.setRole(com.smarttimetable.entity.Role.ROLE_ADMIN);
+                } else {
+                    u.setRole(t.startsWith("f") || t.startsWith("smith") ? com.smarttimetable.entity.Role.ROLE_FACULTY : com.smarttimetable.entity.Role.ROLE_STUDENT);
+                }
                 u.setActive(true);
                 userRepository.save(u);
             }

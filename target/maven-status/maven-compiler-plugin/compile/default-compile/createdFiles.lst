@@ -71,6 +71,7 @@ com\smarttimetable\security\JwtUtil.class
 com\smarttimetable\security\JwtFilter.class
 com\smarttimetable\dto\QuizAiGenerateRequest.class
 com\smarttimetable\service\TimetableGeneratorService$ScheduleTask.class
+com\smarttimetable\controller\RestoreController.class
 com\smarttimetable\repository\CoverageRequestRepository.class
 com\smarttimetable\security\CustomUserDetailsService.class
 com\smarttimetable\service\MockAiEvaluationServiceImpl.class

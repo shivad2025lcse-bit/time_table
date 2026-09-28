@@ -1,17 +1,12 @@
 let currentUser = null;
 let authToken = localStorage.getItem('jwt_token');
 
-document.addEventListener('DOMContentLoaded', () => {
-    if (authToken && (window.location.pathname === '/' || window.location.pathname.includes('login'))) {
+setTimeout(() => {
+    if (authToken) {
         currentUser = JSON.parse(localStorage.getItem('user_info') || '{}');
-        const role = currentUser.role || '';
-        if (role === 'ROLE_ADMIN') {
-            window.location.href = '/admin-dashboard.html';
-        } else if (role === 'ROLE_FACULTY') {
-            window.location.href = '/faculty-dashboard.html';
-        } else {
-            window.location.href = '/student-dashboard.html';
-        }
+        showMainApp();
+    } else {
+        showLoginPage();
     }
 
     document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
@@ -23,14 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function apiFetch(url, options = {}) {
     options.headers = options.headers || {};
-    if (authToken) {
-        options.headers['Authorization'] = `Bearer ${authToken}`;
+    const currentToken = localStorage.getItem('jwt_token');
+    if (currentToken) {
+        options.headers['Authorization'] = `Bearer ${currentToken}`;
     }
     if (options.body && typeof options.body === 'string' && !options.headers['Content-Type']) {
         options.headers['Content-Type'] = 'application/json';
     }
     const response = await fetch(url, options);
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
         logout();
     }
     return response;
@@ -55,19 +51,7 @@ async function handleLogin(e) {
             currentUser = data;
             localStorage.setItem('jwt_token', data.token);
             localStorage.setItem('user_info', JSON.stringify(data));
-            
-            if (document.getElementById('loginView')) {
-                showMainApp();
-            } else {
-                const role = data.role || '';
-                if (role === 'ROLE_ADMIN') {
-                    window.location.href = '/admin-dashboard.html';
-                } else if (role === 'ROLE_FACULTY') {
-                    window.location.href = '/faculty-dashboard.html';
-                } else {
-                    window.location.href = '/student-dashboard.html';
-                }
-            }
+            showMainApp();
         } else {
             let errorMsg = "Invalid username or password!";
             if (res.status === 502 || res.status === 504) {
@@ -83,14 +67,17 @@ async function handleLogin(e) {
             }
         }
     } catch (err) {
+        console.error("Login fetch error:", err);
         if (alertBox) {
             alertBox.classList.remove('d-none');
-            alertBox.innerText = "Error connecting to server!";
+            alertBox.innerText = "Error: " + err.message;
         } else {
-            alert("Error connecting to server!");
+            alert("Error: " + err.message);
         }
     }
 }
+window.handleLogin = handleLogin;
+
 
 // Reset Password Handler (Available for all Admin, Faculty, and Students)
 async function handleResetPassword(e) {
@@ -133,38 +120,58 @@ function logout() {
 }
 
 function showLoginPage() {
-    const loginView = document.getElementById('loginView');
-    const appWrapper = document.getElementById('appWrapper');
-    if (loginView) loginView.classList.remove('d-none');
-    if (appWrapper) appWrapper.classList.add('d-none');
+    document.getElementById('loginView')?.classList.remove('d-none');
+    document.getElementById('appWrapper')?.classList.add('d-none');
 }
 
 function showMainApp() {
-    const loginView = document.getElementById('loginView');
-    const appWrapper = document.getElementById('appWrapper');
-    if (loginView) loginView.classList.add('d-none');
-    if (appWrapper) appWrapper.classList.remove('d-none');
+    document.getElementById('loginView')?.classList.add('d-none');
+    document.getElementById('appWrapper')?.classList.remove('d-none');
 
     if (currentUser) {
         const navUserName = document.getElementById('navUserName');
         const navUserRole = document.getElementById('navUserRole');
         if (navUserName) navUserName.innerText = currentUser.name || currentUser.username;
-        if (navUserRole) navUserRole.innerText = currentUser.role ? currentUser.role.replace('ROLE_', '') : '';
-    }
+        const shortRole = currentUser.role ? currentUser.role.replace('ROLE_', '') : '';
+        if (navUserRole) navUserRole.innerText = shortRole;
 
-    if (typeof switchTab === 'function') {
-        if (currentUser && currentUser.role === 'ROLE_STUDENT') {
-            switchTab('view-student-dashboard');
-        } else if (currentUser && currentUser.role === 'ROLE_FACULTY') {
-            switchTab('view-faculty-dashboard');
-        } else {
-            switchTab('view-admin-dashboard');
+        // Store username/role in localStorage so legacy frontend_app.js can find this session
+        if (currentUser.username) {
+            localStorage.setItem('sece_logged_in_user', currentUser.username.toLowerCase());
+        }
+        if (shortRole) {
+            localStorage.setItem('sece_logged_in_role', shortRole);
+        }
+
+        // Defer switchRole so that legacy scripts (frontend_app.js) have time to load
+        if (shortRole) {
+            const trySwitch = (attempts) => {
+                if (typeof window.switchRole === 'function') {
+                    window.switchRole(shortRole, true);
+                } else if (attempts > 0) {
+                    setTimeout(() => trySwitch(attempts - 1), 300);
+                }
+            };
+            trySwitch(10);
         }
     }
 
-    if (typeof loadDashboardStats === 'function') loadDashboardStats();
-    if (typeof loadTimetableData === 'function') loadTimetableData();
-    if (typeof populateSectionDropdowns === 'function') populateSectionDropdowns();
+    if (currentUser && currentUser.role === 'ROLE_STUDENT') {
+        if (window.location.pathname !== '/student') window.location.href = '/student';
+    } else if (currentUser && currentUser.role === 'ROLE_FACULTY') {
+        if (window.location.pathname !== '/faculty') window.location.href = '/faculty';
+    } else if (currentUser && currentUser.role === 'ROLE_ADMIN') {
+        if (window.location.pathname !== '/admin') window.location.href = '/admin';
+    } else {
+        // Fallback
+        if (window.location.pathname !== '/student') window.location.href = '/student';
+    }
+
+    loadDashboardStats();
+    if (typeof loadTimetableData === 'function') {
+        loadTimetableData();
+    }
+    populateSectionDropdowns();
 }
 
 function switchTab(viewId) {
@@ -586,51 +593,81 @@ async function toggleAvailability(teacherId, day, slotId, status) {
 }
 
 // Delete functions (Faculty & Admin permissions)
-async function deleteTeacher(id) {
+window.deleteTeacher = async function(id) {
     if (confirm("Delete this teacher?")) {
-        await apiFetch(`/api/teachers/${id}`, { method: 'DELETE' });
-        loadTeachers();
+        try {
+            const res = await apiFetch(`/api/teachers/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadTeachers(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteStudent(id) {
+window.deleteStudent = async function(id) {
     if (confirm("Remove this student from institution records?")) {
-        await apiFetch(`/api/students/${id}`, { method: 'DELETE' });
-        loadStudents();
+        try {
+            const res = await apiFetch(`/api/students/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadStudents(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteDepartment(id) {
+window.deleteDepartment = async function(id) {
     if (confirm("Delete this department?")) {
-        await apiFetch(`/api/departments/${id}`, { method: 'DELETE' });
-        loadDepartments();
+        try {
+            const res = await apiFetch(`/api/departments/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadDepartments(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteSubject(id) {
+window.deleteSubject = async function(id) {
     if (confirm("Delete this subject?")) {
-        await apiFetch(`/api/subjects/${id}`, { method: 'DELETE' });
-        loadSubjects();
+        try {
+            const res = await apiFetch(`/api/subjects/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadSubjects(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteClassroom(id) {
+window.deleteClassroom = async function(id) {
     if (confirm("Delete this classroom?")) {
-        await apiFetch(`/api/classrooms/${id}`, { method: 'DELETE' });
-        loadClassrooms();
+        try {
+            const res = await apiFetch(`/api/classrooms/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadClassrooms(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteLab(id) {
+window.deleteLab = async function(id) {
     if (confirm("Delete this laboratory?")) {
-        await apiFetch(`/api/laboratories/${id}`, { method: 'DELETE' });
-        loadLabs();
+        try {
+            const res = await apiFetch(`/api/laboratories/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadLabs(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteSection(id) {
+window.deleteSection = async function(id) {
     if (confirm("Remove this class section?")) {
-        await apiFetch(`/api/sections/${id}`, { method: 'DELETE' });
-        loadSections();
+        try {
+            const res = await apiFetch(`/api/sections/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadSections(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
-async function deleteTimeSlot(id) {
+window.deleteTimeSlot = async function(id) {
     if (confirm("Delete this time slot?")) {
-        await apiFetch(`/api/timeslots/${id}`, { method: 'DELETE' });
-        loadTimeSlots();
+        try {
+            const res = await apiFetch(`/api/timeslots/${id}`, { method: 'DELETE' });
+            if (res.ok) { loadTimeSlots(); } 
+            else { const err = await res.text().catch(()=>''); alert("Error: " + err); }
+        } catch (e) { alert("Network error."); }
     }
 }
+
+// Expose all functions to window
+window.logout = logout;
+window.showLoginPage = showLoginPage;
+window.showMainApp = showMainApp;
+window.switchTab = switchTab;

@@ -420,7 +420,7 @@ export default function DashboardLayout() {
                                 <strong>Please select a Department and Section from the dropdowns above to view and edit its timetable.</strong>
                             </div>
 
-                            {!isFaculty && (
+                            {isStudent && (
                             <div id="ttPopupOverlayWrapper" className="tt-popup-wrapper">
                                 <button id="closeTtPopupBtn" className="btn btn-danger btn-sm d-none" style={{ position: 'fixed', top: '20px', right: '30px', zIndex: 10001, borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }} onClick={() => window.closeTtPopup?.()}><i className="fa-solid fa-xmark"></i></button>
 

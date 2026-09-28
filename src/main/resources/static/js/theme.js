@@ -9,11 +9,11 @@ function toggleTheme() {
 }
 
 // Apply theme on load
-document.addEventListener('DOMContentLoaded', () => {
+setTimeout(() => {
     const savedTheme = localStorage.getItem('sece_theme') || 'dark';
     document.body.setAttribute('data-theme', savedTheme);
     const icon = document.getElementById('themeIcon');
     if (icon) {
         icon.className = savedTheme === 'light' ? 'fa-solid fa-sun text-warning' : 'fa-solid fa-moon';
     }
-});
+}, 200);

@@ -56,7 +56,7 @@ public class StudentController {
     public ResponseEntity<Student> updateStudent(@PathVariable Long id, @RequestBody Student studentDetails, Authentication authentication) {
         return studentService.getStudentById(id)
                 .map(existing -> {
-                    boolean isStudent = authentication.getAuthorities().stream()
+                    boolean isStudent = authentication != null && authentication.getAuthorities().stream()
                             .anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"));
                     if (isStudent && (existing.getUser() == null || !existing.getUser().getUsername().equals(authentication.getName()))) {
                         return ResponseEntity.status(403).body((Student) null);

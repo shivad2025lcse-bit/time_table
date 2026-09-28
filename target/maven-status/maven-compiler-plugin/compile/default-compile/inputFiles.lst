@@ -15,6 +15,7 @@ D:\Java_project\src\main\java\com\smarttimetable\entity\QuizQuestion.java
 D:\Java_project\src\main\java\com\smarttimetable\exception\GlobalExceptionHandler.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Teacher.java
 D:\Java_project\src\main\java\com\smarttimetable\security\JwtUtil.java
+D:\Java_project\src\main\java\com\smarttimetable\controller\RestoreController.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\package-info.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\DashboardController.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Substitution.java

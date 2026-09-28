@@ -2435,8 +2435,12 @@ function quickAssignWednesdayALT() {
 
 // Filter Change Handler
 function onFilterChange() {
-    currentDept = document.getElementById('deptSelect').value;
-    currentSection = document.getElementById('sectionSelect').value;
+    const deptEl = document.getElementById('deptSelect');
+    const secEl = document.getElementById('sectionSelect');
+    if (!deptEl || !secEl) return;
+
+    currentDept = deptEl.value;
+    currentSection = secEl.value;
     localStorage.setItem('sece_last_viewed_dept', currentDept);
     localStorage.setItem('sece_last_viewed_section', currentSection);
 
@@ -4951,26 +4955,53 @@ window.renderCredentialsList = async function() {
         let students = [];
         let teachers = [];
         
-        if (credRes.ok) creds = await credRes.json();
-        if (studentRes.ok) students = await studentRes.json();
-        if (teacherRes.ok) teachers = await teacherRes.json();
+        let debugStatus = `credRes: ${credRes.status} ${credRes.statusText}`;
+        if (credRes.ok && studentRes.ok && teacherRes.ok) {
+            creds = await credRes.json();
+            students = await studentRes.json();
+            teachers = await teacherRes.json();
+        } else {
+            console.warn("Backend unavailable or failed. Using local storage data.");
+            studentsRoster.forEach(s => {
+                const uname = s.username || (s.roll ? s.roll.toLowerCase() : '');
+                creds.push({
+                    username: uname,
+                    role: 'STUDENT',
+                    rawPassword: getStoredPassword(uname) || getStudentPassword(s),
+                    active: 'true'
+                });
+            });
+            staffDirectory.forEach(t => {
+                const u = buildGeneratedUsername('FACULTY', t.name);
+                creds.push({
+                    username: u,
+                    role: 'FACULTY',
+                    rawPassword: getStoredPassword(u) || buildGeneratedPassword('FACULTY', u),
+                    active: 'true'
+                });
+            });
+            students = studentsRoster;
+            teachers = staffDirectory;
+        }
+        
+        window._debugFetchStatus = debugStatus;
         
         // Enhance credentials with extra info
         window._credDataCache = creds.map(c => {
             const extra = { name: '-', sectionDept: '-', isAdvisor: false };
-            if (c.role === 'ROLE_STUDENT') {
-                const s = students.find(x => (x.user && x.user.username === c.username) || x.username === c.username || x.registerNumber?.toLowerCase() === c.username);
+            if (c.role === 'ROLE_STUDENT' || c.role === 'STUDENT') {
+                const s = students.find(x => (x.user && x.user.username === c.username) || x.username === c.username || x.registerNumber?.toLowerCase() === c.username || (x.roll && x.roll.toLowerCase() === c.username));
                 if (s) {
                     extra.name = s.name || s.studentName || s.firstName || '-';
-                    extra.sectionDept = s.section ? s.section.sectionName : (s.department ? s.department.name : '-');
+                    extra.sectionDept = s.section ? s.section.sectionName : (s.department ? s.department.name : (s.sec || '-'));
                     extra.entityId = s.id || s.registerNumber || s.roll || `'${s.roll}'`;
                 }
-            } else if (c.role === 'ROLE_FACULTY') {
-                const t = teachers.find(x => (x.user && x.user.username === c.username) || x.username === c.username);
+            } else if (c.role === 'ROLE_FACULTY' || c.role === 'FACULTY') {
+                const t = teachers.find(x => (x.user && x.user.username === c.username) || x.username === c.username || buildGeneratedUsername('FACULTY', x.name) === c.username);
                 if (t) {
                     extra.name = t.displayName || t.name || t.firstName || '-';
                     extra.sectionDept = t.department ? (t.department.name || t.department) : (t.dept || '-');
-                    extra.entityId = t.id || t.employeeId || `'${t.employeeId}'`;
+                    extra.entityId = t.id || t.employeeId || `'${t.name}'`;
                     if (t.classAdvisorFor && t.classAdvisorFor.trim() !== '') {
                         extra.isAdvisor = true;
                     }
@@ -5024,9 +5055,9 @@ window.filterCredentials = function() {
     
     // Filter by role
     let filtered = window._credDataCache.filter(c => {
-        if (window._credCurrentRole === 'STUDENT') return c.role === 'ROLE_STUDENT';
-        if (window._credCurrentRole === 'FACULTY') return c.role === 'ROLE_FACULTY';
-        if (window._credCurrentRole === 'CLASS_ADVISOR') return c.role === 'ROLE_FACULTY' && c.isAdvisor;
+        if (window._credCurrentRole === 'STUDENT') return c.role === 'ROLE_STUDENT' || c.role === 'STUDENT';
+        if (window._credCurrentRole === 'FACULTY') return c.role === 'ROLE_FACULTY' || c.role === 'FACULTY';
+        if (window._credCurrentRole === 'CLASS_ADVISOR') return (c.role === 'ROLE_FACULTY' || c.role === 'FACULTY') && c.isAdvisor;
         return false;
     });
     
@@ -5040,7 +5071,12 @@ window.filterCredentials = function() {
     }
     
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colSpan="7" class="text-center text-muted py-4">No records found.</td></tr>';
+        tbody.innerHTML = `<tr><td colSpan="7" class="text-center text-muted py-4">
+            No records found. <br/>
+            DEBUG: Status = ${window._debugFetchStatus || 'unknown'}. <br/>
+            DEBUG: Cache Length = ${window._credDataCache ? window._credDataCache.length : 'null'}. <br/>
+            DEBUG: Cache = ${JSON.stringify(window._credDataCache).substring(0, 200)}...
+        </td></tr>`;
         return;
     }
     

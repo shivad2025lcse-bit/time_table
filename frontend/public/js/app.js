@@ -18,8 +18,9 @@ setTimeout(() => {
 
 async function apiFetch(url, options = {}) {
     options.headers = options.headers || {};
-    if (authToken) {
-        options.headers['Authorization'] = `Bearer ${authToken}`;
+    const currentToken = localStorage.getItem('jwt_token');
+    if (currentToken) {
+        options.headers['Authorization'] = `Bearer ${currentToken}`;
     }
     if (options.body && typeof options.body === 'string' && !options.headers['Content-Type']) {
         options.headers['Content-Type'] = 'application/json';
