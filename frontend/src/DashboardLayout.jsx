@@ -456,11 +456,11 @@ export default function DashboardLayout() {
                                                 <th style={{ width: "100px" }}>Day Order</th>
                                                 <th>1<br /><small className="text-dim" id="ttHeaderP1">08.40 - 09.40</small></th>
                                                 <th>2<br /><small className="text-dim" id="ttHeaderP2">09.40 - 10.40</small></th>
+                                                <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderTea">10.40<br/>-<br/>11.00</th>
                                                 <th>3<br /><small className="text-dim" id="ttHeaderP3">11.00 - 12.00</small></th>
-                                                <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderTea">12.00<br/>-<br/>12.15</th>
                                                 <th>4<br /><small className="text-dim" id="ttHeaderP4">12.00 - 01.00</small></th>
+                                                <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderLunch">01.00<br/>-<br/>01.40</th>
                                                 <th>5<br /><small className="text-dim" id="ttHeaderP5">01.40 - 02.30</small></th>
-                                                <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderLunch">02.30<br/>-<br/>03.15</th>
                                                 <th>ACT<br /><small className="text-dim" id="ttHeaderAct">Activity</small></th>
                                                 <th>6<br /><small className="text-dim" id="ttHeaderP6">02.30 - 03.20</small></th>
                                                 <th>7<br /><small className="text-dim" id="ttHeaderP7">03.20 - 04.10</small></th>

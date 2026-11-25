@@ -42,6 +42,12 @@ public class TimetableEntry {
     @Column(name = "academic_year")
     private String academicYear = "2025-2026";
 
+    @Column(name = "assigned_faculty", length = 120)
+    private String assignedFaculty;
+
+    @Column(name = "assigned_venue", length = 120)
+    private String assignedVenue;
+
     public TimetableEntry() {}
 
     public TimetableEntry(String day, TimeSlot timeSlot, Subject subject, Teacher teacher, Classroom classroom, Laboratory laboratory, Section section, Integer semester, String academicYear) {
@@ -85,4 +91,10 @@ public class TimetableEntry {
 
     public String getAcademicYear() { return academicYear; }
     public void setAcademicYear(String academicYear) { this.academicYear = academicYear; }
+
+    public String getAssignedFaculty() { return assignedFaculty; }
+    public void setAssignedFaculty(String assignedFaculty) { this.assignedFaculty = assignedFaculty; }
+
+    public String getAssignedVenue() { return assignedVenue; }
+    public void setAssignedVenue(String assignedVenue) { this.assignedVenue = assignedVenue; }
 }

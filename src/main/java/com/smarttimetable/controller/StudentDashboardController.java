@@ -72,10 +72,16 @@ public class StudentDashboardController {
         
         Map<String, Object> studentInfo = new HashMap<>();
         studentInfo.put("id", student.getId());
-        studentInfo.put("year", student.getSemester() != null ? (student.getSemester() + 1) / 2 : "Unknown"); // e.g., II Year
-        studentInfo.put("department", student.getDepartment().getCode());
-        studentInfo.put("section", section.getSectionName().substring(section.getSectionName().lastIndexOf(" ") + 1));
-        studentInfo.put("fullSectionName", section.getSectionName());
+        studentInfo.put("year", resolveYearLabel(student, section));
+        String deptCode = (student.getDepartment() != null && student.getDepartment().getCode() != null)
+                ? student.getDepartment().getCode()
+                : (section.getCourse() != null && section.getCourse().getDepartment() != null
+                    ? section.getCourse().getDepartment().getCode()
+                    : "CSE");
+        studentInfo.put("department", deptCode);
+        String secFull = section.getSectionName() != null ? section.getSectionName().trim() : "";
+        studentInfo.put("section", secFull.contains(" ") ? secFull.substring(secFull.lastIndexOf(" ") + 1) : secFull);
+        studentInfo.put("fullSectionName", secFull);
         response.put("student", studentInfo);
         
         response.put("date", today.toString());
@@ -192,11 +198,32 @@ public class StudentDashboardController {
             
         if (entry != null && entry.getSubject() != null && !entry.getSubject().getSubjectName().equalsIgnoreCase("FREE")) {
             period.put("subject", entry.getSubject().getSubjectName());
-            period.put("faculty", entry.getTeacher() != null ? entry.getTeacher().getName() : "TBA");
-            period.put("room", entry.getClassroom() != null ? entry.getClassroom().getRoomNumber() : "TBA");
+            String fac = (entry.getAssignedFaculty() != null && !entry.getAssignedFaculty().trim().isEmpty())
+                    ? entry.getAssignedFaculty().trim()
+                    : (entry.getTeacher() != null ? entry.getTeacher().getName() : "TBA");
+            String venue = (entry.getAssignedVenue() != null && !entry.getAssignedVenue().trim().isEmpty())
+                    ? entry.getAssignedVenue().trim()
+                    : (entry.getClassroom() != null ? entry.getClassroom().getRoomNumber()
+                        : (entry.getLaboratory() != null ? entry.getLaboratory().getLabName() : "TBA"));
+            period.put("faculty", fac);
+            period.put("room", venue);
         } else {
             period.put("subject", "FREE");
         }
         return period;
+    }
+
+    private String resolveYearLabel(Student student, Section section) {
+        Integer sem = student.getSemester() != null ? student.getSemester() : section.getSemester();
+        if (section.getYear() != null) return String.valueOf(section.getYear());
+        if (sem != null) return String.valueOf((sem + 1) / 2);
+        if (section.getSectionName() != null) {
+            String first = section.getSectionName().trim().split("\\s+")[0].toUpperCase();
+            if (first.equals("I")) return "1";
+            if (first.equals("II")) return "2";
+            if (first.equals("III")) return "3";
+            if (first.equals("IV")) return "4";
+        }
+        return "II";
     }
 }

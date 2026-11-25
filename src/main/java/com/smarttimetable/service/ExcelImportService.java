@@ -141,72 +141,25 @@ public class ExcelImportService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> saveManualTimetable(String sectionName, Map<String, Map<String, String>> gridData) throws Exception {
-        Map<String, Object> response = new HashMap<>();
-        
-        Section section = sectionRepository.findBySectionName(sectionName).orElse(null);
+        String cleanSection = (sectionName != null && !sectionName.trim().isEmpty()) ? sectionName.trim() : "II CSE C";
+        Section section = sectionRepository.findBySectionName(cleanSection).orElse(null);
+
         if (section == null) {
-            List<Section> allSections = sectionRepository.findAll();
-            if (!allSections.isEmpty()) section = allSections.get(0);
+            String[] tokens = cleanSection.split("\\s+");
+            String yr = tokens.length >= 1 ? tokens[0] : "II";
+            String dp = tokens.length >= 2 ? tokens[1] : "CSE";
+            String sc = tokens.length >= 3 ? tokens[2] : "A";
+            return assignUploadedClassTimetable(dp, yr, sc, cleanSection, null, gridData);
         }
 
-        List<TimeSlot> slots = ensureTimeSlots();
-        List<Subject> allSubjects = subjectRepository.findAll();
-        List<Teacher> allTeachers = teacherRepository.findAll();
+        int semester = section.getSemester() != null ? section.getSemester() : 3;
+        int savedCount = replaceSectionTimetableFromGrid(section, semester, gridData);
 
-        int importedCount = 0;
-        int updatedCount = 0;
-
-        for (Map.Entry<String, Map<String, String>> entryDay : gridData.entrySet()) {
-            String day = entryDay.getKey();
-            Map<String, String> periods = entryDay.getValue();
-            
-            for (int p = 1; p <= 7; p++) {
-                String cellVal = periods.get("P" + p);
-                if (cellVal == null || cellVal.trim().isEmpty()) {
-                    continue; // Leave free
-                }
-
-                String formattedVal = cellVal;
-
-                if (section == null || slots.isEmpty()) {
-                    continue;
-                }
-
-                final int periodIdx = p;
-                TimeSlot timeSlot = slots.stream().filter(s -> s.getSlotNumber() != null && s.getSlotNumber() == periodIdx).findFirst().orElse(slots.get(0));
-                
-                String subjectCode = formattedVal.split(",")[0].trim();
-                Subject subject = allSubjects.stream().filter(s -> s.getSubjectCode() != null && s.getSubjectCode().equalsIgnoreCase(subjectCode)).findFirst().orElse(null);
-                if (subject == null) {
-                    if (!allSubjects.isEmpty()) subject = allSubjects.get(0);
-                }
-                
-                Teacher teacher = null;
-                if (!allTeachers.isEmpty()) teacher = allTeachers.get(0);
-
-                List<TimetableEntry> existing = timetableRepository.findBySectionId(section.getId());
-                TimetableEntry entry = existing.stream()
-                    .filter(e -> e.getDay().equals(day) && e.getTimeSlot().getId().equals(timeSlot.getId()))
-                    .findFirst()
-                    .orElse(new TimetableEntry());
-                
-                if (entry.getId() != null) {
-                    updatedCount++;
-                } else {
-                    importedCount++;
-                }
-                
-                entry.setDay(day);
-                entry.setSection(section);
-                entry.setTimeSlot(timeSlot);
-                if (subject != null) entry.setSubject(subject);
-                if (teacher != null) entry.setTeacher(teacher);
-                
-                timetableRepository.save(entry);
-            }
-        }
-        
-        response.put("message", "Timetable saved successfully to Database.\n" + importedCount + " inserted, " + updatedCount + " updated.");
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", "Timetable saved successfully to Database (" + savedCount + " periods for " + section.getSectionName() + ").");
+        response.put("sectionName", section.getSectionName());
+        response.put("sectionId", section.getId());
+        response.put("entriesSaved", savedCount);
         return response;
     }
 
@@ -288,7 +241,19 @@ public class ExcelImportService {
             }
         }
 
-        // 5. Replace section timetable entries accurately
+        // 5. Replace section timetable entries accurately via shared grid saver
+        int savedCount = replaceSectionTimetableFromGrid(section, semester, gridData);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", "Assigned timetable (" + savedCount + " periods) to " + targetSectionName + ".");
+        response.put("sectionName", targetSectionName);
+        response.put("sectionId", section.getId());
+        response.put("entriesSaved", savedCount);
+        response.put("classAdvisor", assignedAdvisorName);
+        return response;
+    }
+
+    private int replaceSectionTimetableFromGrid(Section section, int semester, Map<String, Map<String, String>> gridData) {
         List<TimetableEntry> existing = timetableRepository.findBySectionId(section.getId());
         if (!existing.isEmpty()) {
             timetableRepository.deleteAll(existing);
@@ -296,8 +261,13 @@ public class ExcelImportService {
 
         List<TimeSlot> slots = ensureTimeSlots();
         List<Subject> allSubjects = subjectRepository.findAll();
+        List<Teacher> allTeachers = teacherRepository.findAll();
         List<Classroom> allRooms = classroomRepository.findAll();
         List<Laboratory> allLabs = laboratoryRepository.findAll();
+
+        Department dept = (section.getCourse() != null && section.getCourse().getDepartment() != null)
+                ? section.getCourse().getDepartment()
+                : departmentRepository.findAll().stream().findFirst().orElse(null);
 
         int savedCount = 0;
         if (gridData != null && !slots.isEmpty()) {
@@ -345,19 +315,14 @@ public class ExcelImportService {
                     entry.setClassroom(room);
                     entry.setLaboratory(lab);
                     entry.setSemester(semester);
+                    if (!facText.isEmpty()) entry.setAssignedFaculty(facText);
+                    if (!venueText.isEmpty()) entry.setAssignedVenue(venueText);
                     timetableRepository.save(entry);
                     savedCount++;
                 }
             }
         }
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("message", "Assigned timetable (" + savedCount + " periods) to " + targetSectionName + ".");
-        response.put("sectionName", targetSectionName);
-        response.put("sectionId", section.getId());
-        response.put("entriesSaved", savedCount);
-        response.put("classAdvisor", assignedAdvisorName);
-        return response;
+        return savedCount;
     }
 
     private List<TimeSlot> ensureTimeSlots() {

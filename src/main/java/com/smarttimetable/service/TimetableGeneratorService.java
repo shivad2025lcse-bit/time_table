@@ -403,7 +403,10 @@ public class TimetableGeneratorService {
         dto.setSubjectType(entry.getSubject().getType().name());
 
         dto.setTeacherId(entry.getTeacher().getId());
-        dto.setTeacherName(entry.getTeacher().getName());
+        String displayFaculty = (entry.getAssignedFaculty() != null && !entry.getAssignedFaculty().trim().isEmpty())
+                ? entry.getAssignedFaculty().trim()
+                : entry.getTeacher().getName();
+        dto.setTeacherName(displayFaculty);
 
         if (entry.getClassroom() != null) {
             dto.setClassroomId(entry.getClassroom().getId());
@@ -413,6 +416,10 @@ public class TimetableGeneratorService {
         if (entry.getLaboratory() != null) {
             dto.setLaboratoryId(entry.getLaboratory().getId());
             dto.setLabName(entry.getLaboratory().getLabName());
+        }
+
+        if (entry.getAssignedVenue() != null && !entry.getAssignedVenue().trim().isEmpty()) {
+            dto.setRoomNumber(entry.getAssignedVenue().trim());
         }
 
         dto.setSectionId(entry.getSection().getId());

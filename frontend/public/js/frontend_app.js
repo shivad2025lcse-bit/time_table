@@ -495,25 +495,32 @@ const DEFAULT_TIMETABLE_DATA = {};
 function loadSavedTimetable() {
     const merged = JSON.parse(JSON.stringify(DEFAULT_TIMETABLE_DATA));
     
-    // 1. Inject custom built timetables
-    activeSections.forEach(sec => {
-        const builtSaved = localStorage.getItem(`sece_tt_built_${sec.name}`);
+    // 1. Inject custom built timetables (for activeSections and currentSection)
+    const builtSectionNames = new Set(activeSections.map(s => s.name));
+    if (typeof currentSection !== 'undefined' && currentSection) builtSectionNames.add(currentSection);
+    builtSectionNames.forEach(secName => {
+        const builtSaved = localStorage.getItem(`sece_tt_built_${secName}`);
         if (builtSaved) {
             try {
                 const built = JSON.parse(builtSaved);
                 if (built && built.grid) {
-                    merged[sec.name] = {};
+                    merged[secName] = {};
                     Object.keys(built.grid).forEach(day => {
-                        merged[sec.name][day] = [];
-                        for(let i=1; i<=7; i++) {
-                             const pData = built.grid[day][`P${i}`] || '';
-                             const parts = pData.split(',').map(s => s.trim());
-                             merged[sec.name][day].push({
-                                 sub: parts[0] || '',
-                                 faculty: parts[1] || '',
-                                 venue: parts[2] || '',
-                                 cat: 'cat-theory'
-                             });
+                        merged[secName][day] = [];
+                        for (let i = 1; i <= 7; i++) {
+                            const pData = built.grid[day][`P${i}`] || '';
+                            const parts = pData.split(',').map(s => s.trim());
+                            const subTxt = parts[0] || 'FREE';
+                            const lowSub = subTxt.toLowerCase();
+                            let cat = 'cat-theory';
+                            if (lowSub.includes('lab') || lowSub.includes('practical') || lowSub.includes('project')) cat = 'cat-lab';
+                            else if (lowSub === 'alt') cat = 'cat-alt';
+                            merged[secName][day].push({
+                                sub: subTxt,
+                                faculty: parts[1] || '',
+                                venue: parts[2] || '',
+                                cat: cat
+                            });
                         }
                     });
                 }
@@ -1664,12 +1671,8 @@ function renderTimetableGrid() {
     }
     // --- End Custom Manual Override ---
 
-    let data = {};
+    let data = null;
     if (window.currentTimetableEntries && window.currentTimetableEntries.length > 0) {
-        days.forEach(day => {
-            data[day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
-        });
-        
         let filteredEntries = window.currentTimetableEntries;
         if (typeof currentSection !== 'undefined' && currentSection) {
             let q1 = currentSection.toUpperCase();
@@ -1677,24 +1680,34 @@ function renderTimetableGrid() {
             filteredEntries = filteredEntries.filter(e => {
                 if (!e.sectionName) return false;
                 let sName = e.sectionName.toUpperCase();
-                return sName.includes(q1) || sName.includes(q2) || sName === q1 || sName === q2;
+                return sName === q1 || sName === q2 || sName.includes(q1) || sName.includes(q2);
             });
         }
-        
-        filteredEntries.forEach(entry => {
-            let day = entry.day;
-            let pIdx = entry.slotNumber - 1;
-            if (pIdx >= 0 && pIdx < 7 && data[day]) {
-                data[day][pIdx] = {
-                    sub: entry.subjectName || entry.subjectCode,
-                    code: entry.subjectCode,
-                    faculty: entry.teacherName,
-                    venue: entry.roomNumber || entry.labName || 'TBA',
-                    cat: entry.subjectType === 'LAB' || entry.subjectType === 'PROJECT' ? 'cat-lab' : 'cat-theory'
-                };
-            }
-        });
-    } else {
+        if (filteredEntries.length > 0) {
+            data = {};
+            days.forEach(day => {
+                data[day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
+            });
+            filteredEntries.forEach(entry => {
+                let day = entry.day;
+                let pIdx = (entry.slotNumber || 1) - 1;
+                if (pIdx >= 0 && pIdx < 7 && data[day]) {
+                    const sName = entry.subjectName || entry.subjectCode || 'FREE';
+                    const low = sName.toLowerCase();
+                    let cat = (entry.subjectType === 'LAB' || entry.subjectType === 'PROJECT' || low.includes('lab') || low.includes('practical') || low.includes('project')) ? 'cat-lab' : (low === 'alt' ? 'cat-alt' : 'cat-theory');
+                    data[day][pIdx] = {
+                        sub: sName,
+                        code: entry.subjectCode || '',
+                        faculty: entry.teacherName || '-',
+                        venue: entry.roomNumber || entry.labName || 'TBA',
+                        cat: cat
+                    };
+                }
+            });
+        }
+    }
+    if (!data) {
+        timetableData = loadSavedTimetable();
         data = timetableData[currentSection];
         if (!data) {
             data = {};
@@ -1878,6 +1891,32 @@ if (document.readyState === 'complete') {
 }
 
 
+// Backend Timetable Loader (populates Student / Faculty / Admin grids from PostgreSQL/H2 DB)
+window.loadTimetableData = async function() {
+    try {
+        const token = localStorage.getItem('jwt_token');
+        if (!token) return [];
+        const res = await apiFetch('/api/timetable');
+        if (!res || !res.ok) return [];
+        const entries = await res.json();
+        window.currentTimetableEntries = Array.isArray(entries) ? entries : [];
+
+        if (typeof getEffectiveRole === 'function' && getEffectiveRole() === 'STUDENT' && window.currentTimetableEntries.length > 0) {
+            const firstSec = window.currentTimetableEntries[0].sectionName;
+            if (firstSec) {
+                currentSection = firstSec;
+                window.currentSection = firstSec;
+                localStorage.setItem('sece_last_viewed_section', firstSec);
+                window.updateBannerHeaders?.(firstSec);
+            }
+        }
+        return window.currentTimetableEntries;
+    } catch (err) {
+        console.warn('Could not load backend timetable entries:', err);
+        return [];
+    }
+};
+
 // Helper to Create Period Cell
 function createCell(day, pIdx, pData) {
     const td = document.createElement('td');
@@ -1930,9 +1969,43 @@ function renderCourseRefTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    courseReferenceList.forEach(item => {
+    // Derive live course rows from DB entries or saved grid for currentSection when available
+    const dynamicMap = new Map();
+    const secFilter = (typeof currentSection !== 'undefined' && currentSection) ? currentSection.replace('_', ' ').toUpperCase() : '';
+    if (window.currentTimetableEntries && window.currentTimetableEntries.length > 0) {
+        window.currentTimetableEntries.forEach(e => {
+            if (secFilter && e.sectionName && e.sectionName.toUpperCase() !== secFilter && !e.sectionName.toUpperCase().includes(secFilter)) return;
+            const sub = e.subjectName || e.subjectCode || '';
+            if (!sub || sub.toUpperCase() === 'FREE') return;
+            const fac = e.teacherName || '-';
+            const venue = e.roomNumber || e.labName || '-';
+            const cat = (e.subjectType === 'LAB' || sub.toLowerCase().includes('lab') || sub.toLowerCase().includes('practical')) ? 'PC (Lab)' : 'PC';
+            const key = `${sub.toLowerCase()}|${venue.toLowerCase()}`;
+            if (!dynamicMap.has(key)) {
+                dynamicMap.set(key, { short: sub, code: e.subjectCode && e.subjectCode !== sub ? `${e.subjectCode} ${sub}` : sub, faculty: fac, venue, cat, credits: '-', hrs: 1 });
+            } else {
+                dynamicMap.get(key).hrs += 1;
+            }
+        });
+    } else if (currentSection && timetableData[currentSection]) {
+        Object.values(timetableData[currentSection]).forEach(dayList => {
+            if (!Array.isArray(dayList)) return;
+            dayList.forEach(c => {
+                if (!c || !c.sub || c.sub.toUpperCase() === 'FREE') return;
+                const key = `${c.sub.toLowerCase()}|${(c.venue || '').toLowerCase()}`;
+                if (!dynamicMap.has(key)) {
+                    dynamicMap.set(key, { short: c.sub, code: c.code || c.sub, faculty: c.faculty || '-', venue: c.venue || '-', cat: c.cat === 'cat-lab' ? 'PC (Lab)' : 'PC', credits: '-', hrs: 1 });
+                } else {
+                    dynamicMap.get(key).hrs += 1;
+                }
+            });
+        });
+    }
+
+    const rows = dynamicMap.size > 0 ? Array.from(dynamicMap.values()) : courseReferenceList;
+    rows.forEach(item => {
         const tr = document.createElement('tr');
-        if (item.short === 'ALT') tr.className = 'table-warning text-dark font-semibold';
+        if (String(item.short).toUpperCase() === 'ALT') tr.className = 'table-warning text-dark font-semibold';
 
         tr.innerHTML = `
             <td><strong class="text-info">${item.short}</strong></td>
@@ -2101,8 +2174,8 @@ function switchRole(role, silent = false) {
         if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.add('d-none');
         if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
     } else { // STUDENT
-        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.add('d-none');
-        if (referenceTableArea) referenceTableArea.classList.add('d-none');
+        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.remove('d-none');
+        if (referenceTableArea) referenceTableArea.classList.remove('d-none');
         if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.remove('d-none');
         if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
     }
@@ -2276,14 +2349,28 @@ function switchRole(role, silent = false) {
 
     // Standard dashboard updates
     if (role === 'STUDENT') {
-        renderTimetableGrid();
-        renderStudentsRoster();
+        if (typeof window.loadTimetableData === 'function') {
+            window.loadTimetableData().then(() => {
+                renderTimetableGrid();
+                renderCourseRefTable();
+                renderStudentsRoster();
+            });
+        } else {
+            renderTimetableGrid();
+            renderStudentsRoster();
+        }
         if (typeof window.fetchStudentDynamicDashboard === 'function') {
             window.fetchStudentDynamicDashboard();
             if (window.dynamicDashboardInterval) clearInterval(window.dynamicDashboardInterval);
             window.dynamicDashboardInterval = setInterval(window.fetchStudentDynamicDashboard, 30000);
         }
     } else {
+        if (typeof window.loadTimetableData === 'function') {
+            window.loadTimetableData().then(() => {
+                if (typeof onFilterChange === 'function') onFilterChange();
+                else { renderTimetableGrid(); renderCourseRefTable(); }
+            });
+        }
         if (typeof onFilterChange === 'function') {
             onFilterChange();
         } else {
@@ -4852,9 +4939,15 @@ window.showTtPopup = function() {
     if (wrapper) {
         wrapper.classList.remove('d-none');
         wrapper.classList.remove('tt-fullscreen-modal'); // ensure it's inline
-        // Hide the fixed close button since we will add an inline one
         const closeBtn = document.getElementById('closeTtPopupBtn');
         if (closeBtn) closeBtn.classList.add('d-none');
+        if (typeof window.loadTimetableData === 'function') {
+            window.loadTimetableData().then(() => {
+                renderTimetableGrid();
+                renderCourseRefTable();
+            });
+        }
+        wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 };
 window.closeTtPopup = function() {
@@ -6815,7 +6908,7 @@ window.renderTimetableBuilderGrid = function(section) {
     tbody.innerHTML = html;
 };
 
-window.saveTimetableBuilder = function() {
+window.saveTimetableBuilder = async function() {
     const section = window.currentTimetableSection;
     if (!section) return;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -6848,23 +6941,33 @@ window.saveTimetableBuilder = function() {
     });
     
     localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
+    localStorage.removeItem('class_tt_' + section);
     
-    fetch('/api/timetable/save-manual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section: section, grid: data.grid })
-    }).then(r => r.ok ? r.json() : Promise.reject())
-      .then(() => console.log('Saved to MySQL Database successfully'))
-      .catch(() => console.warn('Failed to save to MySQL Database'));
-
-    showToast('Success', `Timetable for ${section} saved!`);
+    try {
+        const res = await apiFetch('/api/timetable/save-manual', {
+            method: 'POST',
+            body: JSON.stringify({ section: section, grid: data.grid })
+        });
+        if (res && res.ok) {
+            const resData = await res.json();
+            showToast('Success', resData.message || `Timetable for ${section} saved to database!`);
+        } else {
+            showToast('Saved Locally', `Timetable for ${section} saved locally (database sync returned an error).`, 'warning');
+        }
+    } catch (err) {
+        console.warn('Failed to save to Database:', err);
+        showToast('Saved Locally', `Timetable for ${section} saved locally.`, 'warning');
+    }
     
     const modalEl = bootstrap.Modal.getInstance(document.getElementById('timetableBuilderModal'));
     if (modalEl) modalEl.hide();
     
     timetableData = loadSavedTimetable();
-    if (currentSection === section) {
+    if (typeof window.loadTimetableData === 'function') await window.loadTimetableData();
+    if (currentSection === section || !currentSection) {
+        currentSection = section;
         renderTimetableGrid();
+        renderCourseRefTable();
     }
 };
 
@@ -8954,8 +9057,14 @@ window.handleUploadAssignTtFile = async function(event) {
                 secEl.value = m.sectionCode.toUpperCase();
             }
             if (advEl && m.classAdvisor) {
-                const advLow = m.classAdvisor.toLowerCase().replace(/^(dr\.?|ms\.?|mr\.?|mrs\.?)\s*/i, '').trim();
-                const matchAdv = Array.from(advEl.options).find(o => o.text.toLowerCase().includes(advLow) || o.value.toLowerCase().includes(advLow));
+                const normName = s => String(s || '').toLowerCase().replace(/^(dr|ms|mr|mrs)\.?\s*/i, '').replace(/[.\s]+/g, '');
+                const targetNorm = normName(m.classAdvisor);
+                const lastTok = m.classAdvisor.toLowerCase().trim().split(/[\s.]+/).pop();
+                const matchAdv = Array.from(advEl.options).find(o => {
+                    const oNorm = normName(o.text);
+                    return (targetNorm && (oNorm.includes(targetNorm) || targetNorm.includes(oNorm)))
+                        || (lastTok && lastTok.length >= 3 && o.text.toLowerCase().includes(lastTok));
+                });
                 if (matchAdv) advEl.value = matchAdv.value;
             }
         }
@@ -9046,6 +9155,7 @@ window.assignUploadedClassTimetable = async function() {
         if (typeof populateSectionSelects === 'function') populateSectionSelects();
         if (typeof loadTimetableData === 'function') await loadTimetableData();
         if (typeof renderTimetableGrid === 'function') renderTimetableGrid();
+        if (typeof renderCourseRefTable === 'function') renderCourseRefTable();
 
         if (alertEl) {
             alertEl.className = 'alert alert-success small py-2 mt-2 mb-0';
