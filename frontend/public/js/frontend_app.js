@@ -100,7 +100,9 @@ function usernameRuleText(role) {
 
 function openLoginForm(role) {
     const config = AUTH_CONFIG[role];
-    document.getElementById('selectedLoginRole').value = role;
+    window._selectedLoginRole = role;
+    const roleInput = document.getElementById('selectedLoginRole');
+    if (roleInput) roleInput.value = role;
     document.getElementById('loginRoleBadge').innerText = role;
     document.getElementById('loginTitle').innerText = config.title;
     document.getElementById('loginHint').innerText = usernameRuleText(role);
@@ -115,6 +117,7 @@ function openLoginForm(role) {
 }
 
 function backToRoleSelection() {
+    window._selectedLoginRole = null;
     document.getElementById('loginFormPanel').classList.add('login-hidden');
     document.getElementById('roleSelection').classList.remove('login-hidden');
     document.getElementById('roleLoginForm').reset();
@@ -129,7 +132,9 @@ function toggleLoginPassword() {
 
 async function handleRoleLogin(e) {
     e.preventDefault();
-    const role = document.getElementById('selectedLoginRole').value;
+    const badgeRole = (document.getElementById('loginRoleBadge')?.innerText || '').trim().toUpperCase();
+    const inputRole = (document.getElementById('selectedLoginRole')?.value || '').trim().toUpperCase();
+    const role = (window._selectedLoginRole || (badgeRole && AUTH_CONFIG[badgeRole] ? badgeRole : inputRole) || 'STUDENT').toUpperCase();
     const username = document.getElementById('loginUsername').value.trim().toLowerCase();
     const password = document.getElementById('loginPassword').value;
     const loginBtn = document.getElementById('roleLoginBtn');
@@ -295,7 +300,8 @@ function updateForgotPasswordHint() {
 }
 
 function openForgotPasswordForLogin() {
-    const role = document.getElementById('selectedLoginRole').value || 'STUDENT';
+    const badgeRole = (document.getElementById('loginRoleBadge')?.innerText || '').trim().toUpperCase();
+    const role = window._selectedLoginRole || (badgeRole && AUTH_CONFIG[badgeRole] ? badgeRole : document.getElementById('selectedLoginRole')?.value) || 'STUDENT';
     document.getElementById('fpUserType').value = role;
     updateForgotPasswordHint();
     const modal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
