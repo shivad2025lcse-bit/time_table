@@ -85,4 +85,42 @@ public class TimetableOperationsController {
 
     @DeleteMapping("/period-notifications/{id}")
     public void deletePeriodNotification(@PathVariable Long id) { service.deletePeriodNotification(id); }
+
+    // Faculty Personal Timetables (viewable/editable by Admin and the owning Faculty)
+    @GetMapping("/faculty-timetables/{username}")
+    public ResponseEntity<java.util.Map<String, Object>> getFacultyTimetable(@PathVariable String username) {
+        return service.getFacultyTimetable(username)
+                .<ResponseEntity<java.util.Map<String, Object>>>map(ft -> ResponseEntity.ok(java.util.Map.of(
+                        "username", ft.getUsername(),
+                        "dataJson", ft.getDataJson(),
+                        "updatedBy", ft.getUpdatedBy() != null ? ft.getUpdatedBy() : "",
+                        "updatedAt", ft.getUpdatedAt() != null ? ft.getUpdatedAt().toString() : ""
+                )))
+                .orElseGet(() -> ResponseEntity.ok(java.util.Map.of(
+                        "username", username.toLowerCase(),
+                        "dataJson", "{}"
+                )));
+    }
+
+    @PostMapping("/faculty-timetables/{username}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    public ResponseEntity<?> saveFacultyTimetable(
+            @PathVariable String username,
+            @RequestBody java.util.Map<String, String> payload,
+            org.springframework.security.core.Authentication authentication) {
+        boolean isAdmin = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String actor = authentication != null ? authentication.getName() : "";
+        if (!isAdmin && !actor.equalsIgnoreCase(username)) {
+            return ResponseEntity.status(403).body(java.util.Map.of("error", "Faculty can only edit their own timetable."));
+        }
+        String dataJson = payload.getOrDefault("dataJson", "{}");
+        FacultyTimetable saved = service.saveFacultyTimetable(username, dataJson, actor);
+        return ResponseEntity.ok(java.util.Map.of(
+                "username", saved.getUsername(),
+                "dataJson", saved.getDataJson(),
+                "updatedBy", saved.getUpdatedBy() != null ? saved.getUpdatedBy() : "",
+                "updatedAt", saved.getUpdatedAt() != null ? saved.getUpdatedAt().toString() : ""
+        ));
+    }
 }

@@ -17,6 +17,7 @@ public class TimetableOperationsService {
     @Autowired private CustomSubjectRepository subjectRepo;
     @Autowired private CustomVenueRepository venueRepo;
     @Autowired private PeriodNotificationRepository notificationRepo;
+    @Autowired private FacultyTimetableRepository facultyTimetableRepo;
 
     // Overrides
     public List<TimetableOverride> getAllOverrides() { return overrideRepo.findAll(); }
@@ -48,4 +49,20 @@ public class TimetableOperationsService {
     public List<PeriodNotification> getAllPeriodNotifications() { return notificationRepo.findAll(); }
     public PeriodNotification savePeriodNotification(PeriodNotification notif) { return notificationRepo.save(notif); }
     public void deletePeriodNotification(Long id) { notificationRepo.deleteById(id); }
+
+    // Faculty Personal Timetables
+    public java.util.Optional<FacultyTimetable> getFacultyTimetable(String username) {
+        return facultyTimetableRepo.findByUsernameIgnoreCase(username);
+    }
+
+    public FacultyTimetable saveFacultyTimetable(String username, String dataJson, String updatedBy) {
+        String normalized = username.trim().toLowerCase();
+        FacultyTimetable ft = facultyTimetableRepo.findByUsernameIgnoreCase(normalized)
+                .orElseGet(FacultyTimetable::new);
+        ft.setUsername(normalized);
+        ft.setDataJson(dataJson != null ? dataJson : "{}");
+        ft.setUpdatedBy(updatedBy);
+        ft.setUpdatedAt(java.time.LocalDateTime.now());
+        return facultyTimetableRepo.save(ft);
+    }
 }

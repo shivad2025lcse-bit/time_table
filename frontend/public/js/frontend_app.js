@@ -7,7 +7,7 @@ const AUTH_CONFIG = {
     ADMIN: { prefix: 'a', title: 'Admin Login', example: 'shiva25012007', icon: 'fa-user-shield', color: 'danger' }
 };
 const ADMIN_USERNAME = 'shiva25012007';
-const ADMIN_INITIAL_PASSWORD = 'shiv2501';
+const ADMIN_INITIAL_PASSWORD = 'password123';
 
 function normalizeNamePart(name) {
     return String(name || '').toLowerCase().replace(/[^a-z]/g, '');
@@ -143,19 +143,27 @@ async function handleRoleLogin(e) {
     if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Logging in...'; }
 
     // Step 1: Try backend API authentication first (works for all backend users)
+    let backendResponded = false;
     try {
         const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
+        backendResponded = true;
 
         if (res.ok) {
             const data = await res.json();
-            // Backend login success -” store token and user info
+            const actualRole = (data.role || '').replace('ROLE_', '');
+            if (actualRole && actualRole !== role) {
+                if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket me-1"></i> Login'; }
+                alert(`This account has ${actualRole} access. Please use the ${actualRole} login card.`);
+                return;
+            }
+            // Backend login success - store token and user info
             localStorage.setItem('jwt_token', data.token);
             localStorage.setItem('user_info', JSON.stringify(data));
-            localStorage.setItem('sece_logged_in_user', username);
+            localStorage.setItem('sece_logged_in_user', (data.username || username).toLowerCase());
             localStorage.setItem('sece_logged_in_role', role);
             currentUserRole = role;
 
@@ -165,7 +173,10 @@ async function handleRoleLogin(e) {
                     const stuRes = await fetch('/api/students', { headers: { 'Authorization': 'Bearer ' + data.token } });
                     if (stuRes.ok) {
                         const students = await stuRes.json();
-                        const me = students.find(s => s.user && s.user.username === username);
+                        const me = students.find(s =>
+                            (s.user && String(s.user.username || '').toLowerCase() === username) ||
+                            String(s.registerNumber || '').toLowerCase() === username
+                        );
                         if (me && me.section) {
                             const secName = me.section.sectionName || me.section.name || '';
                             if (secName) {
@@ -183,10 +194,15 @@ async function handleRoleLogin(e) {
             }
             return;
         }
-        // Backend returned 401/403 -” fall through to local validation below
+        // Backend explicitly rejected credentials (401/403)
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket me-1"></i> Login'; }
+        alert('Invalid username or password.');
+        return;
     } catch (networkErr) {
         console.warn('Backend unreachable, falling back to local auth', networkErr);
     }
+
+    if (backendResponded) return;
 
     // Step 2: Fallback to local validation (for hardcoded admin / offline mode)
     if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket me-2"></i>Login'; }
@@ -1513,13 +1529,38 @@ function renderAdminLeaveNotifications() {
         });
     }
 
+    const adminChangeNotifs = (typeof getFacultyAdminTtNotifications === 'function')
+        ? getFacultyAdminTtNotifications()
+        : [];
+
+    let adminChangeHtml = '';
+    if (currentUserRole === 'FACULTY' && adminChangeNotifs.length > 0) {
+        adminChangeHtml = `<div class="mb-3">
+            <h6 class="text-warning fw-bold mb-2"><i class="fa-solid fa-calendar-check me-2"></i>Timetable Changes by Admin</h6>
+            <ul class="list-group list-group-flush mb-2">
+                ${adminChangeNotifs.map(n => `
+                    <li class="list-group-item bg-dark text-white border-warning d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <span class="badge bg-warning text-dark me-2">${n.day || 'Schedule'}</span>
+                            <small class="text-muted">${n.date || ''}</small>
+                            <div class="small mt-1">${n.reason || n.section || 'Your timetable was updated by Admin.'}</div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" onclick="window.dismissFacultyAdminTtNotif?.('${n._id || ''}')" title="Dismiss">
+                            <i class="fa-solid fa-check"></i>
+                        </button>
+                    </li>
+                `).join('')}
+            </ul>
+        </div>`;
+    }
+
     const staffNames = Object.keys(todaysLeaves);
     if (staffNames.length === 0) {
-        list.innerHTML = '<div class="alert alert-success small py-2 mb-0"><i class="fa-solid fa-check-circle me-1"></i> No faculty members are reported absent today.</div>';
+        list.innerHTML = adminChangeHtml + '<div class="alert alert-success small py-2 mb-0"><i class="fa-solid fa-check-circle me-1"></i> No faculty members are reported absent today.</div>';
         return;
     }
 
-    let html = '<ul class="list-group list-group-flush">';
+    let html = adminChangeHtml + '<ul class="list-group list-group-flush">';
     staffNames.forEach(staff => {
         // deduplicate identical periods for the same staff
         const uniquePeriods = [];
@@ -1822,8 +1863,13 @@ function updateStudentDashboardPeriod() {
 }
 
 // Call on load and every minute
-setInterval(updateStudentDashboardPeriod, 60000);
-window.addEventListener('load', () => setTimeout(updateStudentDashboardPeriod, 1000));
+if (window.__studentDashboardPeriodInterval) clearInterval(window.__studentDashboardPeriodInterval);
+window.__studentDashboardPeriodInterval = setInterval(updateStudentDashboardPeriod, 60000);
+if (document.readyState === 'complete') {
+    setTimeout(updateStudentDashboardPeriod, 1000);
+} else {
+    window.addEventListener('load', () => setTimeout(updateStudentDashboardPeriod, 1000));
+}
 
 
 // Helper to Create Period Cell
@@ -2155,12 +2201,12 @@ function switchRole(role, silent = false) {
             ttTitleHeader.style.borderColor = 'var(--bs-secondary)';
             ttTitleEditIcon.classList.remove('d-none');
 
-            ttTitleHeader.addEventListener('blur', function () {
+            ttTitleHeader.onblur = function () {
                 localStorage.setItem('sece_custom_tt_title_' + currentSection, this.innerText);
                 showToast('Title Saved', 'Custom timetable title saved successfully.');
-            });
+            };
 
-            ttTitleEditIcon.addEventListener('click', function () {
+            ttTitleEditIcon.onclick = function () {
                 ttTitleHeader.focus();
                 // Select all text
                 const range = document.createRange();
@@ -2168,7 +2214,7 @@ function switchRole(role, silent = false) {
                 const sel = window.getSelection();
                 sel.removeAllRanges();
                 sel.addRange(range);
-            });
+            };
         } else {
             ttTitleHeader.contentEditable = false;
             ttTitleHeader.style.borderColor = 'transparent';
@@ -2209,9 +2255,9 @@ function switchRole(role, silent = false) {
         if (semEditIcon) semEditIcon.classList.add('d-none');
         if (ayEditIcon) {
             ayEditIcon.classList.remove('d-none');
-            ayEditIcon.addEventListener('click', () => {
+            ayEditIcon.onclick = () => {
                 if (window.openEditAyModal) window.openEditAyModal();
-            });
+            };
         }
     } else {
         if (batchEditIcon) batchEditIcon.classList.add('d-none');
@@ -2243,6 +2289,19 @@ function switchRole(role, silent = false) {
     renderNotificationStatus();
     toggleSubstitutionUI();
     if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+    if (role === 'FACULTY') {
+        if (typeof window.syncFacultyPersonalTtFromBackend === 'function') {
+            window.syncFacultyPersonalTtFromBackend().then(() => {
+                if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+            });
+        }
+        if (typeof fetchPeriodNotificationsFromAPI === 'function') {
+            fetchPeriodNotificationsFromAPI().then(() => {
+                if (typeof window.renderFacultyAdminTtBanner === 'function') window.renderFacultyAdminTtBanner();
+                if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
+            });
+        }
+    }
 
     const resetBtn = document.getElementById('resetTimetableBtn');
     if (resetBtn) resetBtn.classList.toggle('d-none', role !== 'ADMIN');
@@ -5071,12 +5130,7 @@ window.filterCredentials = function() {
     }
     
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colSpan="7" class="text-center text-muted py-4">
-            No records found. <br/>
-            DEBUG: Status = ${window._debugFetchStatus || 'unknown'}. <br/>
-            DEBUG: Cache Length = ${window._credDataCache ? window._credDataCache.length : 'null'}. <br/>
-            DEBUG: Cache = ${JSON.stringify(window._credDataCache).substring(0, 200)}...
-        </td></tr>`;
+        tbody.innerHTML = '<tr><td colSpan="7" class="text-center text-muted py-4">No matching credentials found.</td></tr>';
         return;
     }
     
@@ -5638,9 +5692,6 @@ window.renderAdminResourcesUI = renderAdminResourcesUI;
 window.handleAddSubject = handleAddSubject;
 window.importAdminSubjectExcel = importAdminSubjectExcel;
 window.removeAdminSubject = removeAdminSubject;
-window.editAdminSubject = window.editAdminSubject;
-window.saveEditSubject = window.saveEditSubject;
-window.deleteAdminSubject = window.deleteAdminSubject;
 window.handleAdminAddClass = handleAdminAddClass;
 window.handleAddVenue = handleAddVenue;
 window.importAdminVenueExcel = importAdminVenueExcel;
@@ -6092,7 +6143,7 @@ function updateAnnouncementTicker() {
                 announcements.push({ text: msg });
             });
         } else if (role === 'ADMIN' || role === 'FACULTY') {
-            allNotifs.forEach(n => {
+            allNotifs.filter(n => n.source !== 'admin_faculty_tt_change').forEach(n => {
                 let msg = `Substitution (${n.section}): `;
                 if (n.originalFaculty) msg += `Faculty ${n.originalFaculty} is absent, `;
                 msg += `Period ${n.period} handled by ${n.staff}.`;
@@ -6111,7 +6162,7 @@ function updateAnnouncementTicker() {
                     if (sub.date === today && sub.originalFaculty) todaysLeaves[sub.originalFaculty] = true;
                 });
             }
-            allNotifs.forEach(n => {
+            allNotifs.filter(n => n.source !== 'admin_faculty_tt_change').forEach(n => {
                 let fac = n.originalFaculty;
             if (!fac || fac.trim() === '') {
                 const pIdx = parseInt(n.period) - 1;
@@ -6132,13 +6183,17 @@ function updateAnnouncementTicker() {
             }
                 todaysLeaves[fac] = true;
             });
-            badgeCount = Object.keys(todaysLeaves).length;
+            const adminFacCount = (role === 'FACULTY' && typeof getFacultyAdminTtNotifications === 'function')
+                ? getFacultyAdminTtNotifications().length
+                : 0;
+            badgeCount = Object.keys(todaysLeaves).length + adminFacCount;
         }
     }
 
-    // Update the notification badge on the bell icon
+    // Update the notification badge on the bell icon only when changed
     const badge = document.getElementById('headerNotifBadge');
-    if (badge) {
+    if (badge && window._lastBadgeCount !== badgeCount) {
+        window._lastBadgeCount = badgeCount;
         if (badgeCount > 0) {
             badge.innerText = badgeCount;
             badge.style.display = 'block';
@@ -6148,7 +6203,11 @@ function updateAnnouncementTicker() {
     }
 
     if (announcements.length === 0) {
-        container.style.display = 'none';
+        if (window._lastTickerVisible !== false) {
+            window._lastTickerVisible = false;
+            window._lastTickerHtml = '';
+            container.style.display = 'none';
+        }
         return;
     }
 
@@ -6157,14 +6216,20 @@ function updateAnnouncementTicker() {
         `<i class="fa-solid fa-star text-warning me-2" style="font-size:0.8rem"></i><span class="me-5 fw-bold">${a.text}</span>`
     ).join('<span class="mx-3 text-warning opacity-75">&#9733;</span>');
 
-    marquee.innerHTML = tickerHtml;
-    container.style.display = 'block';
+    if (window._lastTickerHtml !== tickerHtml) {
+        window._lastTickerHtml = tickerHtml;
+        marquee.innerHTML = tickerHtml;
+    }
+    if (window._lastTickerVisible !== true) {
+        window._lastTickerVisible = true;
+        container.style.display = 'block';
+    }
 }
 window.updateAnnouncementTicker = updateAnnouncementTicker;
 
-// Persistent polling: every 1.5s keep the ticker in sync with localStorage
-// This survives React re-renders since it runs independently
-setInterval(updateAnnouncementTicker, 1500);
+// Sync ticker with localStorage without restarting marquee animation unnecessarily
+if (window.__announcementTickerInterval) clearInterval(window.__announcementTickerInterval);
+window.__announcementTickerInterval = setInterval(updateAnnouncementTicker, 3000);
 
 
 window.renderAnnouncements = function() {
@@ -6383,34 +6448,34 @@ window.shareViaWebAPI = function() {
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize the ticker bar immediately if there are saved announcements
-    setTimeout(() => { if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker(); }, 800);
+function _initModalListeners() {
+    setTimeout(() => { if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker(); }, 300);
 
-    // Poll for modals occasionally since React might render them after DOMContentLoaded
-    setInterval(() => {
+    let attempts = 0;
+    const bindModals = () => {
+        attempts++;
         const credModalEl = document.getElementById('viewCredentialsModal');
         if (credModalEl && !credModalEl.dataset.initialized) {
             credModalEl.dataset.initialized = 'true';
-            credModalEl.addEventListener('show.bs.modal', () => { if (window.searchUserCredentials) window.searchUserCredentials(); });
+            credModalEl.addEventListener('show.bs.modal', () => { if (window.renderCredentialsList) window.renderCredentialsList(); });
         }
-        
+
         const adminFacModalEl = document.getElementById('adminFacultyDetailsModal');
         if (adminFacModalEl && !adminFacModalEl.dataset.initialized) {
             adminFacModalEl.dataset.initialized = 'true';
-            adminFacModalEl.addEventListener('show.bs.modal', () => { if (window.searchAdminFacultyDetails) window.searchAdminFacultyDetails(); });
+            adminFacModalEl.addEventListener('show.bs.modal', () => { if (window.renderAdminFacultyDetails) window.renderAdminFacultyDetails(); });
         }
-        
+
         const annModalEl = document.getElementById('manageAnnouncementsModal');
         if (annModalEl && !annModalEl.dataset.initialized) {
             annModalEl.dataset.initialized = 'true';
             annModalEl.addEventListener('show.bs.modal', () => { if (window.renderAnnouncements) window.renderAnnouncements(); });
         }
-        
+
         const shareModalEl = document.getElementById('shareAppModal');
         if (shareModalEl && !shareModalEl.dataset.initialized) {
             shareModalEl.dataset.initialized = 'true';
-            shareModalEl.addEventListener('show.bs.modal', () => { 
+            shareModalEl.addEventListener('show.bs.modal', () => {
                 const input = document.getElementById('shareAppLinkInput');
                 if (input) input.value = window.location.origin;
             });
@@ -6421,14 +6486,29 @@ document.addEventListener('DOMContentLoaded', () => {
             avtModalEl.addEventListener('show.bs.modal', () => { if (window.initAdminViewEditTimetableModal) window.initAdminViewEditTimetableModal(); });
         }
 
-        // Ensure ticker is visible whenever the ticker container appears
         const ticker = document.getElementById('announcementTickerContainer');
         if (ticker && !ticker.dataset.initialized) {
             ticker.dataset.initialized = 'true';
             if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
         }
-    }, 1000);
-});
+
+        const allDone = credModalEl && adminFacModalEl && annModalEl && shareModalEl && avtModalEl && ticker;
+        if ((allDone || attempts >= 15) && window.__modalInitInterval) {
+            clearInterval(window.__modalInitInterval);
+            window.__modalInitInterval = null;
+        }
+    };
+
+    bindModals();
+    if (window.__modalInitInterval) clearInterval(window.__modalInitInterval);
+    window.__modalInitInterval = setInterval(bindModals, 500);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initModalListeners);
+} else {
+    _initModalListeners();
+}
 
 window.editPersistentStudent = async function(id) {
     let student = studentsRoster.find(s => s.id === id || s.roll === id || s.registerNumber === id);
@@ -6988,6 +7068,13 @@ window.fetchStudentDynamicDashboard = async function() {
             }
         });
         
+        if (response.status === 401) {
+            if (window.dynamicDashboardInterval) {
+                clearInterval(window.dynamicDashboardInterval);
+                window.dynamicDashboardInterval = null;
+            }
+            return;
+        }
         if (!response.ok) return;
         
         const data = await response.json();
@@ -7112,15 +7199,15 @@ window.fetchStudentDynamicDashboard = async function() {
     }
 };
 
-// Force start polling in case switchRole missed it
+// Poll student live period card every 30 seconds while on /student
 if (window.dynamicDashboardInterval) clearInterval(window.dynamicDashboardInterval);
 window.dynamicDashboardInterval = setInterval(() => {
-    if (localStorage.getItem("sece_logged_in_role") === "STUDENT") {
+    if (window.location.pathname === '/student' && localStorage.getItem("sece_logged_in_role") === "STUDENT") {
         if (typeof window.fetchStudentDynamicDashboard === 'function') {
             window.fetchStudentDynamicDashboard();
         }
     }
-}, 3000);
+}, 30000);
 
 
 
@@ -7343,7 +7430,17 @@ window.saveMyTimetable = function() {
         });
     });
 
-    localStorage.setItem(_getFacultyTTKey(), JSON.stringify(data));
+    data._columns = facultyTtColumns;
+    const jsonStr = JSON.stringify(data);
+    localStorage.setItem(_getFacultyTTKey(), jsonStr);
+
+    const uname = String(localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
+    if (uname && localStorage.getItem('jwt_token')) {
+        apiFetch(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`, {
+            method: 'POST',
+            body: JSON.stringify({ dataJson: jsonStr })
+        }).catch(err => console.warn('Could not sync faculty timetable to backend:', err));
+    }
 
     if (typeof bootstrap !== 'undefined') {
         const modalEl = document.getElementById('myTimetableModal');
@@ -7919,3 +8016,599 @@ window.removeClassAdvisor = function(facName) {
         }
     }
 };
+
+// =========================
+// ACADEMIC YEAR & EXCEL IMPORT HANDLERS
+// =========================
+window.openEditAyModal = function() {
+    const ayInput = document.getElementById('ayStartYearInput');
+    const saved = localStorage.getItem('sece_global_custom_ay') || '2026 - 2027';
+    if (ayInput) {
+        const m = saved.match(/^(\d{4})/);
+        if (m) ayInput.value = m[1];
+    }
+    const modalEl = document.getElementById('editAyModal');
+    if (modalEl) new bootstrap.Modal(modalEl).show();
+};
+
+window.saveAcademicYear = function() {
+    const ayInput = document.getElementById('ayStartYearInput');
+    const startYear = ayInput ? parseInt(ayInput.value, 10) : 2026;
+    if (isNaN(startYear) || startYear < 2000 || startYear > 3000) {
+        alert('Please enter a valid academic start year.');
+        return;
+    }
+    const ayText = `${startYear} - ${startYear + 1}`;
+    localStorage.setItem('sece_global_custom_ay', ayText);
+
+    const ayHeader = document.getElementById('ayTextHeader');
+    if (ayHeader) {
+        if (ayHeader.tagName === 'INPUT') ayHeader.value = ayText;
+        else ayHeader.innerText = ayText;
+    }
+    const ayStudents = document.getElementById('ayTextHeaderStudents');
+    if (ayStudents) ayStudents.innerText = ayText;
+
+    const modalEl = document.getElementById('editAyModal');
+    const modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+    if (modal) modal.hide();
+    showToast('Academic Year Updated', `Academic year set to ${ayText}.`);
+};
+
+function _readExcelRows(file) {
+    return new Promise((resolve, reject) => {
+        if (typeof XLSX === 'undefined') {
+            reject(new Error('Excel parser library (XLSX) is not loaded.'));
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+                const sheet = wb.Sheets[wb.SheetNames[0]];
+                resolve(XLSX.utils.sheet_to_json(sheet, { defval: '' }));
+            } catch (err) {
+                reject(err);
+            }
+        };
+        reader.onerror = () => reject(new Error('Failed to read selected file.'));
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+function _pickCol(row, keys) {
+    const entries = Object.entries(row || {});
+    for (const key of keys) {
+        const found = entries.find(([k]) => k.trim().toLowerCase() === key.toLowerCase());
+        if (found && String(found[1]).trim() !== '') return String(found[1]).trim();
+    }
+    return '';
+}
+
+window.importStudentExcel = async function(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+        const rows = await _readExcelRows(file);
+        if (!rows.length) { alert('The selected file contains no student rows.'); return; }
+        let added = 0, failed = 0;
+        for (const r of rows) {
+            const regNo = _pickCol(r, ['Register Number', 'Reg No', 'Roll No', 'registerNumber']);
+            const firstName = _pickCol(r, ['First Name', 'firstName', 'Name']);
+            const lastName = _pickCol(r, ['Last Name', 'lastName']) || '.';
+            if (!regNo || !firstName) { failed++; continue; }
+
+            const dept = _pickCol(r, ['Department', 'Dept', 'department']) || 'CSE';
+            const course = _pickCol(r, ['Course', 'Class', 'course']) || 'BTECH-' + dept;
+            const sec = _pickCol(r, ['Section', 'section']) || 'II ' + dept + ' A';
+            const sem = parseInt(_pickCol(r, ['Semester', 'Sem', 'semester']) || '3', 10) || 3;
+            const email = _pickCol(r, ['Personal Email', 'Email', 'email']) || `${regNo.toLowerCase()}@example.com`;
+            const collegeEmail = _pickCol(r, ['College Email', 'collegeEmail']) || `${regNo.toLowerCase()}@sece.ac.in`;
+
+            const payload = {
+                firstName, lastName, registerNumber: regNo,
+                email, collegeEmail,
+                phone: _pickCol(r, ['Mobile Number', 'Mobile', 'Phone', 'phone']) || '9999999999',
+                parentPhone1: _pickCol(r, ['Parent 1 Mobile', 'Parent Phone 1', 'parentPhone1']) || '9999999999',
+                parentPhone2: _pickCol(r, ['Parent 2 Mobile', 'Parent Phone 2', 'parentPhone2']) || null,
+                residentType: _pickCol(r, ['Resident Type', 'residentType']) || 'Day Scholar',
+                semester: sem,
+                department: { name: dept },
+                course: { name: course },
+                section: { sectionName: sec }
+            };
+            const res = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(payload) });
+            if (res.ok) added++; else failed++;
+        }
+        if (typeof loadRecentStudents === 'function') loadRecentStudents();
+        showToast('Student Import Complete', `Imported ${added} student(s)${failed ? `, ${failed} skipped` : ''}.`);
+    } catch (err) {
+        alert('Error importing students: ' + err.message);
+    } finally {
+        event.target.value = '';
+    }
+};
+
+window.importFacultyExcel = async function(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+        const rows = await _readExcelRows(file);
+        if (!rows.length) { alert('The selected file contains no faculty rows.'); return; }
+        let added = 0, failed = 0;
+        for (const r of rows) {
+            const firstName = _pickCol(r, ['First Name', 'firstName', 'Name']);
+            const lastName = _pickCol(r, ['Last Name', 'lastName']) || '.';
+            if (!firstName) { failed++; continue; }
+
+            const dept = _pickCol(r, ['Department', 'Dept', 'department']) || 'CSE';
+            const personalEmail = _pickCol(r, ['Personal Email', 'Email', 'personalEmail']) || `${firstName.toLowerCase()}@example.com`;
+            const collegeEmail = _pickCol(r, ['College Email', 'collegeEmail']) || `${firstName.toLowerCase()}@sece.ac.in`;
+
+            const payload = {
+                employeeId: _pickCol(r, ['Employee ID', 'Faculty ID', 'employeeId']) || ('EMP' + Date.now().toString().slice(-6) + added),
+                firstName, lastName,
+                personalEmail, collegeEmail,
+                phone1: _pickCol(r, ['Mobile Number 1', 'Mobile 1', 'Phone', 'phone1']) || '9999999999',
+                phone2: _pickCol(r, ['Mobile Number 2', 'Mobile 2', 'phone2']) || '',
+                subjectHandling: _pickCol(r, ['Subject Handling', 'Subject', 'subjectHandling']) || 'General',
+                department: { code: dept }
+            };
+            const res = await apiFetch('/api/teachers', { method: 'POST', body: JSON.stringify(payload) });
+            if (res.ok) added++; else failed++;
+        }
+        if (window.renderAdminFacultyDetails) window.renderAdminFacultyDetails();
+        if (window.loadAdminFullFaculty) window.loadAdminFullFaculty();
+        if (window.renderCredentialsList) window.renderCredentialsList();
+        showToast('Faculty Import Complete', `Imported ${added} faculty member(s)${failed ? `, ${failed} skipped` : ''}.`);
+    } catch (err) {
+        alert('Error importing faculty: ' + err.message);
+    } finally {
+        event.target.value = '';
+    }
+};
+
+window.importFacultyTimetableExcel = async function(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+        const rows = await _readExcelRows(file);
+        if (!rows.length) { alert('The selected Excel file has no rows.'); return; }
+        rows.forEach(r => {
+            const rawDay = _pickCol(r, ['Day', 'Day Order', 'day']);
+            if (!rawDay) return;
+            const day = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase();
+            for (let p = 1; p <= 7; p++) {
+                const val = _pickCol(r, [`Period ${p}`, `P${p}`, `${p}`]);
+                const input = document.getElementById(`myTt_${day}_P${p}`);
+                if (input && val) input.value = val;
+            }
+        });
+        if (typeof window.saveMyTimetable === 'function') window.saveMyTimetable();
+        showToast('Timetable Imported', 'Personal timetable imported from Excel.');
+    } catch (err) {
+        alert('Error importing personal timetable: ' + err.message);
+    } finally {
+        event.target.value = '';
+    }
+};
+
+// =========================
+// ADMIN: VIEW & EDIT FACULTY TIMETABLE + TARGETED FACULTY NOTIFICATIONS
+// =========================
+function _defaultFacultyTtColumnsList() {
+    return [
+        { key: 'P1', label: 'Period 1', isBreak: false, defTime: '08.40 - 09.40' },
+        { key: 'P2', label: 'Period 2', isBreak: false, defTime: '09.40 - 10.40' },
+        { key: 'P3', label: 'Period 3', isBreak: false, defTime: '11.00 - 12.00' },
+        { key: 'TEA', label: 'Tea Break', isBreak: true, defTime: '12.00 - 12.15' },
+        { key: 'P4', label: 'Period 4', isBreak: false, defTime: '12.15 - 01.15' },
+        { key: 'P5', label: 'Period 5', isBreak: false, defTime: '01.15 - 02.00' },
+        { key: 'LUNCH', label: 'Lunch Break', isBreak: true, defTime: '02.00 - 02.40' },
+        { key: 'ACT', label: 'Activity', isBreak: false, defTime: '02.40 - 03.30' },
+        { key: 'P6', label: 'Period 6', isBreak: false, defTime: '03.30 - 04.20' },
+        { key: 'P7', label: 'Period 7', isBreak: false, defTime: '04.20 - 05.10' }
+    ];
+}
+
+function _parseJsonSafe(str, fallback) {
+    try {
+        const v = JSON.parse(str);
+        return v && typeof v === 'object' ? v : fallback;
+    } catch (_) {
+        return fallback;
+    }
+}
+
+window.syncFacultyPersonalTtFromBackend = async function(targetUsername) {
+    const uname = String(targetUsername || localStorage.getItem('sece_logged_in_user') || '').trim().toLowerCase();
+    if (!uname) return null;
+    try {
+        const res = await fetch(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`);
+        if (!res.ok) return null;
+        const body = await res.json();
+        if (body && body.dataJson && body.dataJson !== '{}') {
+            const parsed = _parseJsonSafe(body.dataJson, null);
+            if (parsed && Object.keys(parsed).length > 0) {
+                localStorage.setItem('faculty_personal_tt_' + uname, body.dataJson);
+                if (Array.isArray(parsed._columns) && parsed._columns.length > 0) {
+                    localStorage.setItem('faculty_tt_cols_faculty_personal_tt_' + uname, JSON.stringify(parsed._columns));
+                }
+                return parsed;
+            }
+        }
+    } catch (e) {
+        console.warn('Unable to sync faculty timetable from backend:', e);
+    }
+    return null;
+};
+
+let _adminFacTtColumns = [];
+let _adminFacTtTeachers = [];
+let _adminFacTtSnapshot = {};
+
+window.openAdminFacultyTimetableModal = async function() {
+    const sel = document.getElementById('adminFacTtSelect');
+    const alertBox = document.getElementById('adminFacTtAlert');
+    const noteEl = document.getElementById('adminFacTtNote');
+    const notifyDayEl = document.getElementById('adminFacTtNotifyDay');
+    if (alertBox) alertBox.classList.add('d-none');
+    if (noteEl) noteEl.value = '';
+    if (notifyDayEl) notifyDayEl.value = 'AUTO';
+    if (!sel) return;
+
+    sel.innerHTML = '<option value="">-- Loading Faculty --</option>';
+    let teachers = [];
+    try {
+        const res = await apiFetch('/api/teachers');
+        if (res.ok) teachers = await res.json();
+    } catch (e) {
+        console.warn('Could not load teachers from backend:', e);
+    }
+    if (!Array.isArray(teachers) || teachers.length === 0) {
+        teachers = (window.staffDirectory || []).map(s => ({
+            id: null,
+            employeeId: buildGeneratedUsername('FACULTY', s.name),
+            name: s.displayName || s.name,
+            displayName: s.displayName || s.name,
+            department: { code: s.dept || '' },
+            user: { username: buildGeneratedUsername('FACULTY', s.name) }
+        }));
+    }
+
+    _adminFacTtTeachers = teachers.filter(t => (t.user && t.user.username) || t.employeeId || t.username);
+    if (_adminFacTtTeachers.length === 0) {
+        sel.innerHTML = '<option value="">No faculty members found</option>';
+        return;
+    }
+
+    sel.innerHTML = _adminFacTtTeachers.map(t => {
+        const uname = ((t.user && t.user.username) || t.username || t.employeeId || '').toLowerCase();
+        const disp = t.displayName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() || uname;
+        const dept = t.department ? (t.department.code || t.department.name || '') : (t.dept || '');
+        return `<option value="${uname}">${disp}${dept ? ' (' + dept + ')' : ''} [${uname}]</option>`;
+    }).join('');
+
+    await window.loadAdminFacultyTimetable();
+};
+
+function _renderAdminFacTtGrid(saved) {
+    const thead = document.getElementById('adminFacTtHead');
+    const tbody = document.getElementById('adminFacTtBody');
+    if (!thead || !tbody) return;
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const headers = saved._headers || {};
+    const esc = v => String(v || '').replace(/"/g, '&quot;');
+
+    let thHtml = '<tr><th style="width: 95px;">Day</th>';
+    _adminFacTtColumns.forEach((col, i) => {
+        const timeVal = headers[col.key] || col.defTime || '';
+        if (col.isBreak && col.key !== 'ACT') {
+            thHtml += `<th class="text-warning position-relative">
+                <div class="d-flex justify-content-between px-1 mb-1">
+                    ${i > 0 ? `<i class="fa-solid fa-caret-left" style="cursor:pointer" onclick="window.swapAdminFacultyCol(${i}, -1)"></i>` : `<span></span>`}
+                    ${i < _adminFacTtColumns.length - 1 ? `<i class="fa-solid fa-caret-right" style="cursor:pointer" onclick="window.swapAdminFacultyCol(${i}, 1)"></i>` : `<span></span>`}
+                </div>
+                ${col.label}
+                <input type="text" id="adminFacTtHdr_${col.key}" class="form-control form-control-sm bg-dark text-warning border-secondary text-center mt-1" style="font-size: 0.72rem; padding: 0.2rem;" value="${esc(timeVal)}" />
+            </th>`;
+        } else {
+            thHtml += `<th class="position-relative">
+                <div class="d-flex justify-content-between px-1 text-muted mb-1">
+                    ${i > 0 ? `<i class="fa-solid fa-caret-left" style="cursor:pointer" onclick="window.swapAdminFacultyCol(${i}, -1)"></i>` : `<span></span>`}
+                    <i class="fa-solid fa-trash text-danger" style="cursor:pointer" onclick="window.removeAdminFacultyCol(${i})"></i>
+                    ${i < _adminFacTtColumns.length - 1 ? `<i class="fa-solid fa-caret-right" style="cursor:pointer" onclick="window.swapAdminFacultyCol(${i}, 1)"></i>` : `<span></span>`}
+                </div>
+                <input type="text" value="${esc(col.label)}" class="form-control form-control-sm bg-transparent border-0 text-white text-center p-0 mb-1" onchange="window.updateAdminFacultyColLabel(${i}, this.value)" style="font-size: 0.8rem; font-weight: bold;" />
+                <input type="text" id="adminFacTtHdr_${col.key}" class="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style="font-size: 0.72rem; padding: 0.2rem;" value="${esc(timeVal)}" />
+            </th>`;
+        }
+    });
+    thHtml += '</tr>';
+    thead.innerHTML = thHtml;
+
+    let bodyHtml = '';
+    days.forEach(day => {
+        const d = saved[day] || {};
+        bodyHtml += `<tr><td class="align-middle text-white fw-bold">${day}</td>`;
+        _adminFacTtColumns.forEach(col => {
+            if (col.isBreak && col.key !== 'ACT') {
+                bodyHtml += `<td class="align-middle text-muted small text-center">${col.label.toUpperCase()}</td>`;
+            } else {
+                bodyHtml += `<td><input type="text" id="adminFacTt_${day}_${col.key}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d[col.key])}" placeholder="FREE" /></td>`;
+            }
+        });
+        bodyHtml += '</tr>';
+    });
+    tbody.innerHTML = bodyHtml;
+}
+
+function _collectAdminFacTtData() {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const data = { _headers: {}, _columns: _adminFacTtColumns };
+    _adminFacTtColumns.forEach(col => {
+        data._headers[col.key] = (document.getElementById('adminFacTtHdr_' + col.key) || {}).value || col.defTime || '';
+    });
+    days.forEach(day => {
+        data[day] = {};
+        _adminFacTtColumns.forEach(col => {
+            if (!col.isBreak || col.key === 'ACT') {
+                const el = document.getElementById(`adminFacTt_${day}_${col.key}`);
+                data[day][col.key] = el ? el.value.trim() : '';
+            }
+        });
+    });
+    return data;
+}
+
+window.loadAdminFacultyTimetable = async function() {
+    const sel = document.getElementById('adminFacTtSelect');
+    const metaEl = document.getElementById('adminFacTtMeta');
+    const alertBox = document.getElementById('adminFacTtAlert');
+    if (alertBox) alertBox.classList.add('d-none');
+    if (!sel || !sel.value) return;
+
+    const uname = sel.value.toLowerCase();
+    const teacher = _adminFacTtTeachers.find(t => ((t.user && t.user.username) || t.username || t.employeeId || '').toLowerCase() === uname);
+    const dispName = teacher ? (teacher.displayName || teacher.name || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim()) : uname;
+    const dept = teacher && teacher.department ? (teacher.department.name || teacher.department.code || '') : '';
+    if (metaEl) {
+        metaEl.innerHTML = `<i class="fa-solid fa-user-tie me-1"></i> Viewing timetable for <strong>${dispName}</strong> (${uname})${dept ? ` &bull; ${dept}` : ''}`;
+    }
+
+    let saved = await window.syncFacultyPersonalTtFromBackend(uname);
+    if (!saved) {
+        saved = _parseJsonSafe(localStorage.getItem('faculty_personal_tt_' + uname) || '{}', {});
+    }
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const hasPersonalData = days.some(d => saved[d] && Object.values(saved[d]).some(v => v && String(v).trim()));
+
+    if (!hasPersonalData && teacher && teacher.id) {
+        try {
+            const ttRes = await apiFetch(`/api/timetable/teacher/${teacher.id}`);
+            if (ttRes.ok) {
+                const entries = await ttRes.json();
+                if (Array.isArray(entries) && entries.length > 0) {
+                    entries.forEach(entry => {
+                        if (!entry.day || !entry.slotNumber) return;
+                        if (!saved[entry.day]) saved[entry.day] = {};
+                        const sub = entry.subjectName || entry.subjectCode || '';
+                        const sec = entry.sectionName || '';
+                        const room = entry.roomNumber || entry.labName || '';
+                        saved[entry.day]['P' + entry.slotNumber] = [sub, sec, room].filter(Boolean).join(', ');
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load teacher schedule entries:', e);
+        }
+    }
+
+    if (Array.isArray(saved._columns) && saved._columns.length > 0) {
+        _adminFacTtColumns = JSON.parse(JSON.stringify(saved._columns));
+    } else {
+        const savedCols = _parseJsonSafe(localStorage.getItem('faculty_tt_cols_faculty_personal_tt_' + uname) || 'null', null);
+        _adminFacTtColumns = (Array.isArray(savedCols) && savedCols.length > 0) ? savedCols : _defaultFacultyTtColumnsList();
+    }
+
+    _adminFacTtSnapshot = {};
+    days.forEach(day => {
+        _adminFacTtSnapshot[day] = { ...(saved[day] || {}) };
+    });
+
+    _renderAdminFacTtGrid(saved);
+};
+
+window.addAdminFacultyPeriodCol = function() {
+    const current = _collectAdminFacTtData();
+    const newIdx = _adminFacTtColumns.length + 1;
+    _adminFacTtColumns.push({
+        key: 'P' + newIdx + '_' + Date.now().toString().slice(-4),
+        label: 'Period ' + newIdx,
+        isBreak: false,
+        defTime: '00.00 - 00.00'
+    });
+    _renderAdminFacTtGrid(current);
+};
+
+window.swapAdminFacultyCol = function(idx, dir) {
+    if (idx + dir < 0 || idx + dir >= _adminFacTtColumns.length) return;
+    const current = _collectAdminFacTtData();
+    const tmp = _adminFacTtColumns[idx];
+    _adminFacTtColumns[idx] = _adminFacTtColumns[idx + dir];
+    _adminFacTtColumns[idx + dir] = tmp;
+    _renderAdminFacTtGrid(current);
+};
+
+window.removeAdminFacultyCol = function(idx) {
+    if (!confirm('Remove this period column?')) return;
+    const current = _collectAdminFacTtData();
+    _adminFacTtColumns.splice(idx, 1);
+    _renderAdminFacTtGrid(current);
+};
+
+window.updateAdminFacultyColLabel = function(idx, val) {
+    if (_adminFacTtColumns[idx]) _adminFacTtColumns[idx].label = val;
+};
+
+window.saveAdminFacultyTimetable = async function() {
+    const sel = document.getElementById('adminFacTtSelect');
+    const alertBox = document.getElementById('adminFacTtAlert');
+    const noteEl = document.getElementById('adminFacTtNote');
+    const notifyDayEl = document.getElementById('adminFacTtNotifyDay');
+    if (!sel || !sel.value) {
+        alert('Please select a faculty member first.');
+        return;
+    }
+
+    const uname = sel.value.toLowerCase();
+    const teacher = _adminFacTtTeachers.find(t => ((t.user && t.user.username) || t.username || t.employeeId || '').toLowerCase() === uname);
+    const dispName = teacher ? (teacher.displayName || teacher.name || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim()) : uname;
+    const customNote = noteEl ? noteEl.value.trim() : '';
+    const manualNotifyDay = notifyDayEl ? notifyDayEl.value : 'AUTO';
+
+    const data = _collectAdminFacTtData();
+    const jsonStr = JSON.stringify(data);
+    localStorage.setItem('faculty_personal_tt_' + uname, jsonStr);
+    localStorage.setItem('faculty_tt_cols_faculty_personal_tt_' + uname, JSON.stringify(_adminFacTtColumns));
+
+    try {
+        const res = await apiFetch(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`, {
+            method: 'POST',
+            body: JSON.stringify({ dataJson: jsonStr })
+        });
+        if (!res.ok) throw new Error('Failed to save timetable on server.');
+    } catch (err) {
+        if (alertBox) {
+            alertBox.className = 'alert alert-danger small py-2 mb-2';
+            alertBox.innerText = 'Error saving timetable: ' + err.message;
+        }
+        return;
+    }
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const changedDays = [];
+    days.forEach(day => {
+        const before = _adminFacTtSnapshot[day] || {};
+        const after = data[day] || {};
+        const periodChanges = [];
+        _adminFacTtColumns.forEach(col => {
+            if (col.isBreak && col.key !== 'ACT') return;
+            const prevVal = String(before[col.key] || '').trim();
+            const nextVal = String(after[col.key] || '').trim();
+            if (prevVal !== nextVal) {
+                periodChanges.push(`${col.label}: ${nextVal || 'FREE'}`);
+            }
+        });
+        if (periodChanges.length > 0) {
+            changedDays.push({ day, summary: periodChanges.join('; ') });
+        }
+    });
+
+    if (manualNotifyDay && manualNotifyDay !== 'AUTO' && !changedDays.some(c => c.day === manualNotifyDay)) {
+        changedDays.push({ day: manualNotifyDay, summary: customNote || 'Schedule updated by Admin' });
+    } else if (changedDays.length === 0 && customNote) {
+        const fallbackDay = getTodayDayName() === 'Sunday' ? 'Monday' : getTodayDayName();
+        changedDays.push({ day: fallbackDay, summary: customNote });
+    }
+
+    for (const ch of changedDays) {
+        const reason = `Timetable changed by Admin for ${ch.day}${customNote ? ` (${customNote})` : ''}: ${ch.summary}`;
+        await savePeriodNotificationToAPI({
+            date: getDateForDayName(ch.day),
+            day: ch.day,
+            period: 0,
+            section: ch.summary,
+            originalFaculty: uname,
+            staff: dispName,
+            subject: reason,
+            reason: reason,
+            source: 'admin_faculty_tt_change'
+        });
+    }
+
+    days.forEach(day => {
+        _adminFacTtSnapshot[day] = { ...(data[day] || {}) };
+    });
+    if (noteEl) noteEl.value = '';
+    if (notifyDayEl) notifyDayEl.value = 'AUTO';
+
+    const notifiedText = changedDays.length > 0
+        ? `Saved timetable for ${dispName} and notified for: ${changedDays.map(c => c.day).join(', ')}.`
+        : `Saved timetable for ${dispName}. (No day changes detected to notify.)`;
+
+    if (alertBox) {
+        alertBox.className = 'alert alert-success small py-2 mb-2';
+        alertBox.innerText = notifiedText;
+    }
+    showToast('Faculty Timetable Updated', notifiedText);
+};
+
+function getFacultyAdminTtNotifications() {
+    if (currentUserRole !== 'FACULTY') return [];
+    const uname = String(localStorage.getItem('sece_logged_in_user') || '').trim().toLowerCase();
+    let userNameAlt = '';
+    try {
+        const ui = JSON.parse(localStorage.getItem('user_info') || '{}');
+        if (ui && ui.name) userNameAlt = String(ui.name).trim().toLowerCase();
+    } catch (_) {}
+
+    const all = loadPeriodNotifications();
+    return all.filter(n => {
+        if (n.source !== 'admin_faculty_tt_change') return false;
+        const targetUser = String(n.originalFaculty || '').trim().toLowerCase();
+        const targetName = String(n.staff || '').trim().toLowerCase();
+        return (uname && targetUser === uname) || (userNameAlt && targetName === userNameAlt);
+    });
+}
+
+window.renderFacultyAdminTtBanner = function() {
+    const banner = document.getElementById('facultyAdminTtChangeBanner');
+    if (!banner) return;
+    const notifs = getFacultyAdminTtNotifications();
+    if (currentUserRole !== 'FACULTY' || notifs.length === 0) {
+        banner.classList.add('d-none');
+        banner.innerHTML = '';
+        return;
+    }
+
+    banner.classList.remove('d-none');
+    banner.innerHTML = notifs.map(n => `
+        <div class="alert alert-warning d-flex align-items-center justify-content-between gap-3 shadow-sm mb-2" role="alert" style="border-left: 4px solid #f59e0b;">
+            <div>
+                <h6 class="alert-heading mb-1 fw-bold">
+                    <i class="fa-solid fa-bell me-2"></i>Timetable Changed by Admin (${n.day || ''}${n.date ? ' - ' + n.date : ''})
+                </h6>
+                <p class="mb-0 small text-dark">${n.reason || n.section || 'Your timetable was updated by Admin.'}</p>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-dark flex-shrink-0" onclick="window.dismissFacultyAdminTtNotif?.('${n._id || ''}')">
+                <i class="fa-solid fa-check me-1"></i>Dismiss
+            </button>
+        </div>
+    `).join('');
+};
+
+window.dismissFacultyAdminTtNotif = async function(id) {
+    const all = loadPeriodNotifications();
+    const target = all.find(n => String(n._id || '') === String(id || '') && n.source === 'admin_faculty_tt_change');
+    if (target) {
+        await deletePeriodNotificationFromAPI(target);
+    }
+    window.renderFacultyAdminTtBanner();
+    if (typeof renderAdminLeaveNotifications === 'function') renderAdminLeaveNotifications();
+    if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
+};
+
+if (window.__facultyAdminTtPollInterval) clearInterval(window.__facultyAdminTtPollInterval);
+window.__facultyAdminTtPollInterval = setInterval(() => {
+    if (localStorage.getItem('sece_logged_in_role') === 'FACULTY' && localStorage.getItem('jwt_token')) {
+        if (typeof fetchPeriodNotificationsFromAPI === 'function') {
+            fetchPeriodNotificationsFromAPI().then(() => {
+                if (typeof window.renderFacultyAdminTtBanner === 'function') window.renderFacultyAdminTtBanner();
+                if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
+            });
+        }
+    }
+}, 30000);

@@ -366,7 +366,13 @@ let _resolvedSectionId = null;     // resolved DB id of student's section
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function _loggedInUsername() {
-    return localStorage.getItem('sece_logged_in_user') || '';
+    return (localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
+}
+function _authHeaders(extra = {}) {
+    const token = localStorage.getItem('jwt_token') || '';
+    const headers = { ...extra };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    return headers;
 }
 function _teacherId() {
     // Try to get from session storage set by faculty login flow
@@ -392,8 +398,8 @@ async function _resolveStudentInfo() {
         if (!res.ok) return null;
         const students = await res.json();
         const me = students.find(s =>
-            (s.user && s.user.username === username) ||
-            s.username === username ||
+            (s.user && String(s.user.username || '').toLowerCase() === username) ||
+            String(s.username || '').toLowerCase() === username ||
             String(s.registerNumber || '').toLowerCase() === username
         );
         if (!me) return null;
@@ -423,8 +429,8 @@ async function _resolveTeacherInfo() {
         if (!res.ok) return null;
         const teachers = await res.json();
         const me = teachers.find(t =>
-            (t.user && t.user.username === username) ||
-            t.username === username ||
+            (t.user && String(t.user.username || '').toLowerCase() === username) ||
+            String(t.username || '').toLowerCase() === username ||
             String(t.collegeEmail || '').toLowerCase().startsWith(username)
         );
         if (!me) return null;
@@ -679,7 +685,7 @@ window.quizHandleCreate = async (e) => {
     try {
         const res = await fetch('/api/quizzes', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: _authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(payload)
         });
         if (res.ok) {
@@ -702,7 +708,7 @@ window.quizHandleCreate = async (e) => {
 window.quizLoadFacultyList = async () => {
     const tchId = document.getElementById('fqTeacherId').value || _teacherId();
     try {
-        const res = await fetch('/api/quizzes/teacher/' + tchId);
+        const res = await fetch('/api/quizzes/teacher/' + tchId, { headers: _authHeaders() });
         const list = await res.json();
         const sel = document.getElementById('fqQuizSelect');
         sel.innerHTML = '<option value="">-- Choose a Quiz --</option>' +
@@ -731,8 +737,8 @@ window.quizLoadResults = async (quizId) => {
     body.innerHTML = '<div class="text-muted">Loading...</div>';
 
     const [allRes, weakRes] = await Promise.all([
-        fetch('/api/quizzes/' + quizId + '/results'),
-        fetch('/api/quizzes/' + quizId + '/results/weak')
+        fetch('/api/quizzes/' + quizId + '/results', { headers: _authHeaders() }),
+        fetch('/api/quizzes/' + quizId + '/results/weak', { headers: _authHeaders() })
     ]);
     const all  = await allRes.json();
     const weak = await weakRes.json();
@@ -961,7 +967,7 @@ window.openStudentQuizModal = async () => {
         const info = await _resolveStudentInfo();
         const secId = (info && info.sectionId) ? info.sectionId : 1;
 
-        const res  = await fetch('/api/quizzes/section/' + secId);
+        const res  = await fetch('/api/quizzes/section/' + secId, { headers: _authHeaders() });
         const list = await res.json();
 
         if (!list || list.length === 0) {
@@ -978,7 +984,7 @@ window.openStudentQuizModal = async () => {
         }
     } catch (err) {
         console.error(err);
-        listEl.innerHTML = '<p class="text-danger">Error loading quizzes. Check backend is running on port 8081.</p>';
+        listEl.innerHTML = '<p class="text-danger">Failed to load quizzes. Please try again.</p>';
     }
 
     new bootstrap.Modal(document.getElementById('studentQuizModal')).show();
@@ -989,7 +995,7 @@ window.quizStudentStart = async (quizId) => {
     try {
         const info  = await _resolveStudentInfo();
         const secId = (info && info.sectionId) ? info.sectionId : 1;
-        const res   = await fetch('/api/quizzes/section/' + secId);
+        const res   = await fetch('/api/quizzes/section/' + secId, { headers: _authHeaders() });
         const list  = await res.json();
         const quiz  = list.find(q => q.id === quizId);
         if (!quiz) { alert('Quiz not found.'); return; }
@@ -1074,7 +1080,7 @@ window.quizStudentSubmit = async (e) => {
     try {
         const res = await fetch('/api/quizzes/' + quizId + '/submit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: _authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ studentId, answers })
         });
 
@@ -1303,7 +1309,9 @@ window.openStudentQuizHistoryModal = async () => {
             </div>
         `;
 
+        document.getElementById('sqHistoryPerfSummary')?.remove();
         const summaryEl = document.createElement('div');
+        summaryEl.id = 'sqHistoryPerfSummary';
         summaryEl.innerHTML = summaryHtml;
         listEl.parentNode.insertBefore(summaryEl, listEl);
 
@@ -1568,7 +1576,7 @@ window.quizDeleteSelected = async () => {
     }
 
     try {
-        const res = await fetch('/api/quizzes/' + quizId, { method: 'DELETE' });
+        const res = await fetch('/api/quizzes/' + quizId, { method: 'DELETE', headers: _authHeaders() });
         if (res.ok) {
             showToast('Success', 'Quiz deleted successfully.');
             // Refresh the faculty list

@@ -8,26 +8,26 @@ public class WebViewController {
 
     @GetMapping("/")
     public String index() {
-        return "redirect:/login.html";
+        return "redirect:/login";
     }
 
     @GetMapping("/login")
     public String login() {
-        return "forward:/login.html";
+        return "forward:/index.html";
     }
 
     @GetMapping("/admin")
     public String adminDashboard() {
-        return "forward:/admin-dashboard.html";
+        return "forward:/index.html";
     }
 
     @GetMapping("/faculty")
     public String facultyDashboard() {
-        return "forward:/faculty-dashboard.html";
+        return "forward:/index.html";
     }
 
     @GetMapping("/student")
     public String studentDashboard() {
-        return "forward:/student-dashboard.html";
+        return "forward:/index.html";
     }
 }

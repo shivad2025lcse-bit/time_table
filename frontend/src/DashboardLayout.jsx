@@ -207,19 +207,19 @@ export default function DashboardLayout() {
                                             </button>
                                         </li>
                                         <li>
-                                            <button className="dropdown-item py-2 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#adminAbsentNotifModal" onClick={() => window.renderAdminLeaveNotifications?.()}>
+                                            <button className="dropdown-item py-2 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target={isAdmin || isFaculty ? "#adminAbsentNotifModal" : "#studentDayNotificationModal"} onClick={() => { if (isAdmin || isFaculty) { window.renderAdminLeaveNotifications?.(); } else { window.renderPeriodNotifications?.(); } }}>
                                                 <i className="fa-solid fa-bell text-success"></i> Notifications
                                             </button>
                                         </li>
                                         <li><hr className="dropdown-divider border-secondary" /></li>
                                         <li>
-                                            <button className="dropdown-item py-2 text-danger d-flex align-items-center gap-2" onClick={() => window.logoutUser()}>
+                                            <button className="dropdown-item py-2 text-danger d-flex align-items-center gap-2" onClick={() => window.logoutUser?.()}>
                                                 <i className="fa-solid fa-right-from-bracket"></i> Logout
                                             </button>
                                         </li>
                                     </ul>
                                 </div>
-                                <button className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 ms-1 ms-md-2" type="button" onClick={() => window.logoutUser()}>
+                                <button className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 ms-1 ms-md-2" type="button" onClick={() => window.logoutUser?.()}>
                                     <i className="fa-solid fa-right-from-bracket"></i> <span className="d-none d-md-block">Logout</span>
                                 </button>
                             </div>
@@ -255,6 +255,9 @@ export default function DashboardLayout() {
                                     </button>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminViewFacultyModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
                                         <i className="fa-solid fa-address-card fa-fw me-3 text-info"></i> View Faculty Details
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminFacultyTimetableModal" onClick={() => { window.openAdminFacultyTimetableModal?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-calendar-week fa-fw me-3 text-primary"></i> View Faculty Timetable
                                     </button>
                                 </>
                             )}
@@ -324,14 +327,14 @@ export default function DashboardLayout() {
                                 <i className="fa-solid fa-download"></i> Download TT
                             </button>
                             <ul className="dropdown-menu dropdown-menu-dark shadow w-100">
-                                <li><a className="dropdown-item" href="#" onClick={() => { window.downloadTimetablePNG(); window.innerWidth <= 992 && setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-image me-2 text-info"></i> PNG Image</a></li>
-                                <li><a className="dropdown-item" href="#" onClick={() => { window.exportTimetableCSV(); window.innerWidth <= 992 && setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-csv me-2 text-success"></i> CSV Spreadsheet</a></li>
-                                <li><a className="dropdown-item" href="#" onClick={() => { window.print(); window.innerWidth <= 992 && setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-pdf me-2 text-danger"></i> Print / PDF</a></li>
+                                <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.downloadTimetablePNG?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-image me-2 text-info"></i> PNG Image</a></li>
+                                <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.exportTimetableCSV?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-csv me-2 text-success"></i> CSV Spreadsheet</a></li>
+                                <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.print(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-pdf me-2 text-danger"></i> Print / PDF</a></li>
                             </ul>
                         </div>
                         
                         <div className="mt-auto pt-3 border-top border-secondary">
-                            <button className="sidebar-nav-link text-danger" onClick={() => window.logoutUser()}>
+                            <button className="sidebar-nav-link text-danger" onClick={() => window.logoutUser?.()}>
                                 <i className="fa-solid fa-right-from-bracket fa-fw me-3"></i> Logout
                             </button>
                         </div>
@@ -395,6 +398,10 @@ export default function DashboardLayout() {
                             <p className="mb-0 text-dark" id="facultyNextClassText">Loading...</p>
                         </div>
                     </div>
+
+                    {isFaculty && (
+                        <div id="facultyAdminTtChangeBanner" className="d-none mb-3"></div>
+                    )}
 
 
 
@@ -876,7 +883,7 @@ export default function DashboardLayout() {
             )}
 
 
-            <div className="modal fade" btn-outline-warning tabIndex="-1">
+            <div className="modal fade" id="forgotPasswordModal" tabIndex="-1">
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content bg-dark text-white border-secondary">
                         <div className="modal-header border-secondary">
@@ -1275,6 +1282,7 @@ export default function DashboardLayout() {
                         <div className="modal-body" id="studentProfileBody"></div>
                     </div>
                 </div>
+            </div>
 
             <div className="modal fade" id="facultyProfileModal" tabIndex="-1">
                 <div className="modal-dialog modal-dialog-centered">
@@ -1288,8 +1296,6 @@ export default function DashboardLayout() {
                         <div className="modal-body" id="facultyProfileBody"></div>
                     </div>
                 </div>
-            </div>
-
             </div>
 
 
@@ -1367,19 +1373,19 @@ export default function DashboardLayout() {
                                 </div>
                                 <div className="col-md-4">
                                     <label className="form-label small mb-1">Year</label>
-                                    <select id="modalYearSelectStandalone" className="form-select form-select-sm bg-dark text-white border-secondary">
+                                    <select id="modalYearSelectStandalone" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="III Year">
                                         <option value="I Year">I Year</option>
                                         <option value="II Year">II Year</option>
-                                        <option value="III Year" selected>III Year</option>
+                                        <option value="III Year">III Year</option>
                                         <option value="IV Year">IV Year</option>
                                     </select>
                                 </div>
                                 <div className="col-md-4">
                                     <label className="form-label small mb-1">Semester</label>
-                                    <select id="modalSemSelectStandalone" className="form-select form-select-sm bg-dark text-white border-secondary">
+                                    <select id="modalSemSelectStandalone" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="III Semester">
                                         <option value="I Semester">I Semester</option>
                                         <option value="II Semester">II Semester</option>
-                                        <option value="III Semester" selected>III Semester</option>
+                                        <option value="III Semester">III Semester</option>
                                         <option value="IV Semester">IV Semester</option>
                                         <option value="V Semester">V Semester</option>
                                         <option value="VI Semester">VI Semester</option>
@@ -1666,9 +1672,6 @@ export default function DashboardLayout() {
                     </div>
                 </div>
             </div>
-
-
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 
 
@@ -2479,7 +2482,8 @@ export default function DashboardLayout() {
                         </div>
                     </div>
                 </div>
-            
+            </div>
+
             <div className="modal fade" id="manageClassTtModal" tabIndex="-1">
                 <div className="modal-dialog modal-xl modal-dialog-centered">
                     <div className="modal-content bg-dark text-white border-secondary">
@@ -2491,17 +2495,17 @@ export default function DashboardLayout() {
                             <div className="row mb-4 align-items-end">
                                 <div className="col-md-3">
                                     <label className="form-label text-muted small">Year</label>
-                                    <select id="mcYearSelect" className="form-select bg-dark text-white border-secondary" onChange={() => window.loadManageClassTt && window.loadManageClassTt()}>
+                                    <select id="mcYearSelect" className="form-select bg-dark text-white border-secondary" defaultValue="II" onChange={() => window.loadManageClassTt && window.loadManageClassTt()}>
                                         <option value="I">I</option>
-                                        <option value="II" selected>II</option>
+                                        <option value="II">II</option>
                                         <option value="III">III</option>
                                         <option value="IV">IV</option>
                                     </select>
                                 </div>
                                 <div className="col-md-3">
                                     <label className="form-label text-muted small">Department</label>
-                                    <select id="mcDeptSelect" className="form-select bg-dark text-white border-secondary" onChange={() => window.loadManageClassTt && window.loadManageClassTt()}>
-                                        <option value="CSE" selected>CSE</option>
+                                    <select id="mcDeptSelect" className="form-select bg-dark text-white border-secondary" defaultValue="CSE" onChange={() => window.loadManageClassTt && window.loadManageClassTt()}>
+                                        <option value="CSE">CSE</option>
                                         <option value="IT">IT</option>
                                         <option value="ECE">ECE</option>
                                         <option value="EEE">EEE</option>
@@ -2513,10 +2517,10 @@ export default function DashboardLayout() {
                                 </div>
                                 <div className="col-md-3">
                                     <label className="form-label text-muted small">Section</label>
-                                    <select id="mcSecSelect" className="form-select bg-dark text-white border-secondary" onChange={() => window.loadManageClassTt && window.loadManageClassTt()}>
+                                    <select id="mcSecSelect" className="form-select bg-dark text-white border-secondary" defaultValue="C" onChange={() => window.loadManageClassTt && window.loadManageClassTt()}>
                                         <option value="A">A</option>
                                         <option value="B">B</option>
-                                        <option value="C" selected>C</option>
+                                        <option value="C">C</option>
                                     </select>
                                 </div>
                                 <div className="col-md-3">
@@ -2554,9 +2558,76 @@ export default function DashboardLayout() {
                     </div>
                 </div>
             </div>
-</div>
 
         
+
+            {/* ===== Admin: View & Edit Faculty Timetable Modal ===== */}
+            <div className="modal fade" id="adminFacultyTimetableModal" tabIndex="-1">
+                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
+                            <h5 className="modal-title text-info fw-bold">
+                                <i className="fa-solid fa-calendar-week me-2"></i> View &amp; Edit Faculty Timetable
+                            </h5>
+                            <div className="d-flex align-items-center gap-2">
+                                <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => window.addAdminFacultyPeriodCol?.()}>
+                                    <i className="fa-solid fa-plus me-1"></i> Add Period
+                                </button>
+                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                        </div>
+                        <div className="modal-body p-3">
+                            <div className="row g-2 mb-3 align-items-end">
+                                <div className="col-md-5">
+                                    <label className="form-label small text-muted mb-1">Select Faculty Member</label>
+                                    <select id="adminFacTtSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.loadAdminFacultyTimetable?.()}>
+                                        <option value="">-- Loading Faculty --</option>
+                                    </select>
+                                </div>
+                                <div className="col-md-3">
+                                    <label className="form-label small text-muted mb-1">Notify Day</label>
+                                    <select id="adminFacTtNotifyDay" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="AUTO">
+                                        <option value="AUTO">Auto-detect changed day(s)</option>
+                                        <option value="Monday">Monday</option>
+                                        <option value="Tuesday">Tuesday</option>
+                                        <option value="Wednesday">Wednesday</option>
+                                        <option value="Thursday">Thursday</option>
+                                        <option value="Friday">Friday</option>
+                                        <option value="Saturday">Saturday</option>
+                                    </select>
+                                </div>
+                                <div className="col-md-4">
+                                    <label className="form-label small text-muted mb-1">Change Note (sent to faculty)</label>
+                                    <input type="text" id="adminFacTtNote" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Room shifted to SF 05" />
+                                </div>
+                            </div>
+
+                            <div id="adminFacTtMeta" className="small text-info mb-2"></div>
+                            <div id="adminFacTtAlert" className="alert d-none small py-2 mb-2"></div>
+
+                            <form id="adminFacultyTimetableForm" onSubmit={(e) => { e.preventDefault(); window.saveAdminFacultyTimetable?.(); }}>
+                                <p className="small text-muted mb-2">
+                                    Format: <code>Subject, Class, Venue</code> (e.g. <code>JAVA, II CSE C, SF 04</code>). Leave blank for <code>FREE</code>.
+                                </p>
+                                <div className="table-responsive">
+                                    <table className="table table-dark table-bordered border-secondary table-sm text-center align-middle" style={{ tableLayout: "fixed" }}>
+                                        <thead id="adminFacTtHead"></thead>
+                                        <tbody id="adminFacTtBody">
+                                            <tr><td colSpan="10" className="text-center text-muted py-4">Select a faculty member to view or edit their timetable.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="d-flex justify-content-end gap-2 mt-3">
+                                    <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <button type="submit" className="btn btn-warning fw-bold">
+                                        <i className="fa-solid fa-bell me-1"></i> Save Changes &amp; Notify Faculty
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* ===== Change Password Modal (Authenticated Users) ===== */}
             <div className="modal fade" id="changePasswordModal" tabIndex="-1">

@@ -2,11 +2,13 @@ let currentUser = null;
 let authToken = localStorage.getItem('jwt_token');
 
 setTimeout(() => {
-    if (authToken) {
-        currentUser = JSON.parse(localStorage.getItem('user_info') || '{}');
-        showMainApp();
-    } else {
-        showLoginPage();
+    if (document.getElementById('loginView')) {
+        if (authToken) {
+            currentUser = JSON.parse(localStorage.getItem('user_info') || '{}');
+            showMainApp();
+        } else {
+            showLoginPage();
+        }
     }
 
     document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
@@ -26,7 +28,7 @@ async function apiFetch(url, options = {}) {
         options.headers['Content-Type'] = 'application/json';
     }
     const response = await fetch(url, options);
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
         logout();
     }
     return response;
@@ -116,7 +118,13 @@ function logout() {
     currentUser = null;
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_info');
-    showLoginPage();
+    localStorage.removeItem('sece_logged_in_user');
+    localStorage.removeItem('sece_logged_in_role');
+    if (document.getElementById('loginView')) {
+        showLoginPage();
+    } else if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+        window.location.href = '/login';
+    }
 }
 
 function showLoginPage() {
