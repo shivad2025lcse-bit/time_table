@@ -59,11 +59,30 @@ public class TimetableController {
     @PostMapping("/upload-image")
     public ResponseEntity<?> parseTimetableImage(@RequestParam("file") MultipartFile file) {
         try {
-            String jsonResult = aiTimetableParserService.parseTimetableImage(file);
-            return ResponseEntity.ok(jsonResult);
+            return ResponseEntity.ok(aiTimetableParserService.parseTimetableFile(file));
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Upload parsing failed"));
+        }
+    }
+
+    @PostMapping("/assign-class")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    public ResponseEntity<?> assignUploadedClassTimetable(@RequestBody java.util.Map<String, Object> request) {
+        try {
+            String dept = (String) request.get("department");
+            String year = (String) request.get("year");
+            String sec = (String) request.get("sectionCode");
+            String sectionName = (String) request.get("sectionName");
+            String classAdvisor = (String) request.get("classAdvisor");
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, java.util.Map<String, String>> gridData =
+                    (java.util.Map<String, java.util.Map<String, String>>) request.get("grid");
+            return ResponseEntity.ok(excelImportService.assignUploadedClassTimetable(
+                    dept, year, sec, sectionName, classAdvisor, gridData));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Class assignment failed"));
         }
     }
 

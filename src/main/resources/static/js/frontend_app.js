@@ -6498,13 +6498,19 @@ function _initModalListeners() {
             adminFacTtModalEl.addEventListener('show.bs.modal', () => { if (window.openAdminFacultyTimetableModal) window.openAdminFacultyTimetableModal(); });
         }
 
+        const uploadAssignModalEl = document.getElementById('adminUploadAssignTtModal');
+        if (uploadAssignModalEl && !uploadAssignModalEl.dataset.initialized) {
+            uploadAssignModalEl.dataset.initialized = 'true';
+            uploadAssignModalEl.addEventListener('show.bs.modal', () => { if (window.openUploadAssignTtModal) window.openUploadAssignTtModal(); });
+        }
+
         const ticker = document.getElementById('announcementTickerContainer');
         if (ticker && !ticker.dataset.initialized) {
             ticker.dataset.initialized = 'true';
             if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
         }
 
-        const allDone = credModalEl && adminFacModalEl && annModalEl && shareModalEl && avtModalEl && adminFacTtModalEl && ticker;
+        const allDone = credModalEl && adminFacModalEl && annModalEl && shareModalEl && avtModalEl && adminFacTtModalEl && uploadAssignModalEl && ticker;
         if ((allDone || attempts >= 15) && window.__modalInitInterval) {
             clearInterval(window.__modalInitInterval);
             window.__modalInitInterval = null;
@@ -6962,6 +6968,10 @@ window.importTimetableImage = async function(event) {
             data = JSON.parse(jsonText);
         } catch (e) {
             throw new Error("Invalid JSON response from AI");
+        }
+
+        if (data && !data.data && data.needsClientOcr && data.previewImage) {
+            data.data = await _extractGridViaClientOcr(data.previewImage);
         }
 
         if (data && data.data) {
@@ -8634,3 +8644,368 @@ window.__facultyAdminTtPollInterval = setInterval(() => {
         }
     }
 }, 30000);
+
+// =========================
+// ADMIN: UPLOAD PDF/IMAGE & ASSIGN TO CLASS
+// =========================
+function _detectDayFromOcrText(text) {
+    const lower = String(text || '').trim().toLowerCase();
+    if (/^mon/.test(lower)) return 'Monday';
+    if (/^tue/.test(lower)) return 'Tuesday';
+    if (/^wed/.test(lower)) return 'Wednesday';
+    if (/^thu/.test(lower)) return 'Thursday';
+    if (/^fri/.test(lower)) return 'Friday';
+    if (/^sat/.test(lower)) return 'Saturday';
+    return null;
+}
+
+async function _extractGridViaClientOcr(imageSrc) {
+    if (typeof Tesseract === 'undefined') {
+        return null;
+    }
+    const result = await Tesseract.recognize(imageSrc, 'eng');
+    const words = (result && result.data && Array.isArray(result.data.words)) ? result.data.words : [];
+    if (words.length === 0) return null;
+
+    const sorted = words
+        .filter(w => w.text && w.text.trim())
+        .map(w => ({
+            text: w.text.trim(),
+            x: w.bbox ? w.bbox.x0 : 0,
+            endX: w.bbox ? w.bbox.x1 : 0,
+            y: w.bbox ? (w.bbox.y0 + w.bbox.y1) / 2 : 0
+        }))
+        .sort((a, b) => a.y - b.y || a.x - b.x);
+
+    const rows = [];
+    for (const w of sorted) {
+        if (rows.length === 0 || Math.abs(rows[rows.length - 1][0].y - w.y) > 22) {
+            rows.push([w]);
+        } else {
+            rows[rows.length - 1].push(w);
+        }
+    }
+
+    const dayRows = {};
+    let minX = Infinity, maxX = 0;
+    for (const row of rows) {
+        row.sort((a, b) => a.x - b.x);
+        const day = _detectDayFromOcrText(row[0].text) || _detectDayFromOcrText(row.slice(0, 2).map(w => w.text).join(' '));
+        if (day && !dayRows[day]) {
+            dayRows[day] = row;
+            for (let i = 1; i < row.length; i++) {
+                minX = Math.min(minX, row[i].x);
+                maxX = Math.max(maxX, row[i].endX);
+            }
+        }
+    }
+
+    if (Object.keys(dayRows).length === 0) return null;
+
+    const centers = [];
+    if (minX < maxX) {
+        const step = (maxX - minX) / 7;
+        for (let p = 0; p < 7; p++) centers.push(minX + step * (p + 0.5));
+    } else {
+        for (let p = 0; p < 7; p++) centers.push(150 + p * 100);
+    }
+
+    // Refine period column centers if header row contains 1..7
+    for (const row of rows) {
+        const found = {};
+        for (const w of row) {
+            const clean = w.text.toUpperCase().replace(/^P/, '');
+            if (/^[1-7]$/.test(clean)) {
+                found[parseInt(clean, 10)] = (w.x + w.endX) / 2;
+            }
+        }
+        if (Object.keys(found).length >= 4) {
+            for (let p = 1; p <= 7; p++) {
+                if (found[p] !== undefined) centers[p - 1] = found[p];
+            }
+            break;
+        }
+    }
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const grid = {};
+    days.forEach(day => {
+        grid[day] = Array.from({ length: 7 }, () => ({ sub: 'FREE', code: '', faculty: '', venue: '' }));
+        const row = dayRows[day];
+        if (!row || row.length < 2) return;
+        const buckets = Array.from({ length: 7 }, () => []);
+        for (let i = 1; i < row.length; i++) {
+            const w = row[i];
+            const up = w.text.toUpperCase();
+            if (up === 'TEA' || up === 'LUNCH' || up === 'BREAK') continue;
+            const center = (w.x + w.endX) / 2;
+            let bestIdx = 0, bestDist = Infinity;
+            for (let p = 0; p < 7; p++) {
+                const d = Math.abs(center - centers[p]);
+                if (d < bestDist) { bestDist = d; bestIdx = p; }
+            }
+            buckets[bestIdx].push(w.text);
+        }
+        for (let p = 0; p < 7; p++) {
+            const raw = buckets[p].join(' ').trim();
+            if (raw && raw !== '-' && raw.toUpperCase() !== 'FREE') {
+                const parts = raw.split(/[,|/]+/).map(s => s.trim());
+                grid[day][p] = {
+                    sub: parts[0] || raw,
+                    code: '',
+                    faculty: parts[1] || '',
+                    venue: parts[2] || ''
+                };
+            }
+        }
+    });
+    return grid;
+}
+
+function _renderUploadAssignGrid(ttData) {
+    const tbody = document.getElementById('uatGridBody');
+    if (!tbody) return;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const esc = v => String(v || '').replace(/"/g, '&quot;');
+
+    tbody.innerHTML = days.map(day => {
+        const periods = (ttData && ttData[day]) ? ttData[day] : [];
+        let cells = '';
+        for (let p = 1; p <= 7; p++) {
+            const item = periods[p - 1];
+            let val = '';
+            if (item && item.sub && item.sub.toUpperCase() !== 'FREE' && item.sub.toUpperCase() !== 'BREAK') {
+                val = [item.sub, item.faculty, item.venue].filter(Boolean).join(', ');
+            }
+            cells += `<td><input type="text" id="uat_${day}_P${p}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(val)}" placeholder="FREE" /></td>`;
+        }
+        return `<tr><td class="fw-bold text-white">${day}</td>${cells}</tr>`;
+    }).join('');
+}
+
+window.updateUploadAssignSectionBadge = function() {
+    const dept = (document.getElementById('uatDeptSelect')?.value || 'CSE').trim();
+    const year = (document.getElementById('uatYearSelect')?.value || 'II').trim();
+    const sec = (document.getElementById('uatSecInput')?.value || 'C').trim().toUpperCase();
+    const fullName = `${year} ${dept} ${sec}`;
+    const badge = document.getElementById('uatTargetSectionBadge');
+    if (badge) badge.innerText = fullName;
+
+    // Auto-select existing advisor for that section if known
+    const advisorSel = document.getElementById('uatAdvisorSelect');
+    if (advisorSel && Array.isArray(window._uatTeachersCache)) {
+        const match = window._uatTeachersCache.find(t =>
+            t.classAdvisorFor && t.classAdvisorFor.trim().toLowerCase() === fullName.toLowerCase()
+        );
+        if (match) {
+            const val = (match.user && match.user.username) || match.employeeId || match.name;
+            if (val) advisorSel.value = val;
+        }
+    }
+};
+
+window.openUploadAssignTtModal = async function() {
+    const fileInput = document.getElementById('uatFileInput');
+    const statusEl = document.getElementById('uatExtractStatus');
+    const detailsEl = document.getElementById('uatDetailsSection');
+    const previewWrap = document.getElementById('uatPreviewImgWrap');
+    const alertEl = document.getElementById('uatAssignAlert');
+    const advisorSel = document.getElementById('uatAdvisorSelect');
+
+    if (fileInput) fileInput.value = '';
+    if (statusEl) { statusEl.classList.add('d-none'); statusEl.innerHTML = ''; }
+    if (detailsEl) detailsEl.classList.add('d-none');
+    if (previewWrap) previewWrap.classList.add('d-none');
+    if (alertEl) alertEl.classList.add('d-none');
+
+    if (advisorSel) {
+        advisorSel.innerHTML = '<option value="">-- Select Class Advisor --</option>';
+        let teachers = [];
+        try {
+            const token = localStorage.getItem('jwt_token') || '';
+            const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+            const res = await fetch('/api/teachers', { headers });
+            if (res.ok) teachers = await res.json();
+        } catch (e) {
+            console.warn('Could not load teachers for advisor dropdown:', e);
+        }
+        if (!Array.isArray(teachers) || teachers.length === 0) {
+            teachers = (window.staffDirectory || []).map(s => ({
+                name: s.displayName || s.name,
+                displayName: s.displayName || s.name,
+                classAdvisorFor: s.classAdvisorFor || '',
+                department: { code: s.dept || '' },
+                user: { username: buildGeneratedUsername('FACULTY', s.name) }
+            }));
+        }
+        window._uatTeachersCache = teachers;
+        advisorSel.innerHTML = '<option value="">-- Select Class Advisor --</option>' + teachers.map(t => {
+            const val = (t.user && t.user.username) || t.employeeId || t.name;
+            const disp = t.displayName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() || val;
+            const dept = t.department ? (t.department.code || t.department.name || '') : '';
+            return `<option value="${val}">${disp}${dept ? ' (' + dept + ')' : ''}</option>`;
+        }).join('');
+    }
+    window.updateUploadAssignSectionBadge();
+};
+
+window.handleUploadAssignTtFile = async function(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const statusEl = document.getElementById('uatExtractStatus');
+    const detailsEl = document.getElementById('uatDetailsSection');
+    const previewWrap = document.getElementById('uatPreviewImgWrap');
+    const previewImg = document.getElementById('uatPreviewImg');
+    const alertEl = document.getElementById('uatAssignAlert');
+    if (alertEl) alertEl.classList.add('d-none');
+
+    if (statusEl) {
+        statusEl.className = 'small mt-2 text-info';
+        statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Extracting timetable & image from uploaded file...';
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const token = localStorage.getItem('jwt_token') || '';
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+        const res = await fetch('/api/timetable/upload-image', {
+            method: 'POST',
+            headers,
+            body: formData
+        });
+        const payload = await res.json();
+        if (!res.ok) {
+            throw new Error(payload.error || 'Failed to extract uploaded file.');
+        }
+
+        const previewSrc = payload.previewImage || (file.type.startsWith('image/') ? URL.createObjectURL(file) : '');
+        if (previewSrc && previewImg && previewWrap) {
+            previewImg.src = previewSrc;
+            previewWrap.classList.remove('d-none');
+        }
+
+        let ttData = payload.data || null;
+        let modeNote = payload.extractionMode === 'PDF_TEXT'
+            ? 'Extracted from PDF text table.'
+            : (payload.extractionMode === 'GEMINI_AI' ? 'Extracted via AI vision.' : '');
+
+        if (!ttData && payload.needsClientOcr && previewSrc) {
+            if (statusEl) {
+                statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running OCR on extracted image to detect periods...';
+            }
+            try {
+                ttData = await _extractGridViaClientOcr(previewSrc);
+                modeNote = ttData
+                    ? 'Image extracted and OCR-parsed. Please verify cells & select Class, Year, Section, and Class Advisor.'
+                    : 'Image extracted. Please review/fill periods below and select Class, Year, Section, and Class Advisor.';
+            } catch (ocrErr) {
+                console.warn('Client OCR warning:', ocrErr);
+                modeNote = 'Image extracted. Enter or adjust periods below and select Class, Year, Section, and Class Advisor.';
+            }
+        }
+
+        _renderUploadAssignGrid(ttData || {});
+        if (detailsEl) detailsEl.classList.remove('d-none');
+        window.updateUploadAssignSectionBadge();
+
+        if (statusEl) {
+            statusEl.className = 'small mt-2 text-success fw-semibold';
+            statusEl.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${modeNote || 'File extracted successfully! Select Class, Year, Section, and Class Advisor below.'}`;
+        }
+    } catch (err) {
+        console.error('Upload & Extract error:', err);
+        if (statusEl) {
+            statusEl.className = 'small mt-2 text-danger';
+            statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i>${err.message}`;
+        }
+    }
+};
+
+window.assignUploadedClassTimetable = async function() {
+    const dept = (document.getElementById('uatDeptSelect')?.value || '').trim();
+    const year = (document.getElementById('uatYearSelect')?.value || '').trim();
+    const secCode = (document.getElementById('uatSecInput')?.value || '').trim().toUpperCase();
+    const advisorSel = document.getElementById('uatAdvisorSelect');
+    const advisorVal = advisorSel ? advisorSel.value : '';
+    const advisorLabel = (advisorSel && advisorSel.selectedIndex > 0) ? advisorSel.options[advisorSel.selectedIndex].text : '';
+    const alertEl = document.getElementById('uatAssignAlert');
+
+    if (!dept || !year || !secCode) {
+        alert('Please select Class/Department, Year, and Section.');
+        return;
+    }
+
+    const fullSectionName = `${year} ${dept} ${secCode}`;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const grid = {};
+    days.forEach(day => {
+        grid[day] = {};
+        for (let p = 1; p <= 7; p++) {
+            const el = document.getElementById(`uat_${day}_P${p}`);
+            grid[day][`P${p}`] = el ? el.value.trim() : '';
+        }
+    });
+
+    try {
+        const res = await apiFetch('/api/timetable/assign-class', {
+            method: 'POST',
+            body: JSON.stringify({
+                department: dept,
+                year: year,
+                sectionCode: secCode,
+                sectionName: fullSectionName,
+                classAdvisor: advisorVal,
+                grid: grid
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to assign timetable.');
+
+        // Sync local storage & UI state so grid reflects assigned timetable immediately
+        const builtData = {
+            advisor: data.classAdvisor || advisorLabel || '',
+            tutors: '',
+            metadata: { batch: '2024', year: year, semester: '3' },
+            headers: {},
+            grid: grid
+        };
+        localStorage.setItem(`sece_tt_built_${fullSectionName}`, JSON.stringify(builtData));
+        localStorage.removeItem('class_tt_' + fullSectionName);
+
+        if (typeof activeSections !== 'undefined' && Array.isArray(activeSections)) {
+            if (!activeSections.some(s => s.name === fullSectionName)) {
+                activeSections.push({ dept: dept, name: fullSectionName, classroom: 'SF 04', capacity: 60 });
+                if (typeof saveSections === 'function') saveSections();
+            }
+        }
+        if (advisorVal && Array.isArray(window.staffDirectory)) {
+            window.staffDirectory.forEach(s => {
+                if (s.classAdvisorFor === fullSectionName) s.classAdvisorFor = '';
+                const uname = buildGeneratedUsername('FACULTY', s.name);
+                if (uname === advisorVal || s.name === advisorVal) s.classAdvisorFor = fullSectionName;
+            });
+            if (typeof saveStaffDirectory === 'function') saveStaffDirectory();
+        }
+
+        timetableData = loadSavedTimetable();
+        currentDept = dept;
+        currentSection = fullSectionName;
+        if (typeof populateSectionSelects === 'function') populateSectionSelects();
+        if (typeof loadTimetableData === 'function') await loadTimetableData();
+        if (typeof renderTimetableGrid === 'function') renderTimetableGrid();
+
+        if (alertEl) {
+            alertEl.className = 'alert alert-success small py-2 mt-2 mb-0';
+            alertEl.innerText = data.message || `Timetable assigned to ${fullSectionName}!`;
+        }
+        showToast('Class Timetable Assigned', `Timetable assigned to ${fullSectionName}${data.classAdvisor ? ` (Advisor: ${data.classAdvisor})` : ''}.`);
+    } catch (err) {
+        if (alertEl) {
+            alertEl.className = 'alert alert-danger small py-2 mt-2 mb-0';
+            alertEl.innerText = 'Error: ' + err.message;
+        }
+    }
+};

@@ -259,6 +259,9 @@ export default function DashboardLayout() {
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminFacultyTimetableModal" onClick={() => { if (typeof window.openAdminFacultyTimetableModal === 'function') { window.openAdminFacultyTimetableModal(); } else { window.location.reload(); } if (window.innerWidth <= 992) setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-calendar-week fa-fw me-3 text-primary"></i> View Faculty Timetable
                                     </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminUploadAssignTtModal" onClick={() => { if (typeof window.openUploadAssignTtModal === 'function') { window.openUploadAssignTtModal(); } else { window.location.reload(); } if (window.innerWidth <= 992) setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-file-arrow-up fa-fw me-3 text-info"></i> Upload &amp; Assign Class TT
+                                    </button>
                                 </>
                             )}
 
@@ -2624,6 +2627,130 @@ export default function DashboardLayout() {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ===== Admin: Upload PDF/Image & Assign Class Timetable Modal ===== */}
+            <div className="modal fade" id="adminUploadAssignTtModal" tabIndex="-1">
+                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-info fw-bold">
+                                <i className="fa-solid fa-file-arrow-up me-2"></i> Upload Timetable (PDF / Image) &amp; Assign to Class
+                            </h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body p-4">
+                            <div className="p-3 rounded border border-info bg-secondary bg-opacity-10 mb-3">
+                                <label className="form-label fw-bold text-info mb-2">
+                                    <i className="fa-solid fa-cloud-arrow-up me-2"></i>Step 1: Upload Timetable PDF or Image
+                                </label>
+                                <div className="d-flex flex-wrap align-items-center gap-2">
+                                    <input
+                                        type="file"
+                                        id="uatFileInput"
+                                        accept=".pdf,.png,.jpg,.jpeg,.webp"
+                                        className="form-control form-control-sm bg-dark text-white border-secondary"
+                                        style={{ maxWidth: "420px" }}
+                                        onChange={(e) => window.handleUploadAssignTtFile?.(e)}
+                                    />
+                                    <span className="small text-muted">Supports `.pdf`, `.png`, `.jpg`, `.jpeg`, `.webp`</span>
+                                </div>
+                                <div id="uatExtractStatus" className="small mt-2 d-none"></div>
+                            </div>
+
+                            <div id="uatDetailsSection" className="d-none">
+                                <div className="p-3 rounded border border-warning bg-dark mb-3">
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 className="fw-bold text-warning mb-0">
+                                            <i className="fa-solid fa-graduation-cap me-2"></i>Step 2: Select Class, Year, Section &amp; Class Advisor
+                                        </h6>
+                                        <span className="badge bg-info text-dark" id="uatTargetSectionBadge">II CSE C</span>
+                                    </div>
+                                    <div className="row g-2">
+                                        <div className="col-md-3">
+                                            <label className="form-label small text-muted mb-1">Class / Department *</label>
+                                            <select id="uatDeptSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="CSE" onChange={() => window.updateUploadAssignSectionBadge?.()}>
+                                                <option value="CSE">CSE</option>
+                                                <option value="IT">IT</option>
+                                                <option value="AI&DS">AI&amp;DS</option>
+                                                <option value="AI&ML">AI&amp;ML</option>
+                                                <option value="ECE">ECE</option>
+                                                <option value="EEE">EEE</option>
+                                                <option value="MECH">MECH</option>
+                                                <option value="CSBS">CSBS</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-md-2">
+                                            <label className="form-label small text-muted mb-1">Year *</label>
+                                            <select id="uatYearSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="II" onChange={() => window.updateUploadAssignSectionBadge?.()}>
+                                                <option value="I">I Year</option>
+                                                <option value="II">II Year</option>
+                                                <option value="III">III Year</option>
+                                                <option value="IV">IV Year</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-md-2">
+                                            <label className="form-label small text-muted mb-1">Section *</label>
+                                            <input type="text" id="uatSecInput" list="uatSecSuggestions" className="form-control form-control-sm bg-dark text-white border-secondary" defaultValue="C" placeholder="e.g. A, B, C" onInput={() => window.updateUploadAssignSectionBadge?.()} required />
+                                            <datalist id="uatSecSuggestions">
+                                                <option value="A" />
+                                                <option value="B" />
+                                                <option value="C" />
+                                                <option value="D" />
+                                            </datalist>
+                                        </div>
+                                        <div className="col-md-5">
+                                            <label className="form-label small text-muted mb-1">Class Advisor *</label>
+                                            <select id="uatAdvisorSelect" className="form-select form-select-sm bg-dark text-white border-secondary">
+                                                <option value="">-- Select Class Advisor --</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="uatPreviewImgWrap" className="mb-3 d-none">
+                                    <div className="d-flex justify-content-between align-items-center mb-1">
+                                        <span className="small fw-bold text-info"><i className="fa-solid fa-image me-1"></i> Extracted Image Preview</span>
+                                        <button type="button" className="btn btn-xs btn-outline-secondary py-0 px-2" onClick={() => document.getElementById('uatPreviewImg')?.classList.toggle('d-none')}>Toggle Image</button>
+                                    </div>
+                                    <div className="text-center p-2 rounded border border-secondary bg-black bg-opacity-50">
+                                        <img id="uatPreviewImg" alt="Extracted timetable preview" style={{ maxHeight: "240px", maxWidth: "100%", objectFit: "contain" }} />
+                                    </div>
+                                </div>
+
+                                <form id="uatAssignForm" onSubmit={(e) => { e.preventDefault(); window.assignUploadedClassTimetable?.(); }}>
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <span className="small fw-bold text-success"><i className="fa-solid fa-table me-1"></i> Extracted Timetable (Verify or Edit: <code>Subject, Faculty, Venue</code>)</span>
+                                    </div>
+                                    <div className="table-responsive">
+                                        <table className="table table-dark table-bordered border-secondary table-sm text-center align-middle" style={{ tableLayout: "fixed" }}>
+                                            <thead>
+                                                <tr>
+                                                    <th style={{ width: "95px" }}>Day</th>
+                                                    <th>Period 1</th>
+                                                    <th>Period 2</th>
+                                                    <th>Period 3</th>
+                                                    <th>Period 4</th>
+                                                    <th>Period 5</th>
+                                                    <th>Period 6</th>
+                                                    <th>Period 7</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="uatGridBody"></tbody>
+                                        </table>
+                                    </div>
+                                    <div id="uatAssignAlert" className="alert d-none small py-2 mt-2 mb-0"></div>
+                                    <div className="d-flex justify-content-end gap-2 mt-3">
+                                        <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        <button type="submit" id="uatAssignBtn" className="btn btn-success fw-bold">
+                                            <i className="fa-solid fa-check me-1"></i> Assign Timetable to Class
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
