@@ -6486,13 +6486,19 @@ function _initModalListeners() {
             avtModalEl.addEventListener('show.bs.modal', () => { if (window.initAdminViewEditTimetableModal) window.initAdminViewEditTimetableModal(); });
         }
 
+        const adminFacTtModalEl = document.getElementById('adminFacultyTimetableModal');
+        if (adminFacTtModalEl && !adminFacTtModalEl.dataset.initialized) {
+            adminFacTtModalEl.dataset.initialized = 'true';
+            adminFacTtModalEl.addEventListener('show.bs.modal', () => { if (window.openAdminFacultyTimetableModal) window.openAdminFacultyTimetableModal(); });
+        }
+
         const ticker = document.getElementById('announcementTickerContainer');
         if (ticker && !ticker.dataset.initialized) {
             ticker.dataset.initialized = 'true';
             if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
         }
 
-        const allDone = credModalEl && adminFacModalEl && annModalEl && shareModalEl && avtModalEl && ticker;
+        const allDone = credModalEl && adminFacModalEl && annModalEl && shareModalEl && avtModalEl && adminFacTtModalEl && ticker;
         if ((allDone || attempts >= 15) && window.__modalInitInterval) {
             clearInterval(window.__modalInitInterval);
             window.__modalInitInterval = null;
@@ -8248,6 +8254,9 @@ let _adminFacTtTeachers = [];
 let _adminFacTtSnapshot = {};
 
 window.openAdminFacultyTimetableModal = async function() {
+    if (window._adminFacTtOpeningPromise) return window._adminFacTtOpeningPromise;
+    window._adminFacTtOpeningPromise = (async () => {
+    try {
     const sel = document.getElementById('adminFacTtSelect');
     const alertBox = document.getElementById('adminFacTtAlert');
     const noteEl = document.getElementById('adminFacTtNote');
@@ -8260,7 +8269,9 @@ window.openAdminFacultyTimetableModal = async function() {
     sel.innerHTML = '<option value="">-- Loading Faculty --</option>';
     let teachers = [];
     try {
-        const res = await apiFetch('/api/teachers');
+        const token = localStorage.getItem('jwt_token') || '';
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        const res = await fetch('/api/teachers', { headers });
         if (res.ok) teachers = await res.json();
     } catch (e) {
         console.warn('Could not load teachers from backend:', e);
@@ -8290,6 +8301,11 @@ window.openAdminFacultyTimetableModal = async function() {
     }).join('');
 
     await window.loadAdminFacultyTimetable();
+    } finally {
+        window._adminFacTtOpeningPromise = null;
+    }
+    })();
+    return window._adminFacTtOpeningPromise;
 };
 
 function _renderAdminFacTtGrid(saved) {

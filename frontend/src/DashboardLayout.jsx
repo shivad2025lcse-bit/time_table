@@ -256,7 +256,7 @@ export default function DashboardLayout() {
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminViewFacultyModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
                                         <i className="fa-solid fa-address-card fa-fw me-3 text-info"></i> View Faculty Details
                                     </button>
-                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminFacultyTimetableModal" onClick={() => { window.openAdminFacultyTimetableModal?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }}>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminFacultyTimetableModal" onClick={() => { if (typeof window.openAdminFacultyTimetableModal === 'function') { window.openAdminFacultyTimetableModal(); } else { window.location.reload(); } if (window.innerWidth <= 992) setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-calendar-week fa-fw me-3 text-primary"></i> View Faculty Timetable
                                     </button>
                                 </>
