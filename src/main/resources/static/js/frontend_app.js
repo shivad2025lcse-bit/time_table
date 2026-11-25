@@ -248,6 +248,13 @@ function logoutUser() {
     localStorage.removeItem('sece_logged_in_role');
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_info');
+    localStorage.removeItem('sece_last_viewed_section');
+    localStorage.removeItem('sece_last_viewed_dept');
+    currentSection = '';
+    currentDept = '';
+    window.currentSection = '';
+    window.currentTimetableEntries = [];
+    window.currentTimetableEntriesLoaded = false;
     currentUserRole = null;
     window.location.href = '/login';
 }
@@ -1707,13 +1714,22 @@ function renderTimetableGrid() {
         }
     }
     if (!data) {
-        timetableData = loadSavedTimetable();
-        data = timetableData[currentSection];
-        if (!data) {
+        const roleNow = typeof getEffectiveRole === 'function' ? getEffectiveRole() : currentUserRole;
+        if (roleNow === 'STUDENT' && window.currentTimetableEntriesLoaded) {
+            // Authoritative DB returned no entries for this student's class — do not fall back to another class's localStorage
             data = {};
             days.forEach(day => {
                 data[day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
             });
+        } else {
+            timetableData = loadSavedTimetable();
+            data = timetableData[currentSection];
+            if (!data) {
+                data = {};
+                days.forEach(day => {
+                    data[day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
+                });
+            }
         }
     }
 
@@ -1891,7 +1907,7 @@ if (document.readyState === 'complete') {
 }
 
 
-// Backend Timetable Loader (populates Student / Faculty / Admin grids from PostgreSQL/H2 DB)
+// Backend Timetable Loader (populates Student / Faculty / Admin grids from database)
 window.loadTimetableData = async function() {
     try {
         const token = localStorage.getItem('jwt_token');
@@ -1900,14 +1916,19 @@ window.loadTimetableData = async function() {
         if (!res || !res.ok) return [];
         const entries = await res.json();
         window.currentTimetableEntries = Array.isArray(entries) ? entries : [];
+        window.currentTimetableEntriesLoaded = true;
 
-        if (typeof getEffectiveRole === 'function' && getEffectiveRole() === 'STUDENT' && window.currentTimetableEntries.length > 0) {
-            const firstSec = window.currentTimetableEntries[0].sectionName;
-            if (firstSec) {
-                currentSection = firstSec;
-                window.currentSection = firstSec;
-                localStorage.setItem('sece_last_viewed_section', firstSec);
-                window.updateBannerHeaders?.(firstSec);
+        if (typeof getEffectiveRole === 'function' && getEffectiveRole() === 'STUDENT') {
+            if (window.currentTimetableEntries.length > 0) {
+                const firstSec = window.currentTimetableEntries[0].sectionName;
+                if (firstSec) {
+                    currentSection = firstSec;
+                    window.currentSection = firstSec;
+                    localStorage.setItem('sece_last_viewed_section', firstSec);
+                    window.updateBannerHeaders?.(firstSec);
+                    const ttTitleHeader = document.getElementById('ttTitleHeader');
+                    if (ttTitleHeader) ttTitleHeader.innerText = firstSec;
+                }
             }
         }
         return window.currentTimetableEntries;
@@ -2002,7 +2023,14 @@ function renderCourseRefTable() {
         });
     }
 
-    const rows = dynamicMap.size > 0 ? Array.from(dynamicMap.values()) : courseReferenceList;
+    const roleNow = typeof getEffectiveRole === 'function' ? getEffectiveRole() : currentUserRole;
+    const rows = dynamicMap.size > 0
+        ? Array.from(dynamicMap.values())
+        : ((roleNow === 'STUDENT' && window.currentTimetableEntriesLoaded) ? [] : courseReferenceList);
+    if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No courses assigned for this class yet.</td></tr>';
+        return;
+    }
     rows.forEach(item => {
         const tr = document.createElement('tr');
         if (String(item.short).toUpperCase() === 'ALT') tr.className = 'table-warning text-dark font-semibold';
@@ -7221,15 +7249,23 @@ window.fetchStudentDynamicDashboard = async function() {
             return;
         }
 
-        // Populate Profile Info
+        // Populate Profile Info & bind Student's exact section (never keep another class from localStorage)
         if (data.student && document.getElementById("dynStudentProfile")) {
             document.getElementById("dynStudentProfile").innerHTML = `<i class="fa-solid fa-graduation-cap me-1"></i>${data.student.year} Yr ${data.student.department} - Sec ${data.student.section}`;
-            
-            // Set currentSection to the full section name so timetable renders correctly
+
             const secName = data.student.fullSectionName || data.student.section;
             if (secName) {
+                const changed = currentSection !== secName;
+                currentSection = secName;
                 window.currentSection = secName;
                 localStorage.setItem('sece_last_viewed_section', secName);
+                const ttTitleHeader = document.getElementById('ttTitleHeader');
+                if (ttTitleHeader) ttTitleHeader.innerText = secName;
+                if (changed) {
+                    window.updateBannerHeaders?.(secName);
+                    renderTimetableGrid();
+                    renderCourseRefTable();
+                }
             }
         }
         

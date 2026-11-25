@@ -118,6 +118,7 @@ public class TimetableController {
                             .collect(Collectors.toList()));
                 }
             }
+            return ResponseEntity.ok(java.util.Collections.emptyList());
         }
         
         if (authentication != null && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_FACULTY"))) {
@@ -132,6 +133,7 @@ public class TimetableController {
                             .collect(Collectors.toList()));
                 }
             }
+            return ResponseEntity.ok(java.util.Collections.emptyList());
         }
         
         List<TimetableEntry> entries = timetableRepository.findAll();
