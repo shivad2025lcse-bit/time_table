@@ -72,9 +72,14 @@ public class StudentController {
                     existing.setResidentType(studentDetails.getResidentType());
                     existing.setHostelBlock(studentDetails.getHostelBlock());
                     existing.setRoomNumber(studentDetails.getRoomNumber());
-                    // Students shouldn't change their semester, only Admin/Faculty
+                    // Students shouldn't change their semester/section, only Admin/Faculty
                     if (!isStudent) {
-                        existing.setSemester(studentDetails.getSemester());
+                        if (studentDetails.getSemester() != null) {
+                            existing.setSemester(studentDetails.getSemester());
+                        }
+                        if (studentDetails.getSection() != null) {
+                            existing.setSection(studentDetails.getSection());
+                        }
                     }
                     return ResponseEntity.ok(studentService.saveStudent(existing));
                 })

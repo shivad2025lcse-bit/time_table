@@ -67,13 +67,20 @@ public class StudentService {
                         return courseRepository.save(c);
                     })));
         }
-        if (student.getSection() != null && student.getSection().getId() == null && student.getSection().getSectionName() != null) {
-            student.setSection(sectionRepository.findBySectionName(student.getSection().getSectionName())
+        if (student.getSection() != null && student.getSection().getSectionName() != null) {
+            String normalizedSec = normalizeSectionName(
+                    student.getSection().getSectionName(),
+                    student.getDepartment() != null ? student.getDepartment().getCode() : null,
+                    student.getSemester()
+            );
+            student.setSection(sectionRepository.findAll().stream()
+                    .filter(s -> s.getSectionName() != null && s.getSectionName().equalsIgnoreCase(normalizedSec))
+                    .findFirst()
                     .orElseGet(() -> {
                         com.smarttimetable.entity.Section s = new com.smarttimetable.entity.Section();
-                        s.setSectionName(student.getSection().getSectionName());
+                        s.setSectionName(normalizedSec);
                         s.setCourse(student.getCourse());
-                        s.setSemester(student.getSemester());
+                        s.setSemester(student.getSemester() != null ? student.getSemester() : 3);
                         return sectionRepository.save(s);
                     }));
         }
@@ -117,6 +124,35 @@ public class StudentService {
         }
         
         return studentRepository.save(student);
+    }
+
+    private String normalizeSectionName(String raw, String deptCode, Integer semester) {
+        String s = raw == null ? "" : raw.trim().replaceAll("\\s+", " ");
+        // If duplicated like "2 CSE II CSE A" or "BTECH-CSE CSE II CSE A", keep the canonical trailing section
+        java.util.regex.Matcher trail = java.util.regex.Pattern
+                .compile("\\b(I|II|III|IV|[1-4])\\s+([A-Za-z&.-]+)\\s+([A-Za-z0-9]+)$", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(s);
+        if (trail.find()) {
+            return toRomanYear(trail.group(1)) + " " + trail.group(2).toUpperCase() + " " + trail.group(3).toUpperCase();
+        }
+        String dept = (deptCode != null && !deptCode.trim().isEmpty()) ? deptCode.trim().toUpperCase() : "CSE";
+        int sem = semester != null ? semester : 3;
+        String yr = toRomanYear(String.valueOf((sem + 1) / 2));
+        if (s.matches("^[A-Za-z]$")) {
+            return yr + " " + dept + " " + s.toUpperCase();
+        }
+        return s;
+    }
+
+    private String toRomanYear(String y) {
+        String u = y == null ? "" : y.trim().toUpperCase();
+        switch (u) {
+            case "1": case "I": return "I";
+            case "2": case "II": return "II";
+            case "3": case "III": return "III";
+            case "4": case "IV": return "IV";
+            default: return u.isEmpty() ? "II" : u;
+        }
     }
 
     public void deleteStudent(Long id) {

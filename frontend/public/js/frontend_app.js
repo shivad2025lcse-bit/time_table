@@ -2818,6 +2818,21 @@ function toggleAddStudentForm() {
     card.classList.toggle('d-none');
 }
 
+function buildCanonicalStudentSection(courseId, deptId, secId, semester) {
+    const toRomanYr = v => ({ '1': 'I', '2': 'II', '3': 'III', '4': 'IV', 'I': 'I', 'II': 'II', 'III': 'III', 'IV': 'IV' }[String(v || '').trim().toUpperCase()] || '');
+    const semNum = parseInt(semester, 10) || 3;
+    const yrFromSem = toRomanYr(Math.ceil(semNum / 2)) || 'II';
+    const rawSec = String(secId || '').trim().replace(/\s+/g, ' ');
+    const fullSecMatch = rawSec.match(/^(I|II|III|IV|[1-4])\s+([A-Za-z&.-]+)\s+([A-Za-z0-9]+)$/i);
+    if (fullSecMatch) {
+        return `${toRomanYr(fullSecMatch[1]) || yrFromSem} ${fullSecMatch[2].toUpperCase()} ${fullSecMatch[3].toUpperCase()}`;
+    }
+    const yrPart = toRomanYr(courseId) || yrFromSem;
+    const deptClean = String(deptId || 'CSE').trim().toUpperCase();
+    const secLetter = (rawSec.split(/\s+/).pop() || 'A').toUpperCase();
+    return `${yrPart} ${deptClean} ${secLetter}`;
+}
+
 function handleAddStudent(e) {
     e.preventDefault();
     if (!ensureStudentManagementAccess()) return;
@@ -2871,7 +2886,7 @@ function handleAddStudent(e) {
         'ECE': 'BTECH-ECE'
     };
     const actualCourseId = deptCourseMap[deptId] || 'BTECH-' + deptId;
-    const fullSectionName = courseId + ' ' + deptId + ' ' + secId;
+    const fullSectionName = buildCanonicalStudentSection(courseId, deptId, secId, semester);
 
     const payload = {
         registerNumber: regNo,
@@ -5670,7 +5685,7 @@ window.submitManageStudentForm = async function (e) {
         'ECE': 'BTECH-ECE'
     };
     const actualCourseId = deptCourseMap[deptId] || 'BTECH-' + deptId;
-    const fullSectionName = courseId + ' ' + deptId + ' ' + secId;
+    const fullSectionName = buildCanonicalStudentSection(courseId, deptId, secId, semester);
 
     const payload = {
         firstName: firstName,
@@ -6761,7 +6776,7 @@ window.submitEditStudentForm = async function(e) {
 
     const deptCourseMap = { 'CSE': 'BTECH-CSE', 'IT': 'BTECH-IT', 'AI&DS': 'BTECH-AIDS', 'AI&ML': 'BTECH-AIML', 'ECE': 'BTECH-ECE' };
     const actualCourseId = deptCourseMap[deptId] || 'BTECH-' + deptId;
-    const fullSectionName = courseId + ' ' + deptId + ' ' + secId;
+    const fullSectionName = buildCanonicalStudentSection(courseId, deptId, secId, semester);
 
     const payload = {
         firstName: firstName, lastName: lastName, registerNumber: regNo,
