@@ -8702,6 +8702,7 @@ async function _extractGridViaClientOcr(imageSrc) {
 
     if (Object.keys(dayRows).length === 0) return null;
 
+    const firstDayY = Math.min(...Object.values(dayRows).map(r => r[0].y));
     const centers = [];
     if (minX < maxX) {
         const step = (maxX - minX) / 7;
@@ -8710,21 +8711,32 @@ async function _extractGridViaClientOcr(imageSrc) {
         for (let p = 0; p < 7; p++) centers.push(150 + p * 100);
     }
 
-    // Refine period column centers if header row contains 1..7
-    for (const row of rows) {
+    // Refine period column centers from header row above Monday containing 1..7
+    const hdrCandidates = rows
+        .filter(r => r[0].y < firstDayY - 10 && r[0].y >= firstDayY - 180)
+        .sort((a, b) => b[0].y - a[0].y);
+    for (const row of hdrCandidates) {
         const found = {};
         for (const w of row) {
             const clean = w.text.toUpperCase().replace(/^P/, '');
-            if (/^[1-7]$/.test(clean)) {
+            if (/^[1-7]$/.test(clean) && w.x > (minX === Infinity ? 80 : minX - 60)) {
                 found[parseInt(clean, 10)] = (w.x + w.endX) / 2;
             }
         }
-        if (Object.keys(found).length >= 4) {
+        if (Object.keys(found).length >= 5) {
             for (let p = 1; p <= 7; p++) {
                 if (found[p] !== undefined) centers[p - 1] = found[p];
             }
             break;
         }
+    }
+
+    // Compute approximate period column intervals [left, right] excluding Tea/Lunch gaps
+    const halfW = [];
+    for (let p = 0; p < 7; p++) {
+        const dL = p > 0 ? (centers[p] - centers[p - 1]) : (centers[1] - centers[0]);
+        const dR = p < 6 ? (centers[p + 1] - centers[p]) : (centers[6] - centers[5]);
+        halfW.push(Math.min(dL, dR) * 0.48);
     }
 
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -8736,15 +8748,28 @@ async function _extractGridViaClientOcr(imageSrc) {
         const buckets = Array.from({ length: 7 }, () => []);
         for (let i = 1; i < row.length; i++) {
             const w = row[i];
-            const up = w.text.toUpperCase();
-            if (up === 'TEA' || up === 'LUNCH' || up === 'BREAK') continue;
-            const center = (w.x + w.endX) / 2;
-            let bestIdx = 0, bestDist = Infinity;
+            const up = w.text.toUpperCase().replace(/\s+/g, '');
+            if (up === 'TEA' || up === 'LUNCH' || up === 'BREAK' || up === 'TEABREAK' || up === 'LUNCHBREAK') continue;
+            if (/^\d{1,2}\.\d{2}$/.test(up) || up === 'AM' || up === 'PM' || up === 'TO') continue;
+            // Assign to every period overlapping bbox, or nearest period if none
+            let assigned = false;
             for (let p = 0; p < 7; p++) {
-                const d = Math.abs(center - centers[p]);
-                if (d < bestDist) { bestDist = d; bestIdx = p; }
+                const cL = centers[p] - halfW[p];
+                const cR = centers[p] + halfW[p];
+                if (w.endX >= cL + 2 && w.x <= cR - 2) {
+                    buckets[p].push(w.text);
+                    assigned = true;
+                }
             }
-            buckets[bestIdx].push(w.text);
+            if (!assigned) {
+                const center = (w.x + w.endX) / 2;
+                let bestIdx = 0, bestDist = Infinity;
+                for (let p = 0; p < 7; p++) {
+                    const d = Math.abs(center - centers[p]);
+                    if (d < bestDist) { bestDist = d; bestIdx = p; }
+                }
+                buckets[bestIdx].push(w.text);
+            }
         }
         for (let p = 0; p < 7; p++) {
             const raw = buckets[p].join(' ').trim();
@@ -8909,6 +8934,31 @@ window.handleUploadAssignTtFile = async function(event) {
 
         _renderUploadAssignGrid(ttData || {});
         if (detailsEl) detailsEl.classList.remove('d-none');
+
+        // Pre-fill Class / Department, Year, Section, and Class Advisor if extracted from PDF
+        if (payload.metadata) {
+            const m = payload.metadata;
+            const deptEl = document.getElementById('uatDeptSelect');
+            const yearEl = document.getElementById('uatYearSelect');
+            const secEl = document.getElementById('uatSecInput');
+            const advEl = document.getElementById('uatAdvisorSelect');
+            if (deptEl && m.department) {
+                const matchOpt = Array.from(deptEl.options).find(o => o.value.toUpperCase() === m.department.toUpperCase());
+                if (matchOpt) deptEl.value = matchOpt.value;
+            }
+            if (yearEl && m.year) {
+                const matchYr = Array.from(yearEl.options).find(o => o.value.toUpperCase() === m.year.toUpperCase());
+                if (matchYr) yearEl.value = matchYr.value;
+            }
+            if (secEl && m.sectionCode) {
+                secEl.value = m.sectionCode.toUpperCase();
+            }
+            if (advEl && m.classAdvisor) {
+                const advLow = m.classAdvisor.toLowerCase().replace(/^(dr\.?|ms\.?|mr\.?|mrs\.?)\s*/i, '').trim();
+                const matchAdv = Array.from(advEl.options).find(o => o.text.toLowerCase().includes(advLow) || o.value.toLowerCase().includes(advLow));
+                if (matchAdv) advEl.value = matchAdv.value;
+            }
+        }
         window.updateUploadAssignSectionBadge();
 
         if (statusEl) {
