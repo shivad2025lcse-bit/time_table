@@ -621,7 +621,10 @@ function loadSections() {
         return Array.isArray(saved) ? saved : JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
     } catch (_) { return JSON.parse(JSON.stringify(DEFAULT_SECTIONS)); }
 }
-function saveSections() { localStorage.setItem(SECTIONS_STORAGE_KEY, JSON.stringify(activeSections)); }
+function saveSections() {
+    localStorage.setItem(SECTIONS_STORAGE_KEY, JSON.stringify(activeSections));
+    if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
+}
 let activeSections = loadSections();
 
 // Active timetable data = default schedule + any saved edits from Admin/Faculty
@@ -744,6 +747,7 @@ function loadStaffDirectory() {
 
 function saveStaffDirectory() {
     localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(staffDirectory));
+    if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
 }
 
 function loadSubstitutions() {
@@ -3781,7 +3785,10 @@ function loadAdminResources() {
     } catch (_) { return { subjects: [], venues: [] }; }
 }
 let adminResources = loadAdminResources();
-function saveAdminResources() { localStorage.setItem(RESOURCES_STORAGE_KEY, JSON.stringify(adminResources)); }
+function saveAdminResources() {
+    localStorage.setItem(RESOURCES_STORAGE_KEY, JSON.stringify(adminResources));
+    if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
+}
 
 function mergeCustomSubjectsIntoCourseList() {
     adminResources.subjects.forEach(s => {
@@ -4496,6 +4503,14 @@ function populateEditSubjectSelect() {
     adminResources.subjects.forEach(s => {
         if (!entries.some(e => e[0] === s.short)) entries.push([s.short, `${s.code} ${s.title}`]);
     });
+    const liveCatalog = window._ttSuggestionCatalog;
+    if (liveCatalog && Array.isArray(liveCatalog.subjects)) {
+        liveCatalog.subjects.forEach(s => {
+            if (s.label && !entries.some(e => e[0].toUpperCase() === s.label.toUpperCase())) {
+                entries.push([s.label, s.title || s.code || s.label]);
+            }
+        });
+    }
     const datalist = document.getElementById('subjectOptions');
     if (datalist) {
         datalist.innerHTML = entries.map(([value, label]) =>
@@ -4508,7 +4523,6 @@ function populateEditSubjectSelect() {
 function populateEditVenueSelect() {
     const input = document.getElementById('editVenue');
     if (!input || input.tagName === 'SELECT') return;
-    // Keep the existing editable text field while showing a datalist of saved venues.
     let dl = document.getElementById('savedVenueOptions');
     if (!dl) {
         dl = document.createElement('datalist');
@@ -4516,7 +4530,36 @@ function populateEditVenueSelect() {
         document.body.appendChild(dl);
         input.setAttribute('list', 'savedVenueOptions');
     }
-    dl.innerHTML = adminResources.venues.map(v => `<option value="${v}"></option>`).join('');
+    const seen = new Set();
+    const opts = [];
+    const addV = (name) => {
+        const clean = String(typeof name === 'string' ? name : (name && (name.name || name.label)) || '').trim();
+        if (!clean || clean === '-' || clean.toUpperCase() === 'TBA' || seen.has(clean.toUpperCase())) return;
+        seen.add(clean.toUpperCase());
+        opts.push(clean);
+    };
+    ['SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'].forEach(addV);
+    (adminResources.venues || []).forEach(addV);
+    (activeSections || []).forEach(s => addV(s.classroom));
+    const liveCatalog = window._ttSuggestionCatalog;
+    if (liveCatalog && Array.isArray(liveCatalog.venues)) liveCatalog.venues.forEach(addV);
+    dl.innerHTML = opts.map(v => `<option value="${v.replace(/"/g, '&quot;')}"></option>`).join('');
+
+    // Keep Staff datalist (#savedStaffOptions) synced for Edit Period modal too
+    const staffDl = document.getElementById('savedStaffOptions');
+    if (staffDl) {
+        const staffSeen = new Set();
+        const staffNames = [];
+        const addS = (n) => {
+            const clean = String(typeof n === 'string' ? n : (n && (n.label || n.name)) || '').trim();
+            if (!clean || clean === '-' || staffSeen.has(clean.toUpperCase())) return;
+            staffSeen.add(clean.toUpperCase());
+            staffNames.push(clean);
+        };
+        if (Array.isArray(staffDirectory)) staffDirectory.forEach(addS);
+        if (liveCatalog && Array.isArray(liveCatalog.staff)) liveCatalog.staff.forEach(addS);
+        staffDl.innerHTML = staffNames.map(s => `<option value="${s.replace(/"/g, '&quot;')}"></option>`).join('');
+    }
 }
 
 // =========================
@@ -6749,13 +6792,43 @@ function _initModalListeners() {
         const adminFacTtModalEl = document.getElementById('adminFacultyTimetableModal');
         if (adminFacTtModalEl && !adminFacTtModalEl.dataset.initialized) {
             adminFacTtModalEl.dataset.initialized = 'true';
-            adminFacTtModalEl.addEventListener('show.bs.modal', () => { if (window.openAdminFacultyTimetableModal) window.openAdminFacultyTimetableModal(); });
+            adminFacTtModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+                if (window.openAdminFacultyTimetableModal) window.openAdminFacultyTimetableModal();
+            });
         }
 
         const uploadAssignModalEl = document.getElementById('adminUploadAssignTtModal');
         if (uploadAssignModalEl && !uploadAssignModalEl.dataset.initialized) {
             uploadAssignModalEl.dataset.initialized = 'true';
-            uploadAssignModalEl.addEventListener('show.bs.modal', () => { if (window.openUploadAssignTtModal) window.openUploadAssignTtModal(); });
+            uploadAssignModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+                if (window.openUploadAssignTtModal) window.openUploadAssignTtModal();
+            });
+        }
+
+        const ttBuilderModalEl = document.getElementById('timetableBuilderModal');
+        if (ttBuilderModalEl && !ttBuilderModalEl.dataset.initialized) {
+            ttBuilderModalEl.dataset.initialized = 'true';
+            ttBuilderModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+            });
+        }
+
+        const myTtModalEl = document.getElementById('myTimetableModal');
+        if (myTtModalEl && !myTtModalEl.dataset.initialized) {
+            myTtModalEl.dataset.initialized = 'true';
+            myTtModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+            });
+        }
+
+        const editPeriodModalEl = document.getElementById('editPeriodModal');
+        if (editPeriodModalEl && !editPeriodModalEl.dataset.initialized) {
+            editPeriodModalEl.dataset.initialized = 'true';
+            editPeriodModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+            });
         }
 
         const viewStuTtModalEl = document.getElementById('adminViewStudentTtModal');
@@ -9834,3 +9907,605 @@ window.downloadClassDocument = async function(docId, fileName) {
         alert(err.message);
     }
 };
+
+// =========================================================================
+// SMART STORED TIMETABLE SUGGESTION ENGINE (CLASS TT & FACULTY TT)
+// =========================================================================
+window._ttSuggestionCatalog = window._ttSuggestionCatalog || {
+    subjects: [],
+    staff: [],
+    venues: [],
+    departments: [],
+    sections: [],
+    loadedAt: 0,
+    dirty: true
+};
+
+window.invalidateTtSuggestionCatalog = function(refreshNow) {
+    window._ttSuggestionCatalog.dirty = true;
+    if (refreshNow && typeof window.refreshTtSuggestionCatalog === 'function') {
+        window.refreshTtSuggestionCatalog(true);
+    }
+};
+
+function _buildMergedTtCatalog(apiData) {
+    const subjMap = new Map();
+    const staffMap = new Map();
+    const venueMap = new Map();
+    const deptMap = new Map();
+    const secMap = new Map();
+
+    const addSubject = (label, code, title, faculty, venue, dept) => {
+        const clean = String(label || '').trim();
+        if (!clean || clean.toUpperCase() === 'FREE') return;
+        const k = clean.toUpperCase();
+        const prev = subjMap.get(k) || { label: clean, code: '', title: '', faculty: '', venue: '', dept: '' };
+        subjMap.set(k, {
+            label: prev.label || clean,
+            code: prev.code || String(code || '').trim(),
+            title: prev.title || String(title || '').trim(),
+            faculty: prev.faculty || String(faculty || '').trim(),
+            venue: prev.venue || String(venue || '').trim(),
+            dept: prev.dept || String(dept || '').trim().toUpperCase()
+        });
+    };
+
+    const addStaff = (name, empId, dept, handling) => {
+        const clean = String(name || '').trim();
+        if (!clean || clean === '-' || clean.toUpperCase() === 'TBA') return;
+        const k = clean.toUpperCase();
+        const prev = staffMap.get(k) || { label: clean, employeeId: '', dept: '', subjectHandling: '' };
+        staffMap.set(k, {
+            label: prev.label || clean,
+            employeeId: prev.employeeId || String(empId || '').trim(),
+            dept: prev.dept || String(dept || '').trim().toUpperCase(),
+            subjectHandling: prev.subjectHandling || String(handling || '').trim()
+        });
+    };
+
+    const addVenue = (name, building, type) => {
+        const clean = String(name || '').trim();
+        if (!clean || clean === '-' || clean.toUpperCase() === 'TBA' || clean.toUpperCase() === 'FREE') return;
+        const k = clean.toUpperCase();
+        const prev = venueMap.get(k) || { label: clean, building: '', type: '' };
+        venueMap.set(k, {
+            label: prev.label || clean,
+            building: prev.building || String(building || '').trim(),
+            type: prev.type || String(type || '').trim()
+        });
+    };
+
+    const addDept = (code, name) => {
+        const c = String(code || '').trim().toUpperCase();
+        if (!c) return;
+        if (!deptMap.has(c)) deptMap.set(c, { code: c, name: String(name || c).trim() });
+    };
+
+    const addSection = (secObj) => {
+        if (!secObj) return;
+        const name = String(secObj.sectionName || secObj.name || '').trim();
+        if (!name || /^\d+\s+CSE\s+II\s+CSE/i.test(name)) return;
+        const parts = name.split(/\s+/);
+        const year = String(secObj.year || (parts[0] && /^(I|II|III|IV)$/i.test(parts[0]) ? parts[0] : 'II')).toUpperCase();
+        const dept = String(secObj.dept || (parts.length >= 2 ? parts[1] : 'CSE')).toUpperCase();
+        const sectionCode = String(secObj.sectionCode || (parts.length >= 3 ? parts.slice(2).join(' ') : name)).toUpperCase();
+        addDept(dept, dept);
+        secMap.set(name.toUpperCase(), { sectionName: name, dept, year, sectionCode, semester: secObj.semester || null });
+    };
+
+    // 1. Live DB API data first
+    if (apiData && typeof apiData === 'object') {
+        (apiData.subjects || []).forEach(s => addSubject(s.label, s.code, s.title, s.faculty, s.venue, s.dept));
+        (apiData.staff || []).forEach(t => addStaff(t.label, t.employeeId, t.dept, t.subjectHandling));
+        (apiData.venues || []).forEach(v => addVenue(v.label, v.building, v.type));
+        (apiData.departments || []).forEach(d => addDept(d.code, d.name));
+        (apiData.sections || []).forEach(addSection);
+    }
+
+    // 2. Local / in-memory resources (respecting newly added custom subjects/venues/staff/sections)
+    if (typeof adminResources !== 'undefined' && adminResources) {
+        (adminResources.subjects || []).forEach(s => addSubject(s.short || s.code, s.code, s.title, s.faculty, s.venue, ''));
+        (adminResources.venues || []).forEach(v => {
+            if (typeof v === 'string') addVenue(v, '', 'Custom');
+            else if (v && v.name) addVenue(v.name, v.block, v.type || 'Custom');
+        });
+    }
+    if (typeof courseReferenceList !== 'undefined' && Array.isArray(courseReferenceList)) {
+        courseReferenceList.forEach(c => {
+            addSubject(c.short || (c.code || '').split(' ')[0], c.code, c.code, c.faculty, c.venue, '');
+            addStaff(c.faculty, '', '', c.short || '');
+            addVenue(c.venue, '', '');
+        });
+    }
+    if (typeof staffDirectory !== 'undefined' && Array.isArray(staffDirectory)) {
+        staffDirectory.forEach(s => addStaff(s.name, s.empId, s.dept, s.subjectHandling));
+    }
+    if (typeof window.staffDirectory !== 'undefined' && Array.isArray(window.staffDirectory)) {
+        window.staffDirectory.forEach(s => addStaff(s.name, s.empId, s.dept, s.subjectHandling));
+    }
+    if (typeof activeSections !== 'undefined' && Array.isArray(activeSections)) {
+        activeSections.forEach(s => {
+            addSection(s);
+            addVenue(s.classroom, s.block, 'Classroom');
+        });
+    }
+    if (Array.isArray(window.currentTimetableEntries)) {
+        window.currentTimetableEntries.forEach(e => {
+            addSubject(e.subjectName || e.subjectCode, e.subjectCode, e.subjectName, e.teacherName, e.roomNumber || e.labName, '');
+            addStaff(e.teacherName, '', '', '');
+            addVenue(e.roomNumber || e.labName, '', '');
+        });
+    }
+    ['SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'].forEach(v => addVenue(v, '', 'Campus'));
+
+    return {
+        subjects: Array.from(subjMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
+        staff: Array.from(staffMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
+        venues: Array.from(venueMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
+        departments: Array.from(deptMap.values()).sort((a, b) => a.code.localeCompare(b.code)),
+        sections: Array.from(secMap.values()).sort((a, b) => a.sectionName.localeCompare(b.sectionName)),
+        loadedAt: Date.now(),
+        dirty: false
+    };
+}
+
+window.refreshTtSuggestionCatalog = async function(force = false) {
+    const cat = window._ttSuggestionCatalog;
+    const isFresh = !cat.dirty && cat.loadedAt && (Date.now() - cat.loadedAt < 4000);
+    if (!force && isFresh) return cat;
+
+    if (window._ttCatalogPromise) return window._ttCatalogPromise;
+
+    window._ttCatalogPromise = (async () => {
+        let apiData = null;
+        try {
+            if (typeof apiFetch === 'function' && localStorage.getItem('jwt_token')) {
+                const res = await apiFetch('/api/operations/tt-suggestions');
+                if (res && res.ok) apiData = await res.json();
+            }
+        } catch (err) {
+            console.warn('Could not load live TT suggestions from backend:', err);
+        }
+        window._ttSuggestionCatalog = _buildMergedTtCatalog(apiData);
+        if (typeof populateEditSubjectSelect === 'function') populateEditSubjectSelect();
+        if (typeof populateEditVenueSelect === 'function') populateEditVenueSelect();
+        if (window._smartTtState && window._smartTtState.activeInput) {
+            window._renderSmartTtPopover();
+        }
+        return window._ttSuggestionCatalog;
+    })();
+
+    try {
+        return await window._ttCatalogPromise;
+    } finally {
+        window._ttCatalogPromise = null;
+    }
+};
+
+window._smartTtState = {
+    activeInput: null,
+    mode: 'CLASS',
+    step: 'subject',
+    subject: '',
+    staff: '',
+    dept: '',
+    year: '',
+    section: '',
+    classStr: '',
+    venue: '',
+    filterText: ''
+};
+
+function _getSmartTtPopover() {
+    let pop = document.getElementById('smartTtSuggestionPopover');
+    if (!pop) {
+        pop = document.createElement('div');
+        pop.id = 'smartTtSuggestionPopover';
+        pop.style.cssText = [
+            'position:fixed',
+            'z-index:2055',
+            'width:360px',
+            'max-width:94vw',
+            'background:#111827',
+            'border:1px solid #38bdf8',
+            'border-radius:10px',
+            'box-shadow:0 14px 36px rgba(0,0,0,0.65)',
+            'padding:10px',
+            'display:none',
+            'color:#f8fafc',
+            'font-size:0.82rem'
+        ].join(';');
+        pop.addEventListener('mousedown', (e) => {
+            // Keep input focus so blur doesn't kill click inside popover
+            if (e.target && e.target.tagName !== 'INPUT') e.preventDefault();
+        });
+        document.body.appendChild(pop);
+    }
+    return pop;
+}
+
+function _parseSmartTtInputIntoState(input, mode) {
+    const raw = String(input.value || '').trim();
+    const parts = raw ? raw.split(',').map(s => s.trim()) : [];
+    const st = window._smartTtState;
+    st.mode = mode;
+    st.filterText = '';
+    st.subject = parts[0] || '';
+    if (mode === 'CLASS') {
+        st.staff = parts[1] || '';
+        st.venue = parts[2] || '';
+        st.dept = '';
+        st.year = '';
+        st.section = '';
+        st.classStr = '';
+        st.step = !st.subject ? 'subject' : (!st.staff ? 'staff' : (!st.venue ? 'venue' : 'subject'));
+    } else {
+        st.staff = '';
+        st.classStr = parts[1] || '';
+        st.venue = parts[2] || '';
+        const clsMatch = st.classStr.match(/^(I|II|III|IV)\s+(\S+)\s+(.+)$/i);
+        if (clsMatch) {
+            st.year = clsMatch[1].toUpperCase();
+            st.dept = clsMatch[2].toUpperCase();
+            st.section = clsMatch[3].toUpperCase();
+        } else {
+            st.year = '';
+            st.dept = '';
+            st.section = '';
+        }
+        st.step = !st.subject ? 'subject' : (!st.classStr ? 'dept' : (!st.venue ? 'venue' : 'subject'));
+    }
+}
+
+function _commitSmartTtStateToInput(closeAfter = false) {
+    const st = window._smartTtState;
+    const input = st.activeInput;
+    if (!input) return;
+
+    const pieces = [];
+    if (st.mode === 'CLASS') {
+        if (st.subject) pieces.push(st.subject);
+        if (st.staff || st.venue) pieces.push(st.staff || '');
+        if (st.venue) pieces.push(st.venue);
+    } else {
+        const cls = st.classStr || ((st.year && st.dept && st.section) ? `${st.year} ${st.dept} ${st.section}` : '');
+        st.classStr = cls;
+        if (st.subject) pieces.push(st.subject);
+        if (cls || st.venue) pieces.push(cls || '');
+        if (st.venue) pieces.push(st.venue);
+    }
+
+    const formatted = pieces.join(', ').replace(/,\s*$/, '');
+    input.value = formatted;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (closeAfter) {
+        window.closeSmartTtPopover();
+    } else {
+        window._renderSmartTtPopover();
+    }
+}
+
+window.closeSmartTtPopover = function() {
+    const pop = document.getElementById('smartTtSuggestionPopover');
+    if (pop) pop.style.display = 'none';
+    window._smartTtState.activeInput = null;
+};
+
+function _positionSmartTtPopover(pop, input) {
+    if (!pop || !input) return;
+    const rect = input.getBoundingClientRect();
+    const popW = Math.min(360, window.innerWidth - 16);
+    pop.style.width = popW + 'px';
+    const popH = Math.min(pop.offsetHeight || 280, 340);
+
+    let top = rect.bottom + 6;
+    if (top + popH > window.innerHeight - 10 && rect.top - popH - 6 > 10) {
+        top = rect.top - popH - 6;
+    }
+    let left = rect.left;
+    if (left + popW > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - popW - 8);
+    }
+    pop.style.top = `${Math.max(8, top)}px`;
+    pop.style.left = `${Math.max(8, left)}px`;
+}
+
+window._renderSmartTtPopover = function() {
+    const st = window._smartTtState;
+    const input = st.activeInput;
+    if (!input || !document.body.contains(input)) {
+        window.closeSmartTtPopover();
+        return;
+    }
+
+    const pop = _getSmartTtPopover();
+    const cat = window._ttSuggestionCatalog || { subjects: [], staff: [], venues: [], departments: [], sections: [] };
+    const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const q = String(st.filterText || '').trim().toLowerCase();
+
+    const steps = st.mode === 'CLASS'
+        ? [
+            { id: 'subject', label: '1. Subject', val: st.subject },
+            { id: 'staff', label: '2. Staff', val: st.staff },
+            { id: 'venue', label: '3. Venue', val: st.venue }
+        ]
+        : [
+            { id: 'subject', label: '1. Subject', val: st.subject },
+            { id: 'dept', label: '2. Dept', val: st.dept },
+            { id: 'year', label: '3. Year', val: st.year },
+            { id: 'section', label: '4. Sec', val: st.section },
+            { id: 'venue', label: '5. Venue', val: st.venue }
+        ];
+
+    const tabsHtml = steps.map(s => {
+        const active = st.step === s.id;
+        const done = Boolean(s.val);
+        const cls = active
+            ? 'btn-info text-dark fw-bold'
+            : (done ? 'btn-outline-success text-success' : 'btn-outline-secondary text-light');
+        return `<button type="button" class="btn btn-sm ${cls} py-0 px-2" style="font-size:0.72rem;" data-tt-step="${s.id}">${s.label}${s.val ? `: ${esc(s.val)}` : ''}</button>`;
+    }).join('');
+
+    let quickHtml = '';
+    let itemsHtml = '';
+    let hintText = '';
+
+    if (st.step === 'subject') {
+        hintText = 'Pick a stored Subject (auto-advances to next step):';
+        const list = (cat.subjects || []).filter(s =>
+            !q || s.label.toLowerCase().includes(q) || (s.title || '').toLowerCase().includes(q) || (s.code || '').toLowerCase().includes(q)
+        );
+        itemsHtml = list.length ? list.map(s => {
+            const meta = [s.code && s.code !== s.label ? s.code : '', s.faculty, s.venue].filter(Boolean).join(' • ');
+            return `<button type="button" class="btn btn-sm btn-outline-info text-start d-flex flex-column py-1 px-2" style="max-width:100%;" data-tt-pick="subject" data-val="${esc(s.label)}">
+                <span class="fw-bold text-white" style="font-size:0.78rem;">${esc(s.label)}</span>
+                ${meta ? `<span class="text-muted text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}
+            </button>`;
+        }).join('') : '<div class="text-muted small py-2">No matching subjects. Type any custom subject or add in Manage Resources.</div>';
+    } else if (st.step === 'staff') {
+        hintText = 'Pick Staff / Faculty (auto-advances to Venue):';
+        const subMatch = (cat.subjects || []).find(s => s.label.toUpperCase() === st.subject.toUpperCase());
+        if (subMatch && subMatch.faculty) {
+            const defFull = [st.subject, subMatch.faculty, subMatch.venue || ''].filter(Boolean).join(', ');
+            quickHtml = `<div class="mb-2">
+                <button type="button" class="btn btn-sm btn-success w-100 text-start py-1 px-2" style="font-size:0.74rem;" data-tt-quick="${esc(defFull)}">
+                    <i class="fa-solid fa-bolt me-1"></i>Use Stored Mapping: <strong>${esc(subMatch.faculty)}</strong>${subMatch.venue ? ` (${esc(subMatch.venue)})` : ''}
+                </button>
+            </div>`;
+        }
+        const list = (cat.staff || []).filter(t =>
+            !q || t.label.toLowerCase().includes(q) || (t.dept || '').toLowerCase().includes(q) || (t.employeeId || '').toLowerCase().includes(q)
+        );
+        itemsHtml = list.length ? list.map(t => {
+            const meta = [t.dept, t.subjectHandling].filter(Boolean).join(' • ');
+            return `<button type="button" class="btn btn-sm btn-outline-warning text-start d-flex flex-column py-1 px-2" data-tt-pick="staff" data-val="${esc(t.label)}">
+                <span class="fw-semibold text-white" style="font-size:0.76rem;">${esc(t.label)}</span>
+                ${meta ? `<span class="text-muted text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}
+            </button>`;
+        }).join('') : '<div class="text-muted small py-2">No matching staff found. Add faculty in Manage Faculty Details to see them here.</div>';
+    } else if (st.step === 'venue') {
+        hintText = 'Pick Venue / Room / Lab to finish:';
+        const list = (cat.venues || []).filter(v =>
+            !q || v.label.toLowerCase().includes(q) || (v.building || '').toLowerCase().includes(q) || (v.type || '').toLowerCase().includes(q)
+        );
+        itemsHtml = list.length ? list.map(v => {
+            const meta = [v.type, v.building].filter(Boolean).join(' • ');
+            return `<button type="button" class="btn btn-sm btn-outline-success text-start d-flex flex-column py-1 px-2" data-tt-pick="venue" data-val="${esc(v.label)}">
+                <span class="fw-bold text-white" style="font-size:0.76rem;">${esc(v.label)}</span>
+                ${meta ? `<span class="text-muted" style="font-size:0.65rem;">${esc(meta)}</span>` : ''}
+            </button>`;
+        }).join('') : '<div class="text-muted small py-2">No matching venues found. Add venues in Manage Venues / Resources.</div>';
+    } else if (st.step === 'dept') {
+        hintText = 'Select Department (next: Year → Section):';
+        const list = (cat.departments || []).filter(d =>
+            !q || d.code.toLowerCase().includes(q) || (d.name || '').toLowerCase().includes(q)
+        );
+        itemsHtml = list.length ? list.map(d =>
+            `<button type="button" class="btn btn-sm ${st.dept === d.code ? 'btn-info text-dark fw-bold' : 'btn-outline-info text-white'} py-1 px-2" data-tt-pick="dept" data-val="${esc(d.code)}">
+                ${esc(d.code)}${d.name && d.name !== d.code ? ` <small class="opacity-75">(${esc(d.name)})</small>` : ''}
+            </button>`
+        ).join('') : '<div class="text-muted small py-2">No departments found.</div>';
+    } else if (st.step === 'year') {
+        hintText = `Select Year${st.dept ? ` for ${esc(st.dept)}` : ''} (next: Section):`;
+        const yrs = new Set(['I', 'II', 'III', 'IV']);
+        (cat.sections || []).forEach(s => {
+            if (!st.dept || s.dept === st.dept) yrs.add(s.year || 'II');
+        });
+        const order = ['I', 'II', 'III', 'IV'];
+        const list = Array.from(yrs).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+        itemsHtml = list.map(y => {
+            const count = (cat.sections || []).filter(s => (!st.dept || s.dept === st.dept) && s.year === y).length;
+            return `<button type="button" class="btn btn-sm ${st.year === y ? 'btn-info text-dark fw-bold' : 'btn-outline-info text-white'} py-1 px-3" data-tt-pick="year" data-val="${esc(y)}">
+                ${esc(y)} Year ${count ? `<span class="badge bg-secondary ms-1">${count}</span>` : ''}
+            </button>`;
+        }).join('');
+    } else if (st.step === 'section') {
+        const ctxLabel = [st.year, st.dept].filter(Boolean).join(' ') || 'Class';
+        hintText = `Select Section for ${esc(ctxLabel)} (next: Venue):`;
+        const matching = (cat.sections || []).filter(s =>
+            (!st.dept || s.dept === st.dept) &&
+            (!st.year || s.year === st.year) &&
+            (!q || s.sectionCode.toLowerCase().includes(q) || s.sectionName.toLowerCase().includes(q))
+        );
+        const shownCodes = new Set();
+        const buttons = [];
+        matching.forEach(s => {
+            shownCodes.add(s.sectionCode);
+            buttons.push(`<button type="button" class="btn btn-sm btn-outline-warning text-white fw-semibold py-1 px-2" data-tt-pick="section" data-val="${esc(s.sectionCode)}" data-full-sec="${esc(s.sectionName)}">
+                ${esc(s.sectionCode)} <small class="text-muted">(${esc(s.sectionName)})</small>
+            </button>`);
+        });
+        itemsHtml = buttons.length ? buttons.join('') : '<div class="text-muted small py-2">No sections stored for this Dept & Year yet. Create a section in Manage Sections to see it here.</div>';
+    }
+
+    pop.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom border-secondary">
+            <span class="fw-bold text-info" style="font-size:0.75rem;">
+                <i class="fa-solid fa-wand-magic-sparkles me-1"></i>${st.mode === 'FACULTY' ? 'Faculty TT Quick Assign' : 'Period Quick Assign'}
+            </span>
+            <div class="d-flex gap-1">
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" style="font-size:0.68rem;" data-tt-action="free">Set FREE</button>
+                <button type="button" class="btn btn-xs btn-outline-light py-0 px-2" style="font-size:0.68rem;" data-tt-action="close">Done</button>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-1 mb-2">${tabsHtml}</div>
+        ${quickHtml}
+        <div class="text-muted mb-1" style="font-size:0.7rem;">${hintText}</div>
+        <div class="d-flex flex-wrap gap-1" style="max-height:190px; overflow-y:auto;">${itemsHtml}</div>
+    `;
+
+    pop.style.display = 'block';
+    _positionSmartTtPopover(pop, input);
+
+    pop.querySelectorAll('[data-tt-step]').forEach(btn => {
+        btn.onclick = () => {
+            st.step = btn.getAttribute('data-tt-step');
+            st.filterText = '';
+            window._renderSmartTtPopover();
+        };
+    });
+    pop.querySelectorAll('[data-tt-quick]').forEach(btn => {
+        btn.onclick = () => {
+            const raw = btn.getAttribute('data-tt-quick') || '';
+            const segs = raw.split(',').map(x => x.trim());
+            st.subject = segs[0] || st.subject;
+            st.staff = segs[1] || '';
+            st.venue = segs[2] || '';
+            _commitSmartTtStateToInput(true);
+        };
+    });
+    pop.querySelectorAll('[data-tt-pick]').forEach(btn => {
+        btn.onclick = () => {
+            const kind = btn.getAttribute('data-tt-pick');
+            const val = btn.getAttribute('data-val') || '';
+            st.filterText = '';
+            if (kind === 'subject') {
+                st.subject = val;
+                st.step = st.mode === 'CLASS' ? 'staff' : 'dept';
+                _commitSmartTtStateToInput(false);
+            } else if (kind === 'staff') {
+                st.staff = val;
+                st.step = 'venue';
+                _commitSmartTtStateToInput(false);
+            } else if (kind === 'dept') {
+                st.dept = val;
+                st.year = '';
+                st.section = '';
+                st.classStr = '';
+                st.step = 'year';
+                _commitSmartTtStateToInput(false);
+            } else if (kind === 'year') {
+                st.year = val;
+                st.section = '';
+                st.classStr = '';
+                st.step = 'section';
+                _commitSmartTtStateToInput(false);
+            } else if (kind === 'section') {
+                st.section = val;
+                st.classStr = btn.getAttribute('data-full-sec') || [st.year, st.dept, st.section].filter(Boolean).join(' ');
+                st.step = 'venue';
+                _commitSmartTtStateToInput(false);
+            } else if (kind === 'venue') {
+                st.venue = val;
+                _commitSmartTtStateToInput(true);
+            }
+        };
+    });
+    const freeBtn = pop.querySelector('[data-tt-action="free"]');
+    if (freeBtn) {
+        freeBtn.onclick = () => {
+            if (st.activeInput) {
+                st.activeInput.value = '';
+                st.activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+                st.activeInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            window.closeSmartTtPopover();
+        };
+    }
+    const closeBtn = pop.querySelector('[data-tt-action="close"]');
+    if (closeBtn) closeBtn.onclick = () => window.closeSmartTtPopover();
+};
+
+function _detectTtCellMode(el) {
+    if (!el || el.tagName !== 'INPUT' || el.type !== 'text') return null;
+    if (el.closest('#ttBuilderGrid') || el.closest('#uatGridBody')) return 'CLASS';
+    if (el.closest('#myTimetableBody') || el.closest('#adminFacTtBody')) return 'FACULTY';
+    return null;
+}
+
+(function _initSmartTtSuggestionDelegation() {
+    if (window._smartTtDelegationBound) return;
+    window._smartTtDelegationBound = true;
+
+    const openForInput = (el) => {
+        const mode = _detectTtCellMode(el);
+        if (!mode) return;
+        const alreadyOpen = window._smartTtState.activeInput === el;
+        window._smartTtState.activeInput = el;
+        if (!alreadyOpen) _parseSmartTtInputIntoState(el, mode);
+        window.refreshTtSuggestionCatalog(false);
+        window._renderSmartTtPopover();
+    };
+
+    document.addEventListener('focusin', (e) => {
+        const el = e.target;
+        if (_detectTtCellMode(el)) openForInput(el);
+    });
+
+    document.addEventListener('click', (e) => {
+        const el = e.target;
+        const mode = _detectTtCellMode(el);
+        if (mode) {
+            openForInput(el);
+            return;
+        }
+        const pop = document.getElementById('smartTtSuggestionPopover');
+        if (pop && pop.style.display === 'block' && !pop.contains(el)) {
+            window.closeSmartTtPopover();
+        }
+    });
+
+    document.addEventListener('input', (e) => {
+        const el = e.target;
+        const mode = _detectTtCellMode(el);
+        if (!mode || window._smartTtState.activeInput !== el) return;
+        const val = String(el.value || '');
+        const segs = val.split(',');
+        const segIdx = Math.min(segs.length - 1, 2);
+        window._smartTtState.filterText = (segs[segIdx] || '').trim();
+        if (mode === 'CLASS') {
+            window._smartTtState.subject = (segs[0] || '').trim();
+            window._smartTtState.staff = (segs[1] || '').trim();
+            window._smartTtState.venue = (segs[2] || '').trim();
+        } else {
+            window._smartTtState.subject = (segs[0] || '').trim();
+            window._smartTtState.classStr = (segs[1] || '').trim();
+            window._smartTtState.venue = (segs[2] || '').trim();
+        }
+        window._renderSmartTtPopover();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') window.closeSmartTtPopover();
+    });
+
+    document.addEventListener('hidden.bs.modal', () => {
+        window.closeSmartTtPopover();
+    });
+
+    window.addEventListener('resize', () => {
+        const pop = document.getElementById('smartTtSuggestionPopover');
+        if (pop && pop.style.display === 'block' && window._smartTtState.activeInput) {
+            _positionSmartTtPopover(pop, window._smartTtState.activeInput);
+        }
+    });
+
+    document.addEventListener('scroll', () => {
+        const pop = document.getElementById('smartTtSuggestionPopover');
+        if (pop && pop.style.display === 'block' && window._smartTtState.activeInput) {
+            _positionSmartTtPopover(pop, window._smartTtState.activeInput);
+        }
+    }, true);
+})();

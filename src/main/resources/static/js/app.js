@@ -30,6 +30,13 @@ async function apiFetch(url, options = {}) {
     const response = await fetch(url, options);
     if (response.status === 401) {
         logout();
+    } else if (response.ok && options.method && String(options.method).toUpperCase() !== 'GET') {
+        const u = String(url || '').toLowerCase();
+        if (/\/api\/(teachers|subjects|classrooms|laboratories|departments|sections|timetable|operations\/(custom-subjects|custom-venues))/.test(u)) {
+            if (typeof window.invalidateTtSuggestionCatalog === 'function') {
+                window.invalidateTtSuggestionCatalog(true);
+            }
+        }
     }
     return response;
 }

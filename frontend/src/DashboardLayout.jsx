@@ -798,7 +798,8 @@ export default function DashboardLayout() {
                                 <div className="row g-2 mb-3">
                                     <div className="col-md-6">
                                         <label className="form-label small text-muted">Faculty Incharge</label>
-                                        <input type="text" id="editFaculty" className="form-control form-control-sm bg-dark text-white border-secondary" defaultValue="Dr.S.K.Harikarthick, ASP/CSE" />
+                                        <input type="text" id="editFaculty" list="savedStaffOptions" className="form-control form-control-sm bg-dark text-white border-secondary" defaultValue="Dr.S.K.Harikarthick, ASP/CSE" />
+                                        <datalist id="savedStaffOptions"></datalist>
                                     </div>
                                     <div className="col-md-6">
                                         <label className="form-label small text-muted">Venue / Classroom / Lab</label>
@@ -2742,219 +2743,219 @@ export default function DashboardLayout() {
                                     </div>
                                 </div>
 
-                                <div id="uatPreviewImgWrap" className="mb-3 d-none">
-                                    <div className="d-flex justify-content-between align-items-center mb-1">
-                                        <span className="small fw-bold text-info"><i className="fa-solid fa-image me-1"></i> Extracted Image Preview</span>
-                                        <button type="button" className="btn btn-xs btn-outline-secondary py-0 px-2" onClick={() => document.getElementById('uatPreviewImg')?.classList.toggle('d-none')}>Toggle Image</button>
-                                    </div>
-                                    <div className="text-center p-2 rounded border border-secondary bg-black bg-opacity-50">
-                                        <img id="uatPreviewImg" alt="Extracted timetable preview" style={{ maxHeight: "240px", maxWidth: "100%", objectFit: "contain" }} />
-                                    </div>
-                                </div>
+                                        <div id="uatPreviewImgWrap" className="mb-3 d-none">
+                                            <div className="d-flex justify-content-between align-items-center mb-1">
+                                                <span className="small fw-bold text-info"><i className="fa-solid fa-image me-1"></i> Extracted Image Preview</span>
+                                                <button type="button" className="btn btn-xs btn-outline-secondary py-0 px-2" onClick={() => document.getElementById('uatPreviewImg')?.classList.toggle('d-none')}>Toggle Image</button>
+                                            </div>
+                                            <div className="text-center p-2 rounded border border-secondary bg-black bg-opacity-50">
+                                                <img id="uatPreviewImg" alt="Extracted timetable preview" style={{ maxHeight: "240px", maxWidth: "100%", objectFit: "contain" }} />
+                                            </div>
+                                        </div>
 
-                                <form id="uatAssignForm" onSubmit={(e) => { e.preventDefault(); window.assignUploadedClassTimetable?.(); }}>
-                                    <div className="d-flex justify-content-between align-items-center mb-2">
-                                        <span className="small fw-bold text-success"><i className="fa-solid fa-table me-1"></i> Extracted Timetable (Verify or Edit: <code>Subject, Faculty, Venue</code>)</span>
-                                    </div>
-                                    <div className="table-responsive">
-                                        <table className="table table-dark table-bordered border-secondary table-sm text-center align-middle" style={{ tableLayout: "fixed" }}>
-                                            <thead>
-                                                <tr>
-                                                    <th style={{ width: "95px" }}>Day</th>
-                                                    <th>Period 1</th>
-                                                    <th>Period 2</th>
-                                                    <th>Period 3</th>
-                                                    <th>Period 4</th>
-                                                    <th>Period 5</th>
-                                                    <th>Period 6</th>
-                                                    <th>Period 7</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="uatGridBody"></tbody>
-                                        </table>
-                                    </div>
-                                    <div id="uatAssignAlert" className="alert d-none small py-2 mt-2 mb-0"></div>
-                                    <div className="d-flex justify-content-end gap-2 mt-3">
-                                        <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                        <button type="submit" id="uatAssignBtn" className="btn btn-success fw-bold">
-                                            <i className="fa-solid fa-check me-1"></i> Assign Timetable to Class
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* ===== Admin: View Updated Student Timetable (Year / Section / Class / Dept) ===== */}
-            <div className="modal fade" id="adminViewStudentTtModal" tabIndex="-1">
-                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-                    <div className="modal-content bg-dark text-white border-secondary">
-                        <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
-                            <h5 className="modal-title text-success fw-bold">
-                                <i className="fa-solid fa-table-cells me-2"></i> View Updated Student Timetable
-                            </h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div className="modal-body p-4">
-                            <div className="p-3 rounded border border-secondary bg-secondary bg-opacity-10 mb-3">
-                                <div className="row g-2 align-items-end">
-                                    <div className="col-md-2">
-                                        <label className="form-label small text-muted mb-1">Department</label>
-                                        <select id="vstDeptSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onVstFilterChange?.('dept')}>
-                                            <option value="CSE">CSE</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-md-2">
-                                        <label className="form-label small text-muted mb-1">Year</label>
-                                        <select id="vstYearSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="II" onChange={() => window.onVstFilterChange?.('year')}>
-                                            <option value="I">I Year</option>
-                                            <option value="II">II Year</option>
-                                            <option value="III">III Year</option>
-                                            <option value="IV">IV Year</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-md-2">
-                                        <label className="form-label small text-muted mb-1">Class / Program</label>
-                                        <select id="vstClassSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onVstFilterChange?.('class')}>
-                                            <option value="">All Classes</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-md-2">
-                                        <label className="form-label small text-muted mb-1">Section</label>
-                                        <select id="vstSectionSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.loadAdminViewStudentTt?.()}>
-                                            <option value="A">A</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-md-2">
-                                        <label className="form-label small text-muted mb-1">Semester</label>
-                                        <select id="vstSemSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="" onChange={() => window.loadAdminViewStudentTt?.()}>
-                                            <option value="">Active Sem</option>
-                                            <option value="1">Sem 1</option>
-                                            <option value="2">Sem 2</option>
-                                            <option value="3">Sem 3</option>
-                                            <option value="4">Sem 4</option>
-                                            <option value="5">Sem 5</option>
-                                            <option value="6">Sem 6</option>
-                                            <option value="7">Sem 7</option>
-                                            <option value="8">Sem 8</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-md-2 d-grid">
-                                        <button type="button" className="btn btn-sm btn-success fw-semibold" onClick={() => window.loadAdminViewStudentTt?.()}>
-                                            <i className="fa-solid fa-magnifying-glass me-1"></i> View TT
-                                        </button>
+                                        <form id="uatAssignForm" onSubmit={(e) => { e.preventDefault(); window.assignUploadedClassTimetable?.(); }}>
+                                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                                <span className="small fw-bold text-success"><i className="fa-solid fa-table me-1"></i> Extracted Timetable (Verify or Edit: <code>Subject, Faculty, Venue</code>)</span>
+                                            </div>
+                                            <div className="table-responsive">
+                                                <table className="table table-dark table-bordered border-secondary table-sm text-center align-middle" style={{ tableLayout: "fixed" }}>
+                                                    <thead>
+                                                        <tr>
+                                                            <th style={{ width: "95px" }}>Day</th>
+                                                            <th>Period 1</th>
+                                                            <th>Period 2</th>
+                                                            <th>Period 3</th>
+                                                            <th>Period 4</th>
+                                                            <th>Period 5</th>
+                                                            <th>Period 6</th>
+                                                            <th>Period 7</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="uatGridBody"></tbody>
+                                                </table>
+                                            </div>
+                                            <div id="uatAssignAlert" className="alert d-none small py-2 mt-2 mb-0"></div>
+                                            <div className="d-flex justify-content-end gap-2 mt-3">
+                                                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                <button type="submit" id="uatAssignBtn" className="btn btn-success fw-bold">
+                                                    <i className="fa-solid fa-check me-1"></i> Assign Timetable to Class
+                                                </button>
+                                            </div>
+                                        </form>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
 
-                            <div id="vstMetaBar" className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 small text-info"></div>
-                            <div id="vstAlert" className="alert d-none small py-2 mb-2"></div>
+                    {/* ===== Admin: View Updated Student Timetable (Year / Section / Class / Dept) ===== */}
+                    <div className="modal fade" id="adminViewStudentTtModal" tabIndex="-1">
+                        <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                            <div className="modal-content bg-dark text-white border-secondary">
+                                <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
+                                    <h5 className="modal-title text-success fw-bold">
+                                        <i className="fa-solid fa-table-cells me-2"></i> View Updated Student Timetable
+                                    </h5>
+                                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div className="modal-body p-4">
+                                    <div className="p-3 rounded border border-secondary bg-secondary bg-opacity-10 mb-3">
+                                        <div className="row g-2 align-items-end">
+                                            <div className="col-md-2">
+                                                <label className="form-label small text-muted mb-1">Department</label>
+                                                <select id="vstDeptSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onVstFilterChange?.('dept')}>
+                                                    <option value="CSE">CSE</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-md-2">
+                                                <label className="form-label small text-muted mb-1">Year</label>
+                                                <select id="vstYearSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="II" onChange={() => window.onVstFilterChange?.('year')}>
+                                                    <option value="I">I Year</option>
+                                                    <option value="II">II Year</option>
+                                                    <option value="III">III Year</option>
+                                                    <option value="IV">IV Year</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-md-2">
+                                                <label className="form-label small text-muted mb-1">Class / Program</label>
+                                                <select id="vstClassSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onVstFilterChange?.('class')}>
+                                                    <option value="">All Classes</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-md-2">
+                                                <label className="form-label small text-muted mb-1">Section</label>
+                                                <select id="vstSectionSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.loadAdminViewStudentTt?.()}>
+                                                    <option value="A">A</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-md-2">
+                                                <label className="form-label small text-muted mb-1">Semester</label>
+                                                <select id="vstSemSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="" onChange={() => window.loadAdminViewStudentTt?.()}>
+                                                    <option value="">Active Sem</option>
+                                                    <option value="1">Sem 1</option>
+                                                    <option value="2">Sem 2</option>
+                                                    <option value="3">Sem 3</option>
+                                                    <option value="4">Sem 4</option>
+                                                    <option value="5">Sem 5</option>
+                                                    <option value="6">Sem 6</option>
+                                                    <option value="7">Sem 7</option>
+                                                    <option value="8">Sem 8</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-md-2 d-grid">
+                                                <button type="button" className="btn btn-sm btn-success fw-semibold" onClick={() => window.loadAdminViewStudentTt?.()}>
+                                                    <i className="fa-solid fa-magnifying-glass me-1"></i> View TT
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                            <div className="table-responsive mb-3">
-                                <table className="tt-table student-view-tt w-100">
-                                    <thead>
-                                        <tr>
-                                            <th style={{ width: "95px" }}>Day Order</th>
-                                            <th>1<br /><small className="text-dim">08.40 - 09.40</small></th>
-                                            <th>2<br /><small className="text-dim">09.40 - 10.40</small></th>
-                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>10.40<br />-<br />11.00</th>
-                                            <th>3<br /><small className="text-dim">11.00 - 12.00</small></th>
-                                            <th>4<br /><small className="text-dim">12.00 - 01.00</small></th>
-                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>01.00<br />-<br />01.40</th>
-                                            <th>5<br /><small className="text-dim">01.40 - 02.30</small></th>
-                                            <th>ACT<br /><small className="text-dim">Activity</small></th>
-                                            <th>6<br /><small className="text-dim">02.30 - 03.20</small></th>
-                                            <th>7<br /><small className="text-dim">03.20 - 04.10</small></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="vstGridBody">
-                                        <tr><td colSpan="11" className="text-center text-muted py-4">Select Department, Year, Class, and Section to view the updated student timetable.</td></tr>
-                                    </tbody>
-                                </table>
+                                            <div id="vstMetaBar" className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 small text-info"></div>
+                                            <div id="vstAlert" className="alert d-none small py-2 mb-2"></div>
+
+                                            <div className="table-responsive mb-3">
+                                                <table className="tt-table student-view-tt w-100">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style={{ width: "95px" }}>Day Order</th>
+                                                            <th>1<br /><small className="text-dim">08.40 - 09.40</small></th>
+                                                            <th>2<br /><small className="text-dim">09.40 - 10.40</small></th>
+                                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>10.40<br />-<br />11.00</th>
+                                                            <th>3<br /><small className="text-dim">11.00 - 12.00</small></th>
+                                                            <th>4<br /><small className="text-dim">12.00 - 01.00</small></th>
+                                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>01.00<br />-<br />01.40</th>
+                                                            <th>5<br /><small className="text-dim">01.40 - 02.30</small></th>
+                                                            <th>ACT<br /><small className="text-dim">Activity</small></th>
+                                                            <th>6<br /><small className="text-dim">02.30 - 03.20</small></th>
+                                                            <th>7<br /><small className="text-dim">03.20 - 04.10</small></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="vstGridBody">
+                                                        <tr><td colSpan="11" className="text-center text-muted py-4">Select Department, Year, Class, and Section to view the updated student timetable.</td></tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <div className="border-top border-secondary pt-3">
+                                                <h6 className="small fw-bold text-warning mb-2"><i className="fa-solid fa-book-bookmark me-1"></i> Course &amp; Faculty Incharge Reference</h6>
+                                                <div className="table-responsive">
+                                                    <table className="table table-dark table-bordered border-secondary table-sm align-middle small mb-0">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Subject</th>
+                                                                <th>Code</th>
+                                                                <th>Faculty Incharge</th>
+                                                                <th>Venue</th>
+                                                                <th>Periods / Week</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="vstRefBody"></tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="modal-footer border-secondary">
+                                            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="border-top border-secondary pt-3">
-                                <h6 className="small fw-bold text-warning mb-2"><i className="fa-solid fa-book-bookmark me-1"></i> Course &amp; Faculty Incharge Reference</h6>
-                                <div className="table-responsive">
-                                    <table className="table table-dark table-bordered border-secondary table-sm align-middle small mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th>Subject</th>
-                                                <th>Code</th>
-                                                <th>Faculty Incharge</th>
-                                                <th>Venue</th>
-                                                <th>Periods / Week</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="vstRefBody"></tbody>
-                                    </table>
+                            {/* ===== Class Document Preview Modal (PDF / Image) ===== */}
+                            <div className="modal fade" id="classDocPreviewModal" tabIndex="-1">
+                                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                                    <div className="modal-content bg-dark text-white border-secondary">
+                                        <div className="modal-header border-secondary">
+                                            <h5 className="modal-title text-info fw-bold" id="classDocPreviewTitle">
+                                                <i className="fa-solid fa-file-lines me-2"></i> Class Document Preview
+                                            </h5>
+                                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div className="modal-body p-3 text-center" id="classDocPreviewBody" style={{ minHeight: "420px" }}>
+                                        </div>
+                                        <div className="modal-footer border-secondary">
+                                            <button type="button" className="btn btn-outline-info btn-sm" id="classDocPreviewDownloadBtn">
+                                                <i className="fa-solid fa-download me-1"></i> Download File
+                                            </button>
+                                            <button type="button" className="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div className="modal-footer border-secondary">
-                            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            {/* ===== Class Document Preview Modal (PDF / Image) ===== */}
-            <div className="modal fade" id="classDocPreviewModal" tabIndex="-1">
-                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-                    <div className="modal-content bg-dark text-white border-secondary">
-                        <div className="modal-header border-secondary">
-                            <h5 className="modal-title text-info fw-bold" id="classDocPreviewTitle">
-                                <i className="fa-solid fa-file-lines me-2"></i> Class Document Preview
-                            </h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div className="modal-body p-3 text-center" id="classDocPreviewBody" style={{ minHeight: "420px" }}>
-                        </div>
-                        <div className="modal-footer border-secondary">
-                            <button type="button" className="btn btn-outline-info btn-sm" id="classDocPreviewDownloadBtn">
-                                <i className="fa-solid fa-download me-1"></i> Download File
-                            </button>
-                            <button type="button" className="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                            {/* ===== Change Password Modal (Authenticated Users) ===== */}
+                            <div className="modal fade" id="changePasswordModal" tabIndex="-1">
+                                <div className="modal-dialog modal-dialog-centered">
+                                    <div className="modal-content bg-dark text-white border-secondary">
+                                        <div className="modal-header border-secondary">
+                                            <h5 className="modal-title fw-bold text-warning"><i className="fa-solid fa-lock me-2"></i> Change Password</h5>
+                                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div className="modal-body p-4">
+                                            <form id="changePasswordForm" onSubmit={(e) => { e.preventDefault(); window.handleChangePasswordSubmit && window.handleChangePasswordSubmit(e); }}>
+                                                <div className="mb-3">
+                                                    <label className="form-label text-muted small">Current Password</label>
+                                                    <input type="password" id="cpCurrentPassword" className="form-control bg-dark text-white border-secondary" required />
+                                                </div>
+                                                <div className="mb-3">
+                                                    <label className="form-label text-muted small">New Password</label>
+                                                    <input type="password" id="cpNewPassword" className="form-control bg-dark text-white border-secondary" required />
+                                                </div>
+                                                <div className="mb-3">
+                                                    <label className="form-label text-muted small">Confirm New Password</label>
+                                                    <input type="password" id="cpConfirmPassword" className="form-control bg-dark text-white border-secondary" required />
+                                                </div>
+                                                <div className="d-grid mt-4">
+                                                    <button type="submit" className="btn btn-warning fw-bold">Update Password</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-            {/* ===== Change Password Modal (Authenticated Users) ===== */}
-            <div className="modal fade" id="changePasswordModal" tabIndex="-1">
-                <div className="modal-dialog modal-dialog-centered">
-                    <div className="modal-content bg-dark text-white border-secondary">
-                        <div className="modal-header border-secondary">
-                            <h5 className="modal-title fw-bold text-warning"><i className="fa-solid fa-lock me-2"></i> Change Password</h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div className="modal-body p-4">
-                            <form id="changePasswordForm" onSubmit={(e) => { e.preventDefault(); window.handleChangePasswordSubmit && window.handleChangePasswordSubmit(e); }}>
-                                <div className="mb-3">
-                                    <label className="form-label text-muted small">Current Password</label>
-                                    <input type="password" id="cpCurrentPassword" className="form-control bg-dark text-white border-secondary" required />
-                                </div>
-                                <div className="mb-3">
-                                    <label className="form-label text-muted small">New Password</label>
-                                    <input type="password" id="cpNewPassword" className="form-control bg-dark text-white border-secondary" required />
-                                </div>
-                                <div className="mb-3">
-                                    <label className="form-label text-muted small">Confirm New Password</label>
-                                    <input type="password" id="cpConfirmPassword" className="form-control bg-dark text-white border-secondary" required />
-                                </div>
-                                <div className="d-grid mt-4">
-                                    <button type="submit" className="btn btn-warning fw-bold">Update Password</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </>
-    );
+                        </>
+                        );
 }
 
 
