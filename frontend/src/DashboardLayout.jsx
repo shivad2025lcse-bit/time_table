@@ -262,6 +262,9 @@ export default function DashboardLayout() {
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminUploadAssignTtModal" onClick={() => { if (typeof window.openUploadAssignTtModal === 'function') { window.openUploadAssignTtModal(); } else { window.location.reload(); } if (window.innerWidth <= 992) setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-file-arrow-up fa-fw me-3 text-info"></i> Upload &amp; Assign Class TT
                                     </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminViewStudentTtModal" onClick={() => { if (typeof window.openAdminViewStudentTtModal === 'function') { window.openAdminViewStudentTtModal(); } else { window.location.reload(); } if (window.innerWidth <= 992) setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-table-cells fa-fw me-3 text-success"></i> View Student Timetable
+                                    </button>
                                 </>
                             )}
 
@@ -2751,6 +2754,105 @@ export default function DashboardLayout() {
                                     </div>
                                 </form>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ===== Admin: View Updated Student Timetable (Year / Section / Class / Dept) ===== */}
+            <div className="modal fade" id="adminViewStudentTtModal" tabIndex="-1">
+                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
+                            <h5 className="modal-title text-success fw-bold">
+                                <i className="fa-solid fa-table-cells me-2"></i> View Updated Student Timetable
+                            </h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body p-4">
+                            <div className="p-3 rounded border border-secondary bg-secondary bg-opacity-10 mb-3">
+                                <div className="row g-2 align-items-end">
+                                    <div className="col-md-3">
+                                        <label className="form-label small text-muted mb-1">Department</label>
+                                        <select id="vstDeptSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onVstFilterChange?.('dept')}>
+                                            <option value="CSE">CSE</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-md-2">
+                                        <label className="form-label small text-muted mb-1">Year</label>
+                                        <select id="vstYearSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="II" onChange={() => window.onVstFilterChange?.('year')}>
+                                            <option value="I">I Year</option>
+                                            <option value="II">II Year</option>
+                                            <option value="III">III Year</option>
+                                            <option value="IV">IV Year</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-md-3">
+                                        <label className="form-label small text-muted mb-1">Class / Program</label>
+                                        <select id="vstClassSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onVstFilterChange?.('class')}>
+                                            <option value="">All Classes</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-md-2">
+                                        <label className="form-label small text-muted mb-1">Section</label>
+                                        <select id="vstSectionSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.loadAdminViewStudentTt?.()}>
+                                            <option value="A">A</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-md-2 d-grid">
+                                        <button type="button" className="btn btn-sm btn-success fw-semibold" onClick={() => window.loadAdminViewStudentTt?.()}>
+                                            <i className="fa-solid fa-magnifying-glass me-1"></i> View TT
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="vstMetaBar" className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 small text-info"></div>
+                            <div id="vstAlert" className="alert d-none small py-2 mb-2"></div>
+
+                            <div className="table-responsive mb-3">
+                                <table className="tt-table student-view-tt w-100">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: "95px" }}>Day Order</th>
+                                            <th>1<br /><small className="text-dim">08.40 - 09.40</small></th>
+                                            <th>2<br /><small className="text-dim">09.40 - 10.40</small></th>
+                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>10.40<br/>-<br/>11.00</th>
+                                            <th>3<br /><small className="text-dim">11.00 - 12.00</small></th>
+                                            <th>4<br /><small className="text-dim">12.00 - 01.00</small></th>
+                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>01.00<br/>-<br/>01.40</th>
+                                            <th>5<br /><small className="text-dim">01.40 - 02.30</small></th>
+                                            <th>ACT<br /><small className="text-dim">Activity</small></th>
+                                            <th>6<br /><small className="text-dim">02.30 - 03.20</small></th>
+                                            <th>7<br /><small className="text-dim">03.20 - 04.10</small></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vstGridBody">
+                                        <tr><td colSpan="11" className="text-center text-muted py-4">Select Department, Year, Class, and Section to view the updated student timetable.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="border-top border-secondary pt-3">
+                                <h6 className="small fw-bold text-warning mb-2"><i className="fa-solid fa-book-bookmark me-1"></i> Course &amp; Faculty Incharge Reference</h6>
+                                <div className="table-responsive">
+                                    <table className="table table-dark table-bordered border-secondary table-sm align-middle small mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Subject</th>
+                                                <th>Code</th>
+                                                <th>Faculty Incharge</th>
+                                                <th>Venue</th>
+                                                <th>Periods / Week</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="vstRefBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="modal-footer border-secondary">
+                            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
                 </div>

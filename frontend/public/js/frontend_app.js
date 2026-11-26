@@ -6640,13 +6640,19 @@ function _initModalListeners() {
             uploadAssignModalEl.addEventListener('show.bs.modal', () => { if (window.openUploadAssignTtModal) window.openUploadAssignTtModal(); });
         }
 
+        const viewStuTtModalEl = document.getElementById('adminViewStudentTtModal');
+        if (viewStuTtModalEl && !viewStuTtModalEl.dataset.initialized) {
+            viewStuTtModalEl.dataset.initialized = 'true';
+            viewStuTtModalEl.addEventListener('show.bs.modal', () => { if (window.openAdminViewStudentTtModal) window.openAdminViewStudentTtModal(); });
+        }
+
         const ticker = document.getElementById('announcementTickerContainer');
         if (ticker && !ticker.dataset.initialized) {
             ticker.dataset.initialized = 'true';
             if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
         }
 
-        const allDone = credModalEl && adminFacModalEl && annModalEl && shareModalEl && avtModalEl && adminFacTtModalEl && uploadAssignModalEl && ticker;
+        const allDone = credModalEl && adminFacModalEl && annModalEl && shareModalEl && avtModalEl && adminFacTtModalEl && uploadAssignModalEl && viewStuTtModalEl && ticker;
         if ((allDone || attempts >= 15) && window.__modalInitInterval) {
             clearInterval(window.__modalInitInterval);
             window.__modalInitInterval = null;
@@ -9218,5 +9224,241 @@ window.assignUploadedClassTimetable = async function() {
             alertEl.className = 'alert alert-danger small py-2 mt-2 mb-0';
             alertEl.innerText = 'Error: ' + err.message;
         }
+    }
+};
+
+// =========================================================================
+// ADMIN FEATURE: VIEW UPDATED STUDENT TIMETABLE (Year / Section / Class / Dept)
+// =========================================================================
+function _parseVstSectionMeta(secObj) {
+    const name = String(secObj.sectionName || '').trim();
+    const parts = name.split(/\s+/);
+    const romanMap = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV' };
+    let year = '';
+    if (secObj.year && romanMap[String(secObj.year)]) year = romanMap[String(secObj.year)];
+    else if (parts[0] && /^(I|II|III|IV)$/i.test(parts[0])) year = parts[0].toUpperCase();
+    else if (secObj.semester) year = romanMap[String(Math.ceil(secObj.semester / 2))] || 'II';
+    else year = 'II';
+
+    const dept = (secObj.course && secObj.course.department && secObj.course.department.code)
+        || (parts.length >= 2 ? parts[1].toUpperCase() : 'CSE');
+    const classCode = (secObj.course && (secObj.course.code || secObj.course.name)) || ('BTECH-' + dept);
+    const secCode = secObj.sectionIdentifier
+        || (parts.length >= 3 ? parts.slice(2).join(' ').toUpperCase() : name);
+
+    return { id: secObj.id, name, year, dept: dept.toUpperCase(), classCode, secCode };
+}
+
+window.openAdminViewStudentTtModal = async function() {
+    const alertEl = document.getElementById('vstAlert');
+    const metaBar = document.getElementById('vstMetaBar');
+    if (alertEl) alertEl.classList.add('d-none');
+    if (metaBar) metaBar.innerHTML = '<span class="text-muted">Loading classes and sections...</span>';
+
+    let sections = [];
+    try {
+        const res = await apiFetch('/api/sections');
+        if (res && res.ok) sections = await res.json();
+    } catch (e) {
+        console.warn('Could not load sections for View Student TT:', e);
+    }
+
+    const normalized = Array.isArray(sections)
+        ? sections.map(_parseVstSectionMeta).filter(s => s.name && !/^\d+\s+CSE\s+II\s+CSE/i.test(s.name))
+        : [];
+    window._vstSectionsCache = normalized;
+
+    const deptSel = document.getElementById('vstDeptSelect');
+    if (deptSel) {
+        const depts = new Set(['CSE', 'IT', 'AI&DS', 'AI&ML', 'ECE']);
+        normalized.forEach(s => { if (s.dept) depts.add(s.dept); });
+        const prev = deptSel.value;
+        deptSel.innerHTML = Array.from(depts).sort().map(d => `<option value="${d}">${d}</option>`).join('');
+        if (prev && depts.has(prev)) deptSel.value = prev;
+        else if (depts.has('CSE')) deptSel.value = 'CSE';
+    }
+
+    window.onVstFilterChange('init');
+};
+
+window.onVstFilterChange = function() {
+    const dept = (document.getElementById('vstDeptSelect')?.value || 'CSE').toUpperCase();
+    const year = (document.getElementById('vstYearSelect')?.value || 'II').toUpperCase();
+    const classSel = document.getElementById('vstClassSelect');
+    const secSel = document.getElementById('vstSectionSelect');
+    const allSecs = Array.isArray(window._vstSectionsCache) ? window._vstSectionsCache : [];
+
+    const byDeptYear = allSecs.filter(s => s.dept === dept && s.year === year);
+
+    if (classSel) {
+        const prevClass = classSel.value;
+        const classes = new Set(byDeptYear.map(s => s.classCode).filter(Boolean));
+        if (classes.size === 0) classes.add('BTECH-' + dept);
+        classSel.innerHTML = '<option value="">All Classes</option>' +
+            Array.from(classes).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+        if (prevClass && classes.has(prevClass)) classSel.value = prevClass;
+    }
+
+    const selectedClass = classSel ? classSel.value : '';
+    const matching = byDeptYear.filter(s => !selectedClass || s.classCode === selectedClass);
+
+    if (secSel) {
+        const prevSec = secSel.value;
+        const secMap = new Map();
+        matching.forEach(s => secMap.set(s.secCode, s));
+        if (secMap.size === 0) {
+            ['A', 'B', 'C'].forEach(l => secMap.set(l, { id: null, name: `${year} ${dept} ${l}`, year, dept, classCode: selectedClass || `BTECH-${dept}`, secCode: l }));
+        }
+        secSel.innerHTML = Array.from(secMap.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([code, obj]) => `<option value="${code}" data-sec-id="${obj.id || ''}" data-sec-name="${obj.name}">${code} (${obj.name})</option>`)
+            .join('');
+        if (prevSec && secMap.has(prevSec)) secSel.value = prevSec;
+    }
+
+    window.loadAdminViewStudentTt();
+};
+
+window.loadAdminViewStudentTt = async function() {
+    const dept = (document.getElementById('vstDeptSelect')?.value || 'CSE').toUpperCase();
+    const year = (document.getElementById('vstYearSelect')?.value || 'II').toUpperCase();
+    const secSel = document.getElementById('vstSectionSelect');
+    const opt = secSel && secSel.selectedIndex >= 0 ? secSel.options[secSel.selectedIndex] : null;
+    const secCode = secSel ? secSel.value : 'A';
+    const secId = opt?.dataset?.secId || '';
+    const targetName = opt?.dataset?.secName || `${year} ${dept} ${secCode}`;
+
+    const tbody = document.getElementById('vstGridBody');
+    const refBody = document.getElementById('vstRefBody');
+    const metaBar = document.getElementById('vstMetaBar');
+    const alertEl = document.getElementById('vstAlert');
+    if (!tbody) return;
+    if (alertEl) alertEl.classList.add('d-none');
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading updated timetable...</td></tr>';
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const grid = {};
+    days.forEach(d => { grid[d] = Array.from({ length: 7 }, () => ({ sub: 'FREE', code: '', faculty: '', venue: '', cat: 'cat-theory' })); });
+
+    let loadedCount = 0;
+    let sourceLabel = 'Database';
+
+    if (secId) {
+        try {
+            const res = await apiFetch(`/api/timetable/section/${secId}`);
+            if (res && res.ok) {
+                const entries = await res.json();
+                if (Array.isArray(entries) && entries.length > 0) {
+                    entries.forEach(e => {
+                        const day = e.day;
+                        const pIdx = (e.slotNumber || 1) - 1;
+                        if (grid[day] && pIdx >= 0 && pIdx < 7) {
+                            const sub = e.subjectName || e.subjectCode || 'FREE';
+                            const low = sub.toLowerCase();
+                            const cat = (e.subjectType === 'LAB' || e.subjectType === 'PROJECT' || low.includes('lab') || low.includes('practical') || low.includes('project'))
+                                ? 'cat-lab' : (low === 'alt' ? 'cat-alt' : 'cat-theory');
+                            grid[day][pIdx] = {
+                                sub,
+                                code: e.subjectCode || '',
+                                faculty: e.teacherName || '-',
+                                venue: e.roomNumber || e.labName || 'TBA',
+                                cat
+                            };
+                            loadedCount++;
+                        }
+                    });
+                }
+            }
+        } catch (err) {
+            console.warn('Error loading section timetable for Admin view:', err);
+        }
+    }
+
+    if (loadedCount === 0) {
+        const localBuilt = localStorage.getItem(`sece_tt_built_${targetName}`);
+        if (localBuilt) {
+            try {
+                const parsed = JSON.parse(localBuilt);
+                if (parsed && parsed.grid) {
+                    days.forEach(day => {
+                        for (let p = 1; p <= 7; p++) {
+                            const val = (parsed.grid[day] && parsed.grid[day][`P${p}`]) || '';
+                            if (val && val.toUpperCase() !== 'FREE') {
+                                const parts = val.split(',').map(s => s.trim());
+                                const sub = parts[0] || 'FREE';
+                                const low = sub.toLowerCase();
+                                const cat = (low.includes('lab') || low.includes('practical') || low.includes('project')) ? 'cat-lab' : (low === 'alt' ? 'cat-alt' : 'cat-theory');
+                                grid[day][p - 1] = { sub, code: '', faculty: parts[1] || '-', venue: parts[2] || 'TBA', cat };
+                                loadedCount++;
+                            }
+                        }
+                    });
+                    sourceLabel = 'Local Builder';
+                }
+            } catch (_) {}
+        }
+    }
+
+    if (metaBar) {
+        metaBar.innerHTML = `<span><i class="fa-solid fa-graduation-cap me-1"></i>Section: <strong class="text-white">${targetName}</strong></span>
+            <span><span class="badge ${loadedCount > 0 ? 'bg-success' : 'bg-secondary'}">${loadedCount} periods loaded (${sourceLabel})</span></span>`;
+    }
+    if (loadedCount === 0 && alertEl) {
+        alertEl.className = 'alert alert-warning small py-2 mb-2';
+        alertEl.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i>No timetable has been saved yet for <strong>${targetName}</strong>. Upload or build one using <strong>Upload &amp; Assign Class TT</strong>.`;
+    }
+
+    const esc = v => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const renderVstCell = c => {
+        if (!c || !c.sub || c.sub.toUpperCase() === 'FREE') {
+            return `<td class="cat-theory text-muted"><span class="slot-badge text-secondary">FREE</span></td>`;
+        }
+        return `<td class="${c.cat || 'cat-theory'}">
+            <span class="slot-badge">${esc(c.sub)}</span>
+            <span class="slot-subtext">${esc(c.faculty)}</span>
+            <span class="slot-venue">${esc(c.venue)}</span>
+        </td>`;
+    };
+
+    tbody.innerHTML = days.map(day => {
+        const p = grid[day];
+        const tea = day === 'Monday'
+            ? `<td class="tt-break-cell align-middle" rowspan="6">T<br/>E<br/>A<br/><br/>B<br/>R<br/>E<br/>A<br/>K<br/><div style="font-size:0.55rem;line-height:1.1;margin-top:8px;">10.40<br/>-<br/>11.00</div></td>`
+            : '';
+        const lunch = day === 'Monday'
+            ? `<td class="tt-break-cell align-middle" rowspan="6">L<br/>U<br/>N<br/>C<br/>H<br/><br/>B<br/>R<br/>E<br/>A<br/>K<br/><div style="font-size:0.55rem;line-height:1.1;margin-top:8px;">01.00<br/>-<br/>01.40</div></td>`
+            : '';
+        return `<tr>
+            <td class="fw-bold bg-dark text-info text-center align-middle" style="font-size:0.8rem">${day}</td>
+            ${renderVstCell(p[0])}
+            ${renderVstCell(p[1])}
+            ${tea}
+            ${renderVstCell(p[2])}
+            ${renderVstCell(p[3])}
+            ${lunch}
+            ${renderVstCell(p[4])}
+            <td class="align-middle cat-theory"><div class="text-secondary" style="font-size:0.7rem">-</div></td>
+            ${renderVstCell(p[5])}
+            ${renderVstCell(p[6])}
+        </tr>`;
+    }).join('');
+
+    if (refBody) {
+        const refMap = new Map();
+        days.forEach(day => grid[day].forEach(c => {
+            if (!c.sub || c.sub.toUpperCase() === 'FREE') return;
+            const key = `${c.sub.toLowerCase()}|${(c.venue || '').toLowerCase()}`;
+            if (!refMap.has(key)) refMap.set(key, { ...c, count: 1 });
+            else refMap.get(key).count++;
+        }));
+        refBody.innerHTML = refMap.size > 0
+            ? Array.from(refMap.values()).map(r => `<tr>
+                <td class="fw-bold text-info">${esc(r.sub)}</td>
+                <td>${esc(r.code || '-')}</td>
+                <td>${esc(r.faculty || '-')}</td>
+                <td><span class="badge bg-secondary">${esc(r.venue || '-')}</span></td>
+                <td>${r.count}</td>
+            </tr>`).join('')
+            : '<tr><td colspan="5" class="text-center text-muted py-2">No courses assigned.</td></tr>';
     }
 };
