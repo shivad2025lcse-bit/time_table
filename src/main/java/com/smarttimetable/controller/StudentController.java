@@ -86,6 +86,33 @@ public class StudentController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/bulk-semester")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    public ResponseEntity<?> bulkUpdateSemester(@RequestBody java.util.Map<String, Object> request) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Object> rawIds = (List<Object>) request.get("studentIds");
+            List<Long> studentIds = new java.util.ArrayList<>();
+            if (rawIds != null) {
+                for (Object idObj : rawIds) {
+                    if (idObj != null) studentIds.add(Long.valueOf(idObj.toString()));
+                }
+            }
+            Object semObj = request.get("newSemester");
+            Integer newSemester = semObj != null ? Integer.valueOf(semObj.toString()) : null;
+            String note = request.get("note") != null ? request.get("note").toString() : "";
+
+            List<Student> updated = studentService.updateStudentsSemester(studentIds, newSemester, note);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "updatedCount", updated.size(),
+                    "newSemester", newSemester,
+                    "students", updated
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Semester update failed"));
+        }
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     public ResponseEntity<Void> deleteStudent(@PathVariable Long id) {

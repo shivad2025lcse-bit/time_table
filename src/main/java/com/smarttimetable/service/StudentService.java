@@ -155,6 +155,28 @@ public class StudentService {
         }
     }
 
+    @org.springframework.transaction.annotation.Transactional
+    public List<Student> updateStudentsSemester(List<Long> studentIds, Integer newSemester, String note) {
+        if (studentIds == null || studentIds.isEmpty()) {
+            throw new IllegalArgumentException("Please select at least one student.");
+        }
+        if (newSemester == null || newSemester < 1 || newSemester > 8) {
+            throw new IllegalArgumentException("Semester must be between 1 and 8.");
+        }
+        List<Student> targets = studentRepository.findAllById(studentIds);
+        String cleanNote = (note != null && !note.trim().isEmpty()) ? (" - " + note.trim()) : "";
+        String today = java.time.LocalDate.now().toString();
+        for (Student st : targets) {
+            Integer prevSem = st.getSemester();
+            st.setSemester(newSemester);
+            st.setSemesterMarked(true);
+            String changeLabel = (prevSem != null ? ("Sem " + prevSem + " -> " + newSemester) : ("Sem " + newSemester))
+                    + " (" + today + ")" + cleanNote;
+            st.setSemesterChangeNote(changeLabel);
+        }
+        return studentRepository.saveAll(targets);
+    }
+
     public void deleteStudent(Long id) {
         Student student = studentRepository.findById(id).orElse(null);
         if (student != null) {

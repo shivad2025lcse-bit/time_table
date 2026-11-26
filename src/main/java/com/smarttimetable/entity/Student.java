@@ -57,6 +57,12 @@ public class Student {
     @Column(name = "room_number")
     private String roomNumber;
 
+    @Column(name = "semester_marked")
+    private Boolean semesterMarked = false;
+
+    @Column(name = "semester_change_note", length = 200)
+    private String semesterChangeNote;
+
     @OneToOne(fetch = FetchType.EAGER, cascade = {CascadeType.MERGE, CascadeType.REFRESH})
     @JoinColumn(name = "user_id")
     private User user;
@@ -129,4 +135,10 @@ public class Student {
 
     public String getRoomNumber() { return roomNumber; }
     public void setRoomNumber(String roomNumber) { this.roomNumber = roomNumber; }
+
+    public Boolean getSemesterMarked() { return semesterMarked; }
+    public void setSemesterMarked(Boolean semesterMarked) { this.semesterMarked = semesterMarked; }
+
+    public String getSemesterChangeNote() { return semesterChangeNote; }
+    public void setSemesterChangeNote(String semesterChangeNote) { this.semesterChangeNote = semesterChangeNote; }
 }

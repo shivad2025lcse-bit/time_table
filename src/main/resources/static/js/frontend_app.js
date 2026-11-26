@@ -106,8 +106,14 @@ function openLoginForm(role) {
     document.getElementById('loginRoleBadge').innerText = role;
     document.getElementById('loginTitle').innerText = config.title;
     document.getElementById('loginHint').innerText = usernameRuleText(role);
-    document.getElementById('usernameRule').innerText = role === 'FACULTY' ? '' : (role === 'STUDENT' ? 'Example: 25CS316 (Case-insensitive)' : `Example: ${config.example}`);
-    document.getElementById('loginUsername').placeholder = role === 'FACULTY' ? 'Your Username' : config.example;
+    document.getElementById('usernameRule').innerText = role === 'FACULTY' ? 'Example: fkeerj012345 or smithp012345' : (role === 'STUDENT' ? 'Example: 25cs303 or studenta' : `Example: ${config.example}`);
+    const pwHintEl = document.getElementById('loginPasswordHint');
+    if (pwHintEl) {
+        if (role === 'FACULTY') pwHintEl.innerHTML = 'Initial password for faculty accounts is <code>password123</code>.';
+        else if (role === 'ADMIN') pwHintEl.innerHTML = 'Initial password for Admin (<code>shiva25012007</code>) is <code>password123</code>.';
+        else pwHintEl.innerHTML = 'For enrolled students: UPPERCASE First Name + last 4 mobile digits (or <code>password123</code> for test accounts).';
+    }
+    document.getElementById('loginUsername').placeholder = role === 'FACULTY' ? 'e.g. fkeerj012345 or smithp012345' : config.example;
     document.getElementById('loginIcon').innerHTML =
         `<i class="fa-solid ${config.icon}"></i>`;
 
@@ -201,7 +207,7 @@ async function handleRoleLogin(e) {
         }
         // Backend explicitly rejected credentials (401/403)
         if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket me-1"></i> Login'; }
-        alert('Invalid username or password.');
+        setTimeout(() => alert('Invalid username or password.'), 0);
         return;
     } catch (networkErr) {
         console.warn('Backend unreachable, falling back to local auth', networkErr);
@@ -2392,6 +2398,9 @@ function switchRole(role, silent = false) {
             if (window.dynamicDashboardInterval) clearInterval(window.dynamicDashboardInterval);
             window.dynamicDashboardInterval = setInterval(window.fetchStudentDynamicDashboard, 30000);
         }
+        if (typeof window.loadStudentClassDocuments === 'function') {
+            window.loadStudentClassDocuments();
+        }
     } else {
         if (typeof window.loadTimetableData === 'function') {
             window.loadTimetableData().then(() => {
@@ -3062,7 +3071,7 @@ function removeSection(idx) {
     showToast('Section Removed', `Section ${removed.name} removed.`);
 }
 
-function handleClassAdvisorLogin(e) {
+async function handleClassAdvisorLogin(e) {
     e.preventDefault();
     if (currentUserRole !== 'FACULTY') {
         alert('Class Advisor View is available only inside the Faculty view.');
@@ -3070,7 +3079,30 @@ function handleClassAdvisorLogin(e) {
     }
     const username = String(document.getElementById('advisorLoginUsername').value || '').trim().toLowerCase();
     const password = String(document.getElementById('advisorLoginPassword').value || '');
-    const faculty = staffDirectory.find(s => buildClassAdvisorUsername(s.name) === username && s.classAdvisorFor);
+
+    let faculty = staffDirectory.find(s => buildClassAdvisorUsername(s.name) === username && s.classAdvisorFor);
+    if (!faculty) {
+        try {
+            const res = await apiFetch('/api/teachers');
+            if (res && res.ok) {
+                const dbTeachers = await res.json();
+                const hit = dbTeachers.find(t => {
+                    if (!t.classAdvisorFor) return false;
+                    const nm = t.displayName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim();
+                    const uname = (t.user && t.user.username) ? t.user.username.toLowerCase() : '';
+                    return buildClassAdvisorUsername(nm) === username || buildClassAdvisorUsername(`${t.firstName || ''} ${t.lastName || ''}`) === username || uname === username;
+                });
+                if (hit) {
+                    faculty = {
+                        name: hit.name || `${hit.firstName || ''} ${hit.lastName || ''}`.trim(),
+                        displayName: hit.displayName || hit.name,
+                        classAdvisorFor: hit.classAdvisorFor
+                    };
+                }
+            }
+        } catch (_) {}
+    }
+
     if (!faculty) {
         alert('Invalid Class Advisor username or this faculty member is not assigned as a Class Advisor.');
         return;
@@ -3196,21 +3228,70 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
             </div>
 
             ${students.length === 0 ? '<div class="alert alert-warning mt-2">No students are currently enrolled in this class.</div>' : `
-            <div class="table-responsive">
+            <div class="p-3 rounded border border-warning bg-dark mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <h6 class="fw-bold text-warning mb-0"><i class="fa-solid fa-pen-to-square me-1"></i> Enrolled Students Semester Change</h6>
+                    <span id="caSelectedCountBadge" class="badge bg-info text-dark">0 selected</span>
+                </div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">New Semester *</label>
+                        <select id="caTargetSemSelect" class="form-select form-select-sm bg-dark text-white border-secondary">
+                            <option value="1">Semester 1</option>
+                            <option value="2">Semester 2</option>
+                            <option value="3">Semester 3</option>
+                            <option value="4" selected>Semester 4</option>
+                            <option value="5">Semester 5</option>
+                            <option value="6">Semester 6</option>
+                            <option value="7">Semester 7</option>
+                            <option value="8">Semester 8</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label small text-muted mb-1">Semester Change Remark / Mark</label>
+                        <input type="text" id="caSemChangeNote" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Promoted to Even Sem" />
+                    </div>
+                    <div class="col-md-4 d-grid">
+                        <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="window.applyClassAdvisorSemChanges?.()">
+                            <i class="fa-solid fa-check-double me-1"></i> Mark Semester Changes
+                        </button>
+                    </div>
+                </div>
+                <div id="caSemChangeAlert" class="alert d-none small py-2 mt-2 mb-0"></div>
+            </div>
+
+            <div class="table-responsive mb-3">
                 <table class="table table-dark table-striped table-hover align-middle small">
-                    <thead><tr><th>#</th><th>Roll No</th><th>Name</th><th>Class / Section</th><th>Semester</th><th>Personal Email</th><th>College Mail ID</th><th>Mobile</th><th>Parent Mobile 1</th><th>Parent Mobile 2</th><th>Action</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th style="width:36px;"><input type="checkbox" class="form-check-input" id="caSelectAllChk" title="Select all students" onchange="window.toggleCaSelectAllStudents?.(this.checked)" /></th>
+                            <th>#</th>
+                            <th>Roll No</th>
+                            <th>Name</th>
+                            <th>Class / Section</th>
+                            <th>Semester &amp; Status</th>
+                            <th>Personal Email</th>
+                            <th>College Mail ID</th>
+                            <th>Mobile</th>
+                            <th>Parent Mobile 1</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
                     <tbody>${students.map((s, i) => {
-            return `<tr>
+            const semBadge = s.semesterMarked
+                ? `<span class="badge bg-success ms-1" title="${String(s.semesterChangeNote || '').replace(/"/g, '&quot;')}">Marked</span><div class="text-info" style="font-size:0.7rem;">${s.semesterChangeNote || ''}</div>`
+                : '';
+            return `<tr class="${s.semesterMarked ? 'table-active' : ''}">
+                            <td><input type="checkbox" class="form-check-input ca-student-chk" value="${s.id}" onchange="window.updateCaSelectedCount?.()" /></td>
                             <td class="text-muted">${i + 1}</td>
                             <td><code class="text-warning fw-bold">${s.registerNumber || '-'}</code></td>
                             <td><strong>${(s.firstName || '')} ${(s.lastName || '')}</strong></td>
                             <td><span class="badge bg-primary">${s.section ? (s.section.sectionName || '-') : '-'}</span></td>
-                            <td class="text-center">${s.semester || '-'}</td>
+                            <td class="text-center"><span class="fw-bold text-white">Sem ${s.semester || '-'}</span>${semBadge}</td>
                             <td><small>${s.email || '-'}</small></td>
                             <td><small>${s.collegeEmail || '-'}</small></td>
                             <td>${s.phone || '-'}</td>
                             <td>${s.parentPhone1 || '-'}</td>
-                            <td>${s.parentPhone2 || '-'}</td>
                             <td>
                                 <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id})" title="Delete student"><i class="fa-solid fa-trash"></i></button>
                             </td>
@@ -3218,7 +3299,40 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
         }).join('')}</tbody>
                 </table>
             </div>`}
+
+            <div class="p-3 rounded border border-info bg-secondary bg-opacity-10 mt-2">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h6 class="fw-bold text-info mb-0"><i class="fa-solid fa-file-arrow-up me-1"></i> Publish PDF / Image File for <span class="text-warning">${section}</span> Only</h6>
+                    <span class="badge bg-secondary">Visible only to ${section} students</span>
+                </div>
+                <form onsubmit="window.publishClassAdvisorDocument(event)">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-1">File Title *</label>
+                            <input type="text" id="caDocTitle" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Updated Sem 4 Circular" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-1">Note / Description</label>
+                            <input type="text" id="caDocNote" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Optional note for class students" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-1">PDF or Image File *</label>
+                            <input type="file" id="caDocFile" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif" class="form-control form-control-sm bg-dark text-white border-secondary" required />
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <button type="submit" class="btn btn-sm btn-info text-dark fw-bold">
+                                <i class="fa-solid fa-upload me-1"></i> Publish
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div id="caDocAlert" class="alert d-none small py-2 mt-2 mb-0"></div>
+                <div id="caPublishedDocsList" class="mt-3 small text-muted">Loading published files for ${section}...</div>
+            </div>
         `;
+        window._caCurrentSection = section;
+        window._caCurrentFaculty = faculty;
+        window.loadCaPublishedDocuments?.(section);
     } catch (e) {
         body.innerHTML = '<div class="alert alert-danger">Error loading students from server.</div>';
     }
@@ -3262,7 +3376,7 @@ window.handleClassAdvisorAddStudent = async function (e, prefilledSection) {
         semester: parseInt(semester),
         department: { name: deptId },
         course: { name: courseId },
-        section: { sectionName: secId }
+        section: { sectionName: buildCanonicalStudentSection(courseId, deptId, secId, semester) }
     };
 
     try {
@@ -9460,5 +9574,234 @@ window.loadAdminViewStudentTt = async function() {
                 <td>${r.count}</td>
             </tr>`).join('')
             : '<tr><td colspan="5" class="text-center text-muted py-2">No courses assigned.</td></tr>';
+    }
+};
+
+// =========================================================================
+// CLASS ADVISOR: SEMESTER CHANGES & CLASS-ISOLATED PDF / IMAGE PUBLISHING
+// =========================================================================
+window.toggleCaSelectAllStudents = function(checked) {
+    document.querySelectorAll('.ca-student-chk').forEach(chk => { chk.checked = !!checked; });
+    window.updateCaSelectedCount();
+};
+
+window.updateCaSelectedCount = function() {
+    const chks = Array.from(document.querySelectorAll('.ca-student-chk'));
+    const selected = chks.filter(c => c.checked).length;
+    const badge = document.getElementById('caSelectedCountBadge');
+    if (badge) badge.innerText = `${selected} selected`;
+    const allChk = document.getElementById('caSelectAllChk');
+    if (allChk && chks.length > 0) allChk.checked = selected === chks.length;
+};
+
+window.applyClassAdvisorSemChanges = async function() {
+    const section = window._caCurrentSection;
+    const faculty = window._caCurrentFaculty;
+    const alertBox = document.getElementById('caSemChangeAlert');
+    const selectedIds = Array.from(document.querySelectorAll('.ca-student-chk:checked'))
+        .map(c => Number(c.value))
+        .filter(Boolean);
+
+    if (selectedIds.length === 0) {
+        if (alertBox) {
+            alertBox.className = 'alert alert-warning small py-2 mt-2 mb-0';
+            alertBox.innerText = 'Please select at least one enrolled student using the checkboxes below.';
+        }
+        return;
+    }
+
+    const newSemester = Number(document.getElementById('caTargetSemSelect')?.value || 4);
+    const note = String(document.getElementById('caSemChangeNote')?.value || '').trim();
+
+    try {
+        const res = await apiFetch('/api/students/bulk-semester', {
+            method: 'POST',
+            body: JSON.stringify({ studentIds: selectedIds, newSemester, note })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed to update semester.');
+
+        showToast('Semester Changes Marked', `Updated ${data.updatedCount || selectedIds.length} student(s) to Semester ${newSemester}.`);
+        if (section && faculty) {
+            await window.renderClassAdvisorStudents(section, faculty);
+            const postAlert = document.getElementById('caSemChangeAlert');
+            if (postAlert) {
+                postAlert.className = 'alert alert-success small py-2 mt-2 mb-0';
+                postAlert.innerText = `Marked Semester ${newSemester} for ${data.updatedCount || selectedIds.length} selected student(s).`;
+            }
+        }
+    } catch (err) {
+        if (alertBox) {
+            alertBox.className = 'alert alert-danger small py-2 mt-2 mb-0';
+            alertBox.innerText = 'Error: ' + err.message;
+        }
+    }
+};
+
+function _renderClassDocsList(docs, canDelete, sectionLabel) {
+    if (!Array.isArray(docs) || docs.length === 0) {
+        return `<div class="text-muted small py-2">No PDF or image files published for ${sectionLabel || 'this class'} yet.</div>`;
+    }
+    const esc = v => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const escJs = v => String(v || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `<div class="list-group list-group-flush">${docs.map(d => {
+        const isPdf = String(d.contentType || '').includes('pdf') || String(d.fileName || '').toLowerCase().endsWith('.pdf');
+        const icon = isPdf ? '<i class="fa-solid fa-file-pdf text-danger me-2 fs-5"></i>' : '<i class="fa-solid fa-file-image text-info me-2 fs-5"></i>';
+        const dateStr = d.createdAt ? String(d.createdAt).replace('T', ' ').slice(0, 16) : '';
+        return `<div class="list-group-item bg-dark text-white border-secondary d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <div class="d-flex align-items-center">${icon}<strong>${esc(d.title)}</strong> <span class="badge bg-secondary ms-2">${esc(d.sectionName)}</span></div>
+                <div class="small text-muted">${esc(d.fileName)}${d.note ? ' &bull; ' + esc(d.note) : ''}${d.publishedBy ? ' &bull; By ' + esc(d.publishedBy) : ''}${dateStr ? ' &bull; ' + dateStr : ''}</div>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <button type="button" class="btn btn-sm btn-outline-info py-0 px-2" onclick="window.previewClassDocument(${d.id}, '${escJs(d.title)}', '${escJs(d.contentType)}', '${escJs(d.fileName)}')">
+                    <i class="fa-solid fa-eye me-1"></i> View
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-success py-0 px-2" onclick="window.downloadClassDocument(${d.id}, '${escJs(d.fileName)}')">
+                    <i class="fa-solid fa-download"></i>
+                </button>
+                ${canDelete ? `<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="window.deleteClassAdvisorDocument(${d.id}, '${escJs(d.sectionName)}')" title="Delete file"><i class="fa-solid fa-trash"></i></button>` : ''}
+            </div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+window.publishClassAdvisorDocument = async function(e) {
+    e.preventDefault();
+    const section = window._caCurrentSection;
+    const faculty = window._caCurrentFaculty;
+    const alertBox = document.getElementById('caDocAlert');
+    const title = String(document.getElementById('caDocTitle')?.value || '').trim();
+    const note = String(document.getElementById('caDocNote')?.value || '').trim();
+    const fileInput = document.getElementById('caDocFile');
+    const file = fileInput?.files?.[0];
+
+    if (!section || !file) {
+        alert('Please select a PDF or image file to publish.');
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('sectionName', section);
+    fd.append('title', title || file.name);
+    fd.append('note', note);
+    fd.append('publishedBy', (faculty && (faculty.displayName || faculty.name)) || 'Class Advisor');
+
+    try {
+        const token = localStorage.getItem('jwt_token') || '';
+        const res = await fetch('/api/class-documents/publish', {
+            method: 'POST',
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+            body: fd
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed to publish file.');
+
+        if (alertBox) {
+            alertBox.className = 'alert alert-success small py-2 mt-2 mb-0';
+            alertBox.innerText = `Published "${data.title || file.name}" to ${section} students only.`;
+        }
+        if (document.getElementById('caDocTitle')) document.getElementById('caDocTitle').value = '';
+        if (document.getElementById('caDocNote')) document.getElementById('caDocNote').value = '';
+        if (fileInput) fileInput.value = '';
+
+        await window.loadCaPublishedDocuments(section);
+        showToast('File Published to Class', `${file.name} is now visible to ${section} students only.`);
+    } catch (err) {
+        if (alertBox) {
+            alertBox.className = 'alert alert-danger small py-2 mt-2 mb-0';
+            alertBox.innerText = 'Error: ' + err.message;
+        }
+    }
+};
+
+window.loadCaPublishedDocuments = async function(section) {
+    const listEl = document.getElementById('caPublishedDocsList');
+    if (!listEl || !section) return;
+    try {
+        const res = await apiFetch('/api/class-documents?section=' + encodeURIComponent(section));
+        if (!res || !res.ok) throw new Error('Load failed');
+        const docs = await res.json();
+        listEl.innerHTML = _renderClassDocsList(docs, true, section);
+    } catch (_) {
+        listEl.innerHTML = '<div class="text-danger small">Could not load published files.</div>';
+    }
+};
+
+window.deleteClassAdvisorDocument = async function(docId, section) {
+    if (!confirm('Delete this published class file?')) return;
+    try {
+        const res = await apiFetch('/api/class-documents/' + docId, { method: 'DELETE' });
+        if (res && res.ok) {
+            await window.loadCaPublishedDocuments(section || window._caCurrentSection);
+            showToast('File Deleted', 'Removed published class file.');
+        }
+    } catch (err) {
+        alert('Delete failed: ' + err.message);
+    }
+};
+
+window.loadStudentClassDocuments = async function() {
+    const bodyEl = document.getElementById('studentClassDocsBody');
+    if (!bodyEl) return;
+    try {
+        const res = await apiFetch('/api/class-documents');
+        if (!res || !res.ok) throw new Error('Could not fetch');
+        const docs = await res.json();
+        bodyEl.innerHTML = _renderClassDocsList(docs, false, currentSection || 'your class');
+    } catch (_) {
+        bodyEl.innerHTML = '<div class="text-muted small">No published files available.</div>';
+    }
+};
+
+window.previewClassDocument = async function(docId, title, contentType, fileName) {
+    const modalEl = document.getElementById('classDocPreviewModal');
+    const titleEl = document.getElementById('classDocPreviewTitle');
+    const bodyEl = document.getElementById('classDocPreviewBody');
+    const dlBtn = document.getElementById('classDocPreviewDownloadBtn');
+    if (!modalEl || !bodyEl) return;
+
+    if (titleEl) titleEl.innerHTML = `<i class="fa-solid fa-file-lines me-2"></i>${String(title || fileName || 'Class File')}`;
+    bodyEl.innerHTML = '<div class="py-5"><div class="spinner-border text-info"></div><div class="small text-muted mt-2">Loading file...</div></div>';
+    if (dlBtn) dlBtn.onclick = () => window.downloadClassDocument(docId, fileName);
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+
+    try {
+        const res = await apiFetch('/api/class-documents/' + docId + '/file');
+        if (!res || !res.ok) throw new Error('You do not have permission to view this file.');
+        const blob = await res.blob();
+        if (window._activeClassDocBlobUrl) URL.revokeObjectURL(window._activeClassDocBlobUrl);
+        const blobUrl = URL.createObjectURL(blob);
+        window._activeClassDocBlobUrl = blobUrl;
+
+        const isPdf = String(contentType || '').includes('pdf') || String(fileName || '').toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+            bodyEl.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:72vh; border:none; border-radius:6px; background:#fff;"></iframe>`;
+        } else {
+            bodyEl.innerHTML = `<img src="${blobUrl}" alt="${String(title || fileName)}" style="max-width:100%; max-height:72vh; object-fit:contain; border-radius:6px;" />`;
+        }
+    } catch (err) {
+        bodyEl.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+};
+
+window.downloadClassDocument = async function(docId, fileName) {
+    try {
+        const res = await apiFetch('/api/class-documents/' + docId + '/file');
+        if (!res || !res.ok) throw new Error('Download failed.');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'class-document';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+        alert(err.message);
     }
 };

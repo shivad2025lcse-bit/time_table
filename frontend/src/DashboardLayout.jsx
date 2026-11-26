@@ -138,7 +138,7 @@ export default function DashboardLayout() {
                                         <i className="fa-solid fa-eye" id="loginPasswordEye"></i>
                                     </button>
                                 </div>
-                                <div className="form-text text-muted">Enter your password. For new accounts use your Register Number as username and <code>student123</code> as password.</div>
+                                <div id="loginPasswordHint" className="form-text text-muted">Enter your password. Initial password for Faculty/Admin is <code>password123</code>.</div>
                             </div>
 
                             <button type="submit" id="roleLoginBtn" className="btn btn-primary w-100 fw-bold">
@@ -322,6 +322,9 @@ export default function DashboardLayout() {
                                     </button>
                                     <button className="sidebar-nav-link" onClick={() => { window.showTtPopup && window.showTtPopup(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-regular fa-calendar fa-fw me-3 text-primary"></i> Timetable
+                                    </button>
+                                    <button className="sidebar-nav-link" onClick={() => { window.loadStudentClassDocuments && window.loadStudentClassDocuments(); document.getElementById('studentClassDocsArea')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); if (window.innerWidth <= 992) setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-file-pdf fa-fw me-3 text-info"></i> Class Files / Notices
                                     </button>
                                 </>
                             )}
@@ -519,6 +522,18 @@ export default function DashboardLayout() {
                                         </table>
                                     </div>
                                 </div>
+
+                            <div className="glass-panel mt-3" id="studentClassDocsArea">
+                                <div className="panel-header d-flex justify-content-between align-items-center">
+                                    <h3 className="panel-title"><i className="fa-solid fa-file-pdf text-info me-2"></i> Class Advisor Notices &amp; Files (Class Only)</h3>
+                                    <button type="button" className="btn btn-sm btn-outline-info py-0 px-2" onClick={() => window.loadStudentClassDocuments?.()}>
+                                        <i className="fa-solid fa-rotate me-1"></i> Refresh
+                                    </button>
+                                </div>
+                                <div className="p-3" id="studentClassDocsBody">
+                                    <div className="small text-muted">Loading class documents...</div>
+                                </div>
+                            </div>
                         </div>
                             )}
                             {isFaculty && (
@@ -2853,6 +2868,28 @@ export default function DashboardLayout() {
                         </div>
                         <div className="modal-footer border-secondary">
                             <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ===== Class Document Preview Modal (PDF / Image) ===== */}
+            <div className="modal fade" id="classDocPreviewModal" tabIndex="-1">
+                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-info fw-bold" id="classDocPreviewTitle">
+                                <i className="fa-solid fa-file-lines me-2"></i> Class Document Preview
+                            </h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div className="modal-body p-3 text-center" id="classDocPreviewBody" style={{ minHeight: "420px" }}>
+                        </div>
+                        <div className="modal-footer border-secondary">
+                            <button type="button" className="btn btn-outline-info btn-sm" id="classDocPreviewDownloadBtn">
+                                <i className="fa-solid fa-download me-1"></i> Download File
+                            </button>
+                            <button type="button" className="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
                 </div>
