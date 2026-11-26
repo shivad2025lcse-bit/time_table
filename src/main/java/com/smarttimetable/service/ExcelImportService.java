@@ -141,6 +141,11 @@ public class ExcelImportService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> saveManualTimetable(String sectionName, Map<String, Map<String, String>> gridData) throws Exception {
+        return saveManualTimetable(sectionName, null, gridData);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> saveManualTimetable(String sectionName, Integer explicitSemester, Map<String, Map<String, String>> gridData) throws Exception {
         String cleanSection = (sectionName != null && !sectionName.trim().isEmpty()) ? sectionName.trim() : "II CSE C";
         Section section = sectionRepository.findBySectionName(cleanSection).orElse(null);
 
@@ -149,16 +154,23 @@ public class ExcelImportService {
             String yr = tokens.length >= 1 ? tokens[0] : "II";
             String dp = tokens.length >= 2 ? tokens[1] : "CSE";
             String sc = tokens.length >= 3 ? tokens[2] : "A";
-            return assignUploadedClassTimetable(dp, yr, sc, cleanSection, null, gridData);
+            return assignUploadedClassTimetable(dp, yr, sc, cleanSection, null, explicitSemester, gridData);
         }
 
-        int semester = section.getSemester() != null ? section.getSemester() : 3;
+        int semester = (explicitSemester != null && explicitSemester >= 1 && explicitSemester <= 8)
+                ? explicitSemester
+                : (section.getSemester() != null ? section.getSemester() : 3);
+        if (section.getSemester() == null) {
+            section.setSemester(semester);
+            section = sectionRepository.save(section);
+        }
         int savedCount = replaceSectionTimetableFromGrid(section, semester, gridData);
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("message", "Timetable saved successfully to Database (" + savedCount + " periods for " + section.getSectionName() + ").");
+        response.put("message", "Timetable saved successfully to Database (" + savedCount + " periods for " + section.getSectionName() + ", Sem " + semester + ").");
         response.put("sectionName", section.getSectionName());
         response.put("sectionId", section.getId());
+        response.put("semester", semester);
         response.put("entriesSaved", savedCount);
         return response;
     }
@@ -171,6 +183,18 @@ public class ExcelImportService {
             String sectionName,
             String classAdvisorUsernameOrName,
             Map<String, Map<String, String>> gridData) throws Exception {
+        return assignUploadedClassTimetable(deptCodeOrName, yearRomanOrNum, secCode, sectionName, classAdvisorUsernameOrName, null, gridData);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> assignUploadedClassTimetable(
+            String deptCodeOrName,
+            String yearRomanOrNum,
+            String secCode,
+            String sectionName,
+            String classAdvisorUsernameOrName,
+            Integer explicitSemester,
+            Map<String, Map<String, String>> gridData) throws Exception {
 
         String cleanDept = (deptCodeOrName != null && !deptCodeOrName.trim().isEmpty()) ? deptCodeOrName.trim() : "CSE";
         String cleanYear = (yearRomanOrNum != null && !yearRomanOrNum.trim().isEmpty()) ? yearRomanOrNum.trim() : "II";
@@ -180,7 +204,8 @@ public class ExcelImportService {
                 : (cleanYear + " " + cleanDept + " " + cleanSec);
 
         int yearInt = parseYearToInt(cleanYear);
-        int semester = Math.max(1, Math.min(8, yearInt * 2 - 1));
+        int defaultSem = Math.max(1, Math.min(8, yearInt * 2 - 1));
+        int semester = (explicitSemester != null && explicitSemester >= 1 && explicitSemester <= 8) ? explicitSemester : defaultSem;
 
         // 1. Resolve or create Department
         Department dept = departmentRepository.findByCode(cleanDept)
@@ -216,6 +241,12 @@ public class ExcelImportService {
             return sectionRepository.save(s);
         });
 
+        // Preserve existing section active semester unless unset so unpromoted students are not dragged to the new semester
+        if (section.getSemester() == null) {
+            section.setSemester(semester);
+            section = sectionRepository.save(section);
+        }
+
         // 4. Update Class Advisor if specified
         String assignedAdvisorName = "";
         List<Teacher> allTeachers = teacherRepository.findAll();
@@ -245,16 +276,19 @@ public class ExcelImportService {
         int savedCount = replaceSectionTimetableFromGrid(section, semester, gridData);
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("message", "Assigned timetable (" + savedCount + " periods) to " + targetSectionName + ".");
+        response.put("message", "Assigned timetable (" + savedCount + " periods, Sem " + semester + ") to " + targetSectionName + ".");
         response.put("sectionName", targetSectionName);
         response.put("sectionId", section.getId());
+        response.put("semester", semester);
         response.put("entriesSaved", savedCount);
         response.put("classAdvisor", assignedAdvisorName);
         return response;
     }
 
     private int replaceSectionTimetableFromGrid(Section section, int semester, Map<String, Map<String, String>> gridData) {
-        List<TimetableEntry> existing = timetableRepository.findBySectionId(section.getId());
+        List<TimetableEntry> existing = timetableRepository.findBySectionId(section.getId()).stream()
+                .filter(e -> e.getSemester() == null || Objects.equals(e.getSemester(), semester))
+                .collect(java.util.stream.Collectors.toList());
         if (!existing.isEmpty()) {
             timetableRepository.deleteAll(existing);
         }

@@ -75,11 +75,12 @@ public class TimetableController {
             String sec = (String) request.get("sectionCode");
             String sectionName = (String) request.get("sectionName");
             String classAdvisor = (String) request.get("classAdvisor");
+            Integer semester = request.get("semester") != null ? Integer.valueOf(request.get("semester").toString()) : null;
             @SuppressWarnings("unchecked")
             java.util.Map<String, java.util.Map<String, String>> gridData =
                     (java.util.Map<String, java.util.Map<String, String>>) request.get("grid");
             return ResponseEntity.ok(excelImportService.assignUploadedClassTimetable(
-                    dept, year, sec, sectionName, classAdvisor, gridData));
+                    dept, year, sec, sectionName, classAdvisor, semester, gridData));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Class assignment failed"));
@@ -112,7 +113,10 @@ public class TimetableController {
             if (user != null) {
                 Student student = studentRepository.findByUserId(user.getId()).orElse(null);
                 if (student != null && student.getSection() != null) {
-                    List<TimetableEntry> entries = timetableRepository.findBySectionId(student.getSection().getId());
+                    Integer targetSem = student.getSemester() != null ? student.getSemester() : student.getSection().getSemester();
+                    List<TimetableEntry> entries = timetableRepository.findBySectionId(student.getSection().getId()).stream()
+                            .filter(e -> targetSem == null || java.util.Objects.equals(e.getSemester(), targetSem))
+                            .collect(Collectors.toList());
                     return ResponseEntity.ok(entries.stream()
                             .map(timetableGeneratorService::convertToDto)
                             .collect(Collectors.toList()));
@@ -204,7 +208,11 @@ public class TimetableController {
     }
 
     @GetMapping("/section/{sectionId}")
-    public ResponseEntity<List<TimetableEntryDto>> getSectionTimetable(@PathVariable Long sectionId, Authentication authentication) {
+    public ResponseEntity<List<TimetableEntryDto>> getSectionTimetable(
+            @PathVariable Long sectionId,
+            @RequestParam(required = false) Integer semester,
+            Authentication authentication) {
+        Integer studentSem = null;
         if (authentication != null && authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))) {
             String username = authentication.getName();
             User user = userRepository.findByUsername(username).orElse(null);
@@ -213,9 +221,16 @@ public class TimetableController {
                 if (student == null || student.getSection() == null || !student.getSection().getId().equals(sectionId)) {
                     return ResponseEntity.status(403).build();
                 }
+                studentSem = student.getSemester() != null ? student.getSemester() : student.getSection().getSemester();
             }
         }
+        final Integer filterSem = studentSem != null ? studentSem : semester;
         List<TimetableEntry> entries = timetableRepository.findBySectionId(sectionId);
+        if (filterSem != null) {
+            entries = entries.stream()
+                    .filter(e -> java.util.Objects.equals(e.getSemester(), filterSem))
+                    .collect(Collectors.toList());
+        }
         return ResponseEntity.ok(entries.stream()
                 .map(timetableGeneratorService::convertToDto)
                 .collect(Collectors.toList()));
@@ -264,8 +279,10 @@ public class TimetableController {
     public ResponseEntity<?> saveManualTimetable(@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> request) {
         try {
             String sectionName = (String) request.get("section");
+            Integer semester = request.get("semester") != null ? Integer.valueOf(request.get("semester").toString()) : null;
+            @SuppressWarnings("unchecked")
             java.util.Map<String, java.util.Map<String, String>> gridData = (java.util.Map<String, java.util.Map<String, String>>) request.get("grid");
-            java.util.Map<String, Object> result = excelImportService.saveManualTimetable(sectionName, gridData);
+            java.util.Map<String, Object> result = excelImportService.saveManualTimetable(sectionName, semester, gridData);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", "Manual save failed: " + e.getMessage()));

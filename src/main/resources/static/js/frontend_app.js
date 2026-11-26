@@ -1632,7 +1632,8 @@ function renderTimetableGrid() {
         if (match) secString = match[1].split('-')[0].trim();
     }
     
-    if (secString) {
+    const roleForGrid = typeof getEffectiveRole === 'function' ? getEffectiveRole() : currentUserRole;
+    if (secString && roleForGrid !== 'STUDENT') {
         try {
             const manualData = JSON.parse(localStorage.getItem('class_tt_' + secString));
             const manualCols = JSON.parse(localStorage.getItem('mc_tt_cols_' + secString));
@@ -1720,9 +1721,12 @@ function renderTimetableGrid() {
         }
     }
     if (!data) {
-        const roleNow = typeof getEffectiveRole === 'function' ? getEffectiveRole() : currentUserRole;
-        if (roleNow === 'STUDENT' && window.currentTimetableEntriesLoaded) {
-            // Authoritative DB returned no entries for this student's class — do not fall back to another class's localStorage
+        if (roleForGrid === 'STUDENT' && window.currentTimetableEntriesLoaded) {
+            // Authoritative DB returned no entries for this student's current semester — do not show old-semester or other-class cached timetables
+            const semBadge = window.currentStudentSemester ? `Semester ${window.currentStudentSemester}` : 'your current semester';
+            const warnTr = document.createElement('tr');
+            warnTr.innerHTML = `<td colspan="10" class="text-center py-3 bg-dark border border-warning text-warning small fw-semibold"><i class="fa-solid fa-clock me-2"></i>No timetable has been assigned yet for <strong>${semBadge}</strong>. Your previous semester timetable is hidden until Admin assigns your new semester timetable.</td>`;
+            tbody.appendChild(warnTr);
             data = {};
             days.forEach(day => {
                 data[day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
@@ -7109,7 +7113,11 @@ window.saveTimetableBuilder = async function() {
     try {
         const res = await apiFetch('/api/timetable/save-manual', {
             method: 'POST',
-            body: JSON.stringify({ section: section, grid: data.grid })
+            body: JSON.stringify({
+                section: section,
+                semester: parseInt(data.metadata.semester, 10) || 3,
+                grid: data.grid
+            })
         });
         if (res && res.ok) {
             const resData = await res.json();
@@ -7419,7 +7427,21 @@ window.fetchStudentDynamicDashboard = async function() {
         if(nameBox) nameBox.innerText = data.status.replace(/_/g, " ");
         if(timeBox) timeBox.innerText = "--:--";
 
-        if (data.status === "HOLIDAY" || data.status === "BEFORE_COLLEGE" || data.status === "AFTER_COLLEGE") {
+        window.currentStudentSemester = data.student?.semester || null;
+        window.awaitingStudentTimetable = Boolean(data.awaitingTimetable);
+
+        if (data.awaitingTimetable) {
+            if (statusBox) statusBox.classList.remove("d-none");
+            if (statusText) {
+                statusText.innerText = "AWAITING NEW TT";
+                statusText.className = "fw-bold mb-0 text-warning";
+            }
+            if (nameBox) nameBox.innerText = "New Semester Timetable Not Assigned Yet";
+            if (timeBox) timeBox.innerText = data.student?.semester ? `Semester ${data.student.semester}` : "Pending Admin Assignment";
+            if (window.currentTimetableEntriesLoaded && typeof renderTimetableGrid === 'function') {
+                renderTimetableGrid();
+            }
+        } else if (data.status === "HOLIDAY" || data.status === "BEFORE_COLLEGE" || data.status === "AFTER_COLLEGE") {
             if(statusBox) statusBox.classList.remove("d-none");
             if(statusText) {
                  statusText.innerText = data.status === "HOLIDAY" ? "Holiday! No Classes" : (data.status === "BEFORE_COLLEGE" ? "Classes haven't started yet" : "Classes are over for today");
@@ -9086,9 +9108,10 @@ window.updateUploadAssignSectionBadge = function() {
     const dept = (document.getElementById('uatDeptSelect')?.value || 'CSE').trim();
     const year = (document.getElementById('uatYearSelect')?.value || 'II').trim();
     const sec = (document.getElementById('uatSecInput')?.value || 'C').trim().toUpperCase();
+    const sem = (document.getElementById('uatSemSelect')?.value || '3').trim();
     const fullName = `${year} ${dept} ${sec}`;
     const badge = document.getElementById('uatTargetSectionBadge');
-    if (badge) badge.innerText = fullName;
+    if (badge) badge.innerText = `${fullName} • Sem ${sem}`;
 
     // Auto-select existing advisor for that section if known
     const advisorSel = document.getElementById('uatAdvisorSelect');
@@ -9257,6 +9280,7 @@ window.handleUploadAssignTtFile = async function(event) {
 window.assignUploadedClassTimetable = async function() {
     const dept = (document.getElementById('uatDeptSelect')?.value || '').trim();
     const year = (document.getElementById('uatYearSelect')?.value || '').trim();
+    const semester = parseInt(document.getElementById('uatSemSelect')?.value || '3', 10);
     const secCode = (document.getElementById('uatSecInput')?.value || '').trim().toUpperCase();
     const advisorSel = document.getElementById('uatAdvisorSelect');
     const advisorVal = advisorSel ? advisorSel.value : '';
@@ -9285,6 +9309,7 @@ window.assignUploadedClassTimetable = async function() {
             body: JSON.stringify({
                 department: dept,
                 year: year,
+                semester: semester,
                 sectionCode: secCode,
                 sectionName: fullSectionName,
                 classAdvisor: advisorVal,
@@ -9298,7 +9323,7 @@ window.assignUploadedClassTimetable = async function() {
         const builtData = {
             advisor: data.classAdvisor || advisorLabel || '',
             tutors: '',
-            metadata: { batch: '2024', year: year, semester: '3' },
+            metadata: { batch: '2024', year: year, semester: String(semester) },
             headers: {},
             grid: grid
         };
@@ -9454,12 +9479,15 @@ window.loadAdminViewStudentTt = async function() {
     const grid = {};
     days.forEach(d => { grid[d] = Array.from({ length: 7 }, () => ({ sub: 'FREE', code: '', faculty: '', venue: '', cat: 'cat-theory' })); });
 
+    const selectedSem = document.getElementById('vstSemSelect')?.value || '';
+    const semQuery = selectedSem ? `?semester=${encodeURIComponent(selectedSem)}` : '';
+
     let loadedCount = 0;
     let sourceLabel = 'Database';
 
     if (secId) {
         try {
-            const res = await apiFetch(`/api/timetable/section/${secId}`);
+            const res = await apiFetch(`/api/timetable/section/${secId}${semQuery}`);
             if (res && res.ok) {
                 const entries = await res.json();
                 if (Array.isArray(entries) && entries.length > 0) {
@@ -9488,7 +9516,7 @@ window.loadAdminViewStudentTt = async function() {
         }
     }
 
-    if (loadedCount === 0) {
+    if (loadedCount === 0 && !selectedSem) {
         const localBuilt = localStorage.getItem(`sece_tt_built_${targetName}`);
         if (localBuilt) {
             try {
@@ -9513,13 +9541,14 @@ window.loadAdminViewStudentTt = async function() {
         }
     }
 
+    const semLabel = selectedSem ? `Sem ${selectedSem}` : 'Active Sem';
     if (metaBar) {
-        metaBar.innerHTML = `<span><i class="fa-solid fa-graduation-cap me-1"></i>Section: <strong class="text-white">${targetName}</strong></span>
+        metaBar.innerHTML = `<span><i class="fa-solid fa-graduation-cap me-1"></i>Section: <strong class="text-white">${targetName}</strong> <span class="badge bg-info text-dark ms-1">${semLabel}</span></span>
             <span><span class="badge ${loadedCount > 0 ? 'bg-success' : 'bg-secondary'}">${loadedCount} periods loaded (${sourceLabel})</span></span>`;
     }
     if (loadedCount === 0 && alertEl) {
         alertEl.className = 'alert alert-warning small py-2 mb-2';
-        alertEl.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i>No timetable has been saved yet for <strong>${targetName}</strong>. Upload or build one using <strong>Upload &amp; Assign Class TT</strong>.`;
+        alertEl.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i>No timetable has been saved yet for <strong>${targetName} (${semLabel})</strong>. Upload or build one using <strong>Upload &amp; Assign Class TT</strong>.`;
     }
 
     const esc = v => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

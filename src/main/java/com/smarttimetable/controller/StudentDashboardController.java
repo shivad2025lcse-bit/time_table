@@ -63,7 +63,10 @@ public class StudentDashboardController {
         // Sort by parsed start time
         allSlots.sort(Comparator.comparing(slot -> parseTime(slot.getStartTime())));
 
-        List<TimetableEntry> sectionEntries = timetableRepository.findBySectionId(section.getId());
+        Integer targetSem = student.getSemester() != null ? student.getSemester() : section.getSemester();
+        List<TimetableEntry> sectionEntries = timetableRepository.findBySectionId(section.getId()).stream()
+                .filter(e -> targetSem == null || Objects.equals(e.getSemester(), targetSem))
+                .collect(Collectors.toList());
         List<TimetableEntry> todayEntries = sectionEntries.stream()
                 .filter(e -> e.getDay().equalsIgnoreCase(dayFormatted))
                 .collect(Collectors.toList());
@@ -73,6 +76,7 @@ public class StudentDashboardController {
         Map<String, Object> studentInfo = new HashMap<>();
         studentInfo.put("id", student.getId());
         studentInfo.put("year", resolveYearLabel(student, section));
+        studentInfo.put("semester", targetSem);
         String deptCode = (student.getDepartment() != null && student.getDepartment().getCode() != null)
                 ? student.getDepartment().getCode()
                 : (section.getCourse() != null && section.getCourse().getDepartment() != null
@@ -83,6 +87,7 @@ public class StudentDashboardController {
         studentInfo.put("section", secFull.contains(" ") ? secFull.substring(secFull.lastIndexOf(" ") + 1) : secFull);
         studentInfo.put("fullSectionName", secFull);
         response.put("student", studentInfo);
+        response.put("awaitingTimetable", sectionEntries.isEmpty());
         
         response.put("date", today.toString());
         response.put("day", dayFormatted);

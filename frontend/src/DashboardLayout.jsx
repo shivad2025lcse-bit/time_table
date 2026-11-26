@@ -239,7 +239,7 @@ export default function DashboardLayout() {
                             {isAdmin && (
                                 <>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageStudentsModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
-                                        <i className="fa-solid fa-users fa-fw me-3" style={{color: '#a855f7'}}></i> Add Students
+                                        <i className="fa-solid fa-users fa-fw me-3" style={{ color: '#a855f7' }}></i> Add Students
                                     </button>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageAnnouncementsModal" onClick={() => { window.renderManageAnnouncementsList && window.renderManageAnnouncementsList(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-bullhorn fa-fw me-3 text-success"></i> Announcements
@@ -248,7 +248,7 @@ export default function DashboardLayout() {
                                         <i className="fa-solid fa-user-tie fa-fw me-3 text-warning"></i> Manage Class Advisors
                                     </button>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageRosterModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
-                                        <i className="fa-solid fa-users-gear fa-fw me-3" style={{color: 'var(--sece-indigo)'}}></i> Manage Roster
+                                        <i className="fa-solid fa-users-gear fa-fw me-3" style={{ color: 'var(--sece-indigo)' }}></i> Manage Roster
                                     </button>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminAbsentNotifModal" onClick={() => { window.renderAdminLeaveNotifications?.(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-bell fa-fw me-3 text-warning"></i> Notifications
@@ -329,7 +329,7 @@ export default function DashboardLayout() {
                                 </>
                             )}
                         </nav>
-                        
+
                         {/* Download TT - Shared */}
                         <div className="px-2 mb-3 dropdown">
                             <button className="btn btn-sm btn-success dropdown-toggle fw-bold d-flex align-items-center justify-content-center gap-2 w-100" type="button" data-bs-toggle="dropdown">
@@ -341,7 +341,7 @@ export default function DashboardLayout() {
                                 <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.print(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-pdf me-2 text-danger"></i> Print / PDF</a></li>
                             </ul>
                         </div>
-                        
+
                         <div className="mt-auto pt-3 border-top border-secondary">
                             <button className="sidebar-nav-link text-danger" onClick={() => window.logoutUser?.()}>
                                 <i className="fa-solid fa-right-from-bracket fa-fw me-3"></i> Logout
@@ -356,30 +356,30 @@ export default function DashboardLayout() {
                     <main className="app-main container-fluid px-4 py-3">
                         {/* Student Dashboard Dynamic Current Period Card */}
                         <div id="studentDynamicDashboard" className="d-none mb-4 row justify-content-start">
-                            
+
                             {/* Current Period Card */}
                             <div className="col-lg-4 col-md-5 col-sm-8 mb-3">
-                                <div className="card bg-dark text-white border-secondary shadow-sm h-100" style={{borderRadius: "10px", overflow: "hidden"}}>
+                                <div className="card bg-dark text-white border-secondary shadow-sm h-100" style={{ borderRadius: "10px", overflow: "hidden" }}>
                                     <div className="card-header border-secondary bg-primary bg-gradient py-2">
                                         <h6 className="mb-0 fw-bold small"><i className="fa-solid fa-clock me-2"></i>CURRENT PERIOD</h6>
                                     </div>
                                     <div className="card-body p-3">
                                         <div className="d-flex justify-content-between align-items-center mb-1">
                                             <h6 id="dynCurrentName" className="fw-bold text-info mb-0">Loading...</h6>
-                                            <span id="dynCurrentTime" className="badge bg-secondary" style={{fontSize: "0.7rem"}}>--:--</span>
+                                            <span id="dynCurrentTime" className="badge bg-secondary" style={{ fontSize: "0.7rem" }}>--:--</span>
                                         </div>
-                                        
+
                                         <div id="dynCurrentDetails" className="mt-2">
                                             <h5 id="dynCurrentSubject" className="fw-bold mb-2 text-warning">Please wait</h5>
                                             <p className="mb-1 small text-light"><i className="fa-solid fa-user-tie me-2 text-secondary"></i><span id="dynCurrentFaculty"></span></p>
                                             <p className="mb-0 small text-light"><i className="fa-solid fa-location-dot me-2 text-secondary"></i>Room: <span id="dynCurrentRoom"></span></p>
                                         </div>
-                                        
+
                                         <div id="dynCurrentStatusMessage" className="d-none mt-2 text-center">
                                             <h5 id="dynStatusText" className="fw-bold mb-0 text-success"></h5>
                                         </div>
                                     </div>
-                                    <div className="card-footer border-secondary bg-dark" style={{fontSize: "0.75rem"}}>
+                                    <div className="card-footer border-secondary bg-dark" style={{ fontSize: "0.75rem" }}>
                                         <div className="d-flex justify-content-between align-items-center text-muted">
                                             <span id="dynStudentProfile"><i className="fa-solid fa-graduation-cap me-1"></i>...</span>
                                             <span id="dynNextPeriodBadge" className="badge bg-secondary d-none px-2 py-1">Next: <span id="dynNextPeriodText"></span></span>
@@ -387,7 +387,7 @@ export default function DashboardLayout() {
                                     </div>
                                 </div>
                             </div>
-                            
+
                         </div>
 
                         {/* Student Upcoming Class Alert (Legacy) */}
@@ -399,112 +399,112 @@ export default function DashboardLayout() {
                             </div>
                         </div>
 
-                    {/* Faculty Next Class Alert */}
-                    <div id="facultyNextClassAlert" className="alert alert-primary d-none mb-3 align-items-center shadow-sm" role="alert" style={{ borderLeft: "4px solid #0d6efd" }}>
-                        <i className="fa-solid fa-person-chalkboard fa-2x me-3 text-primary"></i>
-                        <div>
-                            <h6 className="alert-heading mb-1 fw-bold" id="facultyNextClassTitle">Your Next Class</h6>
-                            <p className="mb-0 text-dark" id="facultyNextClassText">Loading...</p>
+                        {/* Faculty Next Class Alert */}
+                        <div id="facultyNextClassAlert" className="alert alert-primary d-none mb-3 align-items-center shadow-sm" role="alert" style={{ borderLeft: "4px solid #0d6efd" }}>
+                            <i className="fa-solid fa-person-chalkboard fa-2x me-3 text-primary"></i>
+                            <div>
+                                <h6 className="alert-heading mb-1 fw-bold" id="facultyNextClassTitle">Your Next Class</h6>
+                                <p className="mb-0 text-dark" id="facultyNextClassText">Loading...</p>
+                            </div>
                         </div>
-                    </div>
 
-                    {isFaculty && (
-                        <div id="facultyAdminTtChangeBanner" className="d-none mb-3"></div>
-                    )}
-
+                        {isFaculty && (
+                            <div id="facultyAdminTtChangeBanner" className="d-none mb-3"></div>
+                        )}
 
 
 
 
-                            <div id="roleBanner" className="alert alert-info py-2 px-3 border-0 rounded-3 d-flex align-items-center justify-content-between mb-3 shadow-sm">
-                                <div id="roleBannerTextContainer">
-                                    <i className="fa-solid fa-shield-halved me-2"></i>
-                                    <span id="roleBannerText">Logged in as <strong>ADMIN</strong>. Click on any period cell in the grid to edit schedule, swap slots, or assign Placement ALT.</span>
-                                </div>
-                                <div className="d-flex align-items-center gap-2">
-                                    <button id="quickAssignBtn" className="btn btn-sm btn-outline-dark py-0 border-0 d-none" onClick={() => window.quickAssignWednesdayALT()}><i className="fa-solid fa-bolt text-warning me-1"></i> Quick Preset: Wed 4,5 ALT</button>
-                                    <button id="resetTimetableBtn" className="btn btn-sm btn-outline-danger py-0 d-none" onClick={() => window.resetTimetableEdits()}><i className="fa-solid fa-rotate-left me-1"></i> Reset Edits to Default</button>
-                                    <button className="btn btn-sm btn-success py-0" onClick={() => window.downloadTimetablePNG()}><i className="fa-solid fa-download me-1"></i> Download PNG</button>
-                                </div>
+
+                        <div id="roleBanner" className="alert alert-info py-2 px-3 border-0 rounded-3 d-flex align-items-center justify-content-between mb-3 shadow-sm">
+                            <div id="roleBannerTextContainer">
+                                <i className="fa-solid fa-shield-halved me-2"></i>
+                                <span id="roleBannerText">Logged in as <strong>ADMIN</strong>. Click on any period cell in the grid to edit schedule, swap slots, or assign Placement ALT.</span>
                             </div>
-
-                            <div id="notifStatusPanel" className="alert alert-secondary py-2 px-3 border-0 rounded-3 mb-3 shadow-sm small">
+                            <div className="d-flex align-items-center gap-2">
+                                <button id="quickAssignBtn" className="btn btn-sm btn-outline-dark py-0 border-0 d-none" onClick={() => window.quickAssignWednesdayALT()}><i className="fa-solid fa-bolt text-warning me-1"></i> Quick Preset: Wed 4,5 ALT</button>
+                                <button id="resetTimetableBtn" className="btn btn-sm btn-outline-danger py-0 d-none" onClick={() => window.resetTimetableEdits()}><i className="fa-solid fa-rotate-left me-1"></i> Reset Edits to Default</button>
+                                <button className="btn btn-sm btn-success py-0" onClick={() => window.downloadTimetablePNG()}><i className="fa-solid fa-download me-1"></i> Download PNG</button>
                             </div>
+                        </div>
 
-                            <div id="adminTTPlaceholder" className="alert alert-warning py-3 px-4 border-0 rounded-3 mb-4 shadow-sm text-center d-none">
-                                <i className="fa-solid fa-circle-info me-2 fs-5 mb-2 d-block"></i>
-                                <strong>Please select a Department and Section from the dropdowns above to view and edit its timetable.</strong>
-                            </div>
+                        <div id="notifStatusPanel" className="alert alert-secondary py-2 px-3 border-0 rounded-3 mb-3 shadow-sm small">
+                        </div>
 
-                            {isStudent && (
+                        <div id="adminTTPlaceholder" className="alert alert-warning py-3 px-4 border-0 rounded-3 mb-4 shadow-sm text-center d-none">
+                            <i className="fa-solid fa-circle-info me-2 fs-5 mb-2 d-block"></i>
+                            <strong>Please select a Department and Section from the dropdowns above to view and edit its timetable.</strong>
+                        </div>
+
+                        {isStudent && (
                             <div id="ttPopupOverlayWrapper" className="tt-popup-wrapper">
                                 <button id="closeTtPopupBtn" className="btn btn-danger btn-sm d-none" style={{ position: 'fixed', top: '20px', right: '30px', zIndex: 10001, borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }} onClick={() => window.closeTtPopup?.()}><i className="fa-solid fa-xmark"></i></button>
 
                                 <div className="glass-panel" id="timetableCaptureArea">
                                     <div className="panel-header">
-                                    <h2 className="panel-title d-flex align-items-center gap-2">
-                                        <i className="fa-solid fa-calendar-days text-info"></i>
-                                        <span id="ttTitleHeader" style={{ outline: "none", padding: "2px 5px", borderRadius: "4px", border: "1px dashed transparent" }}>Class Timetable - Academic Schedule</span>
-                                        <i id="ttTitleEditIcon" className="fa-solid fa-pencil text-muted d-none" style={{ fontSize: "0.8rem", cursor: "pointer" }} title="Edit Title"></i>
-                                    </h2>
-                                    <div className="d-flex align-items-center gap-2">
-                                        {isStudent && (
-                                            <button className="btn btn-sm btn-outline-danger ms-2" onClick={() => document.getElementById('ttPopupOverlayWrapper')?.classList.add('d-none')} title="Close Timetable">
-                                                <i className="fa-solid fa-xmark"></i>
-                                            </button>
-                                        )}
+                                        <h2 className="panel-title d-flex align-items-center gap-2">
+                                            <i className="fa-solid fa-calendar-days text-info"></i>
+                                            <span id="ttTitleHeader" style={{ outline: "none", padding: "2px 5px", borderRadius: "4px", border: "1px dashed transparent" }}>Class Timetable - Academic Schedule</span>
+                                            <i id="ttTitleEditIcon" className="fa-solid fa-pencil text-muted d-none" style={{ fontSize: "0.8rem", cursor: "pointer" }} title="Edit Title"></i>
+                                        </h2>
+                                        <div className="d-flex align-items-center gap-2">
+                                            {isStudent && (
+                                                <button className="btn btn-sm btn-outline-danger ms-2" onClick={() => document.getElementById('ttPopupOverlayWrapper')?.classList.add('d-none')} title="Close Timetable">
+                                                    <i className="fa-solid fa-xmark"></i>
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="p-3 tt-table-wrapper">
-                                    <table className={`tt-table ${isStudent ? 'student-view-tt' : ''}`}>
-                                        <thead>
-                                            <tr>
-                                                <th style={{ width: "100px" }}>Day Order</th>
-                                                <th>1<br /><small className="text-dim" id="ttHeaderP1">08.40 - 09.40</small></th>
-                                                <th>2<br /><small className="text-dim" id="ttHeaderP2">09.40 - 10.40</small></th>
-                                                <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderTea">10.40<br/>-<br/>11.00</th>
-                                                <th>3<br /><small className="text-dim" id="ttHeaderP3">11.00 - 12.00</small></th>
-                                                <th>4<br /><small className="text-dim" id="ttHeaderP4">12.00 - 01.00</small></th>
-                                                <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderLunch">01.00<br/>-<br/>01.40</th>
-                                                <th>5<br /><small className="text-dim" id="ttHeaderP5">01.40 - 02.30</small></th>
-                                                <th>ACT<br /><small className="text-dim" id="ttHeaderAct">Activity</small></th>
-                                                <th>6<br /><small className="text-dim" id="ttHeaderP6">02.30 - 03.20</small></th>
-                                                <th>7<br /><small className="text-dim" id="ttHeaderP7">03.20 - 04.10</small></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="ttGridBody">
-
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            {!isFaculty && (
-                                <div className="glass-panel" id="referenceTableArea">
-                                    <div className="panel-header">
-                                        <h3 className="panel-title"><i className="fa-solid fa-book-bookmark text-warning"></i> Course & Faculty Incharge Reference Table</h3>
-                                    </div>
-                                    <div className="table-responsive p-2">
-                                        <table className="ref-table">
+                                    <div className="p-3 tt-table-wrapper">
+                                        <table className={`tt-table ${isStudent ? 'student-view-tt' : ''}`}>
                                             <thead>
                                                 <tr>
-                                                    <th>Short Name</th>
-                                                    <th>Course Code & Title</th>
-                                                    <th>Faculty Incharge</th>
-                                                    <th>Venue</th>
-                                                    <th>Category</th>
-                                                    <th>Credits</th>
-                                                    <th>No. of Hrs</th>
+                                                    <th style={{ width: "100px" }}>Day Order</th>
+                                                    <th>1<br /><small className="text-dim" id="ttHeaderP1">08.40 - 09.40</small></th>
+                                                    <th>2<br /><small className="text-dim" id="ttHeaderP2">09.40 - 10.40</small></th>
+                                                    <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderTea">10.40<br />-<br />11.00</th>
+                                                    <th>3<br /><small className="text-dim" id="ttHeaderP3">11.00 - 12.00</small></th>
+                                                    <th>4<br /><small className="text-dim" id="ttHeaderP4">12.00 - 01.00</small></th>
+                                                    <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }} id="ttHeaderLunch">01.00<br />-<br />01.40</th>
+                                                    <th>5<br /><small className="text-dim" id="ttHeaderP5">01.40 - 02.30</small></th>
+                                                    <th>ACT<br /><small className="text-dim" id="ttHeaderAct">Activity</small></th>
+                                                    <th>6<br /><small className="text-dim" id="ttHeaderP6">02.30 - 03.20</small></th>
+                                                    <th>7<br /><small className="text-dim" id="ttHeaderP7">03.20 - 04.10</small></th>
                                                 </tr>
                                             </thead>
-                                            <tbody id="courseRefBody">
+                                            <tbody id="ttGridBody">
+
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
-                            )}
 
-                            <div className="glass-panel mt-3" id="studentFacultyAvailabilityArea">
+                                {!isFaculty && (
+                                    <div className="glass-panel" id="referenceTableArea">
+                                        <div className="panel-header">
+                                            <h3 className="panel-title"><i className="fa-solid fa-book-bookmark text-warning"></i> Course & Faculty Incharge Reference Table</h3>
+                                        </div>
+                                        <div className="table-responsive p-2">
+                                            <table className="ref-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Short Name</th>
+                                                        <th>Course Code & Title</th>
+                                                        <th>Faculty Incharge</th>
+                                                        <th>Venue</th>
+                                                        <th>Category</th>
+                                                        <th>Credits</th>
+                                                        <th>No. of Hrs</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="courseRefBody">
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="glass-panel mt-3" id="studentFacultyAvailabilityArea">
                                     <div className="panel-header">
                                         <h3 className="panel-title"><i className="fa-solid fa-people-arrows text-warning"></i> Faculty Availability (Today)</h3>
                                     </div>
@@ -523,149 +523,149 @@ export default function DashboardLayout() {
                                     </div>
                                 </div>
 
-                            <div className="glass-panel mt-3" id="studentClassDocsArea">
-                                <div className="panel-header d-flex justify-content-between align-items-center">
-                                    <h3 className="panel-title"><i className="fa-solid fa-file-pdf text-info me-2"></i> Class Advisor Notices &amp; Files (Class Only)</h3>
-                                    <button type="button" className="btn btn-sm btn-outline-info py-0 px-2" onClick={() => window.loadStudentClassDocuments?.()}>
-                                        <i className="fa-solid fa-rotate me-1"></i> Refresh
-                                    </button>
-                                </div>
-                                <div className="p-3" id="studentClassDocsBody">
-                                    <div className="small text-muted">Loading class documents...</div>
-                                </div>
-                            </div>
-                        </div>
-                            )}
-                            {isFaculty && (
-                                <div className="glass-panel mt-3" id="facultyPersonalTTArea">
-                                    <div className="panel-header d-flex align-items-center justify-content-between">
-                                        <h3 className="panel-title">
-                                            <i className="fa-solid fa-calendar-user text-info me-2"></i>
-                                            My Personal Timetable
-                                        </h3>
-                                        <button
-                                            className="btn btn-sm btn-outline-info d-flex align-items-center gap-1"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#myTimetableModal"
-                                            onClick={() => { window.renderMyTimetable && window.renderMyTimetable(); }}
-                                        >
-                                            <i className="fa-solid fa-pen-to-square"></i> Edit
+                                <div className="glass-panel mt-3" id="studentClassDocsArea">
+                                    <div className="panel-header d-flex justify-content-between align-items-center">
+                                        <h3 className="panel-title"><i className="fa-solid fa-file-pdf text-info me-2"></i> Class Advisor Notices &amp; Files (Class Only)</h3>
+                                        <button type="button" className="btn btn-sm btn-outline-info py-0 px-2" onClick={() => window.loadStudentClassDocuments?.()}>
+                                            <i className="fa-solid fa-rotate me-1"></i> Refresh
                                         </button>
                                     </div>
-                                    <div className="p-2" id="facultyPersonalTTPanel">
-                                        <div className="text-center py-4 text-muted">
-                                            <i className="fa-solid fa-spinner fa-spin fs-3 mb-2 d-block"></i>
-                                            <small>Loading your timetable...</small>
-                                        </div>
+                                    <div className="p-3" id="studentClassDocsBody">
+                                        <div className="small text-muted">Loading class documents...</div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
+                        )}
+                        {isFaculty && (
+                            <div className="glass-panel mt-3" id="facultyPersonalTTArea">
+                                <div className="panel-header d-flex align-items-center justify-content-between">
+                                    <h3 className="panel-title">
+                                        <i className="fa-solid fa-calendar-user text-info me-2"></i>
+                                        My Personal Timetable
+                                    </h3>
+                                    <button
+                                        className="btn btn-sm btn-outline-info d-flex align-items-center gap-1"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#myTimetableModal"
+                                        onClick={() => { window.renderMyTimetable && window.renderMyTimetable(); }}
+                                    >
+                                        <i className="fa-solid fa-pen-to-square"></i> Edit
+                                    </button>
+                                </div>
+                                <div className="p-2" id="facultyPersonalTTPanel">
+                                    <div className="text-center py-4 text-muted">
+                                        <i className="fa-solid fa-spinner fa-spin fs-3 mb-2 d-block"></i>
+                                        <small>Loading your timetable...</small>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
 
                         {isAdmin && (
-                        <div className="mt-4 px-2" id="adminControlPanelContainer">
-                            <h4 className="text-info fw-bold mb-4"><i className="fa-solid fa-shield-halved me-2"></i> {isAdmin ? 'Admin Control Panel' : 'Faculty Control Panel'}</h4>
-                            <div className="row g-4">
-                                {isAdmin && (
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminFacultyDetailsModal" onClick={() => window.renderAdminFacultyDetails && window.renderAdminFacultyDetails()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-address-card text-warning mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Faculty Details</h5>
-                                            <p className="text-muted small mb-0">View complete details of enrolled faculty members.</p>
+                            <div className="mt-4 px-2" id="adminControlPanelContainer">
+                                <h4 className="text-info fw-bold mb-4"><i className="fa-solid fa-shield-halved me-2"></i> {isAdmin ? 'Admin Control Panel' : 'Faculty Control Panel'}</h4>
+                                <div className="row g-4">
+                                    {isAdmin && (
+                                        <div className="col-lg-4 col-md-6 col-sm-12">
+                                            <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminFacultyDetailsModal" onClick={() => window.renderAdminFacultyDetails && window.renderAdminFacultyDetails()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,193,7,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                                <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                                    <i className="fa-solid fa-address-card text-warning mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                                    <h5 className="text-light fw-bold mb-2">Faculty Details</h5>
+                                                    <p className="text-muted small mb-0">View complete details of enrolled faculty members.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {isAdmin && (
+                                        <div className="col-lg-4 col-md-6 col-sm-12">
+                                            <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => { window.renderSectionsList && window.renderSectionsList(); }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(40,167,69,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                                <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                                    <i className="fa-solid fa-school text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                                    <h5 className="text-light fw-bold mb-2">Manage Classes</h5>
+                                                    <p className="text-muted small mb-0">Create and manage departments, years, and sections.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {isAdmin && (
+                                        <div className="col-lg-4 col-md-6 col-sm-12">
+                                            <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageFacultyModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(220,53,69,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                                <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                                    <i className="fa-solid fa-chalkboard-user text-danger mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                                    <h5 className="text-light fw-bold mb-2">Manage Faculty</h5>
+                                                    <p className="text-muted small mb-0">Register and manage faculty members.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {isAdmin && (
+                                        <div className="col-lg-4 col-md-6 col-sm-12">
+                                            <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminResourcesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,188,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                                <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                                    <i className="fa-solid fa-database text-info mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                                    <h5 className="text-light fw-bold mb-2">Manage Subjects</h5>
+                                                    <p className="text-muted small mb-0">Add, edit, or remove subjects and timetable defaults.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {isAdmin && (
+                                        <div className="col-lg-4 col-md-6 col-sm-12">
+                                            <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminVenuesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(25,200,100,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                                <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                                    <i className="fa-solid fa-map-location-dot text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                                    <h5 className="text-light fw-bold mb-2">Manage Venues</h5>
+                                                    <p className="text-muted small mb-0">Configure classrooms, laboratories, and lecture halls.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="col-lg-4 col-md-6 col-sm-12">
+                                        <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageRosterModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(130,100,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                            <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                                <i className="fa-solid fa-users-gear mb-3" style={{ fontSize: "2.5rem", color: "var(--sece-indigo, #7c6fe0)" }}></i>
+                                                <h5 className="text-light fw-bold mb-2">Sections &amp; Students</h5>
+                                                <p className="text-muted small mb-0">Manage section rosters and student data.</p>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                )}
-                                {isAdmin && (
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => { window.renderSectionsList && window.renderSectionsList(); }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(40,167,69,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-school text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Manage Classes</h5>
-                                            <p className="text-muted small mb-0">Create and manage departments, years, and sections.</p>
+                                    <div className="col-lg-4 col-md-6 col-sm-12">
+                                        <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onClick={() => window.initAdminViewEditTimetableModal && window.initAdminViewEditTimetableModal()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,100,200,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                            <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                                <i className="fa-solid fa-table-list text-pink mb-3" style={{ fontSize: "2.5rem", color: "var(--bs-pink, #d63384)" }}></i>
+                                                <h5 className="text-light fw-bold mb-2">View / Edit Timetable</h5>
+                                                <p className="text-muted small mb-0">Select batch, dept, year, and section to edit timetable.</p>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                )}
-                                {isAdmin && (
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageFacultyModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(220,53,69,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-chalkboard-user text-danger mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Manage Faculty</h5>
-                                            <p className="text-muted small mb-0">Register and manage faculty members.</p>
+
+                                    <div className="col-lg-4 col-md-6 col-sm-12">
+                                        <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(230,100,50,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                            <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                                <i className="fa-solid fa-folder-tree text-danger mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                                <h5 className="text-light fw-bold mb-2">View Sections</h5>
+                                                <p className="text-muted small mb-0">View and manage all academic sections created.</p>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                )}
-                                {isAdmin && (
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminResourcesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,188,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-database text-info mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Manage Subjects</h5>
-                                            <p className="text-muted small mb-0">Add, edit, or remove subjects and timetable defaults.</p>
+                                    {isAdmin && (
+                                        <div className="col-lg-4 col-md-6 col-sm-12">
+                                            <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewCredentialsModal" onClick={() => window.renderCredentialsList && window.renderCredentialsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,255,150,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
+                                                <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                                    <i className="fa-solid fa-key text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
+                                                    <h5 className="text-light fw-bold mb-2">View Usernames / Passwords</h5>
+                                                    <p className="text-muted small mb-0">View all Enrolled Student and Faculty Credentials.</p>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
-                                )}
-                                {isAdmin && (
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminVenuesModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(25,200,100,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-map-location-dot text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Manage Venues</h5>
-                                            <p className="text-muted small mb-0">Configure classrooms, laboratories, and lecture halls.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                )}
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#manageRosterModal" onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(130,100,255,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-users-gear mb-3" style={{ fontSize: "2.5rem", color: "var(--sece-indigo, #7c6fe0)" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">Sections &amp; Students</h5>
-                                            <p className="text-muted small mb-0">Manage section rosters and student data.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onClick={() => window.initAdminViewEditTimetableModal && window.initAdminViewEditTimetableModal()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(255,100,200,0.15)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-table-list text-pink mb-3" style={{ fontSize: "2.5rem", color: "var(--bs-pink, #d63384)" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">View / Edit Timetable</h5>
-                                            <p className="text-muted small mb-0">Select batch, dept, year, and section to edit timetable.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewSectionsModal" onClick={() => window.renderSectionsList && window.renderSectionsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(230,100,50,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-folder-tree text-danger mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">View Sections</h5>
-                                            <p className="text-muted small mb-0">View and manage all academic sections created.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                {isAdmin && (
-                                <div className="col-lg-4 col-md-6 col-sm-12">
-                                    <div className="card bg-dark border-secondary h-100 shadow" style={{ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", minHeight: "140px" }} data-bs-toggle="modal" data-bs-target="#viewCredentialsModal" onClick={() => window.renderCredentialsList && window.renderCredentialsList()} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,255,150,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}>
-                                        <div className="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                            <i className="fa-solid fa-key text-success mb-3" style={{ fontSize: "2.5rem" }}></i>
-                                            <h5 className="text-light fw-bold mb-2">View Usernames / Passwords</h5>
-                                            <p className="text-muted small mb-0">View all Enrolled Student and Faculty Credentials.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                )}
                             </div>
-                        </div>
                         )}
 
-                </main>
-            </div>
+                    </main>
+                </div>
             </div>
 
 
@@ -969,215 +969,215 @@ export default function DashboardLayout() {
                             <p id="sectionsAdminOnlyNote" className="small text-muted d-none mb-2"><i className="fa-solid fa-lock me-1"></i> Section management is restricted to Admin accounts.</p>
 
                             <div>
-                            <div className="row g-2 mb-3 align-items-end">
-                                <div className="col-md-12 d-flex gap-2 justify-content-end align-items-end">
-                                    <div className="input-group input-group-sm" style={{ maxWidth: '200px' }}>
-                                        <input type="text" id="rosterSearchRegNo" className="form-control bg-dark text-white border-secondary" placeholder="Reg No..." />
-                                        <button type="button" className="btn btn-outline-info" onClick={() => window.searchStudentInRoster()} title="Search Details"><i className="fa-solid fa-search"></i></button>
+                                <div className="row g-2 mb-3 align-items-end">
+                                    <div className="col-md-12 d-flex gap-2 justify-content-end align-items-end">
+                                        <div className="input-group input-group-sm" style={{ maxWidth: '200px' }}>
+                                            <input type="text" id="rosterSearchRegNo" className="form-control bg-dark text-white border-secondary" placeholder="Reg No..." />
+                                            <button type="button" className="btn btn-outline-info" onClick={() => window.searchStudentInRoster()} title="Search Details"><i className="fa-solid fa-search"></i></button>
+                                        </div>
+                                        {!isAdmin && (
+                                            <button id="addStudentBtn" className="btn btn-sm btn-success" style={{ whiteSpace: 'nowrap' }} onClick={() => window.toggleAddStudentForm()} ><i className="fa-solid fa-user-plus me-1"></i> Add Student</button>
+                                        )}
+                                        <input type="file" id="importStudentExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importStudentExcel && window.importStudentExcel(e)} />
+                                        <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importStudentExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
+                                            <i className="fa-solid fa-file-excel me-1"></i> Import Excel
+                                        </button>
                                     </div>
-                                    {!isAdmin && (
-                                        <button id="addStudentBtn" className="btn btn-sm btn-success" style={{ whiteSpace: 'nowrap' }} onClick={() => window.toggleAddStudentForm()} ><i className="fa-solid fa-user-plus me-1"></i> Add Student</button>
-                                    )}
-                                    <input type="file" id="importStudentExcelInput" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importStudentExcel && window.importStudentExcel(e)} />
-                                    <button type="button" className="btn btn-sm btn-outline-success" onClick={() => document.getElementById('importStudentExcelInput').click()} style={{ whiteSpace: 'nowrap' }}>
-                                        <i className="fa-solid fa-file-excel me-1"></i> Import Excel
-                                    </button>
                                 </div>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between mb-2">
-                                <h6 className="mb-0 text-light fw-bold">Section Roster (Class Strength: <span id="rosterCount">0</span>)</h6>
-                            </div>
-                                    <p id="studentManagementNote" className="small text-muted mb-2"></p>
+                                <div className="d-flex align-items-center justify-content-between mb-2">
+                                    <h6 className="mb-0 text-light fw-bold">Section Roster (Class Strength: <span id="rosterCount">0</span>)</h6>
+                                </div>
+                                <p id="studentManagementNote" className="small text-muted mb-2"></p>
 
 
-                                    <div id="addStudentCard" className="card card-body bg-secondary  border-0 mb-3 d-none">
-                                        <h6 className="fw-bold text-warning mb-2">Register New Student</h6>
-                                        <form id="addStudentForm" onSubmit={(event) => window.handleAddStudent(event)} >
-                                            <div className="row g-2 mb-2">
-                                                <div className="col-md-4">
-                                                    <label className="form-label small">First Name <span className="text-danger">*</span></label>
-                                                    <input type="text" id="rsFirstName" className="form-control form-control-sm bg-dark text-white" required />
-                                                </div>
-                                                <div className="col-md-4">
-                                                    <label className="form-label small">Last Name <span className="text-danger">*</span></label>
-                                                    <input type="text" id="rsLastName" className="form-control form-control-sm bg-dark text-white" required />
-                                                </div>
-                                                <div className="col-md-4">
-                                                    <label className="form-label small">Register Number <span className="text-danger">*</span></label>
-                                                    <input type="text" id="rsRegNo" className="form-control form-control-sm bg-dark text-white" required placeholder="e.g. 71812423001" />
-                                                </div>
+                                <div id="addStudentCard" className="card card-body bg-secondary  border-0 mb-3 d-none">
+                                    <h6 className="fw-bold text-warning mb-2">Register New Student</h6>
+                                    <form id="addStudentForm" onSubmit={(event) => window.handleAddStudent(event)} >
+                                        <div className="row g-2 mb-2">
+                                            <div className="col-md-4">
+                                                <label className="form-label small">First Name <span className="text-danger">*</span></label>
+                                                <input type="text" id="rsFirstName" className="form-control form-control-sm bg-dark text-white" required />
                                             </div>
-                                            <div className="row g-2 mb-2">
-                                                <div className="col-md-4">
-                                                    <label className="form-label small">Personal Email <span className="text-danger">*</span></label>
-                                                    <input type="email" id="rsEmail" className="form-control form-control-sm bg-dark text-white" required />
-                                                </div>
-                                                <div className="col-md-4">
-                                                    <label className="form-label small">College Email <span className="text-danger">*</span></label>
-                                                    <input type="email" id="rsCollegeEmail" className="form-control form-control-sm bg-dark text-white" required />
-                                                </div>
-                                                <div className="col-md-4">
-                                                    <label className="form-label small">Mobile Number <span className="text-danger">*</span></label>
-                                                    <input type="tel" id="rsPhone" className="form-control form-control-sm bg-dark text-white" required />
-                                                </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label small">Last Name <span className="text-danger">*</span></label>
+                                                <input type="text" id="rsLastName" className="form-control form-control-sm bg-dark text-white" required />
                                             </div>
-                                            <div className="row g-2 mb-2">
-                                                <div className="col-md-4">
-                                                    <label className="form-label small">Parent 1 Mobile <span className="text-danger">*</span></label>
-                                                    <input type="tel" id="rsParentPhone1" className="form-control form-control-sm bg-dark text-white" required />
-                                                </div>
-                                                <div className="col-md-4">
-                                                    <label className="form-label small">Parent 2 Mobile <span className="text-muted">(Optional)</span></label>
-                                                    <input type="tel" id="rsParentPhone2" className="form-control form-control-sm bg-dark text-white" />
-                                                </div>
-                                                <div className="col-md-4">
-                                                    <label className="form-label small">Resident Type <span className="text-danger">*</span></label>
-                                                    <select id="rsResidentType" className="form-select form-select-sm bg-dark text-white border-secondary" required onChange={(e) => {
-                                                        const el = document.getElementById('rsHostelFields');
-                                                        if (el) el.classList.toggle('d-none', e.target.value !== 'Hosteller');
-                                                    }}>
-                                                        <option value="">Select...</option>
-                                                        <option value="Hosteller">Hosteller</option>
-                                                        <option value="Day Scholar">Day Scholar</option>
-                                                    </select>
-                                                </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label small">Register Number <span className="text-danger">*</span></label>
+                                                <input type="text" id="rsRegNo" className="form-control form-control-sm bg-dark text-white" required placeholder="e.g. 71812423001" />
                                             </div>
-                                            <div id="rsHostelFields" className="row g-2 mb-2 d-none">
-                                                <div className="col-md-6">
-                                                    <label className="form-label small">Hostel Block</label>
-                                                    <input type="text" id="rsHostelBlock" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. A Block" />
-                                                </div>
-                                                <div className="col-md-6">
-                                                    <label className="form-label small">Room Number</label>
-                                                    <input type="text" id="rsRoomNumber" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. 204" />
-                                                </div>
+                                        </div>
+                                        <div className="row g-2 mb-2">
+                                            <div className="col-md-4">
+                                                <label className="form-label small">Personal Email <span className="text-danger">*</span></label>
+                                                <input type="email" id="rsEmail" className="form-control form-control-sm bg-dark text-white" required />
                                             </div>
-                                            <div className="row g-2 mb-3">
-                                                <div className="col-md-3">
-                                                    <label className="form-label small">Department <span className="text-danger">*</span></label>
-                                                    <input type="text" id="rsDept" list="deptDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. CSE" autoComplete="off" />
-                                                </div>
-                                                <div className="col-md-3">
-                                                    <label className="form-label small">Class <span className="text-danger">*</span></label>
-                                                    <input type="text" id="rsCourse" list="courseDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. BTECH-CSE" autoComplete="off" />
-                                                </div>
-                                                <div className="col-md-3">
-                                                    <label className="form-label small">Section <span className="text-danger">*</span></label>
-                                                    <input type="text" id="rsSection" list="sectionDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. II CSE C" autoComplete="off" />
-                                                </div>
-                                                <div className="col-md-3">
-                                                    <label className="form-label small">Semester <span className="text-danger">*</span></label>
-                                                    <input type="number" id="rsSemester" className="form-control form-control-sm bg-dark text-white" required min="1" max="8" defaultValue="3" />
-                                                </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label small">College Email <span className="text-danger">*</span></label>
+                                                <input type="email" id="rsCollegeEmail" className="form-control form-control-sm bg-dark text-white" required />
                                             </div>
-                                            <button type="submit" className="btn btn-sm btn-warning font-semibold"><i className="fa-solid fa-check me-1"></i> Save Student</button>
+                                            <div className="col-md-4">
+                                                <label className="form-label small">Mobile Number <span className="text-danger">*</span></label>
+                                                <input type="tel" id="rsPhone" className="form-control form-control-sm bg-dark text-white" required />
+                                            </div>
+                                        </div>
+                                        <div className="row g-2 mb-2">
+                                            <div className="col-md-4">
+                                                <label className="form-label small">Parent 1 Mobile <span className="text-danger">*</span></label>
+                                                <input type="tel" id="rsParentPhone1" className="form-control form-control-sm bg-dark text-white" required />
+                                            </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label small">Parent 2 Mobile <span className="text-muted">(Optional)</span></label>
+                                                <input type="tel" id="rsParentPhone2" className="form-control form-control-sm bg-dark text-white" />
+                                            </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label small">Resident Type <span className="text-danger">*</span></label>
+                                                <select id="rsResidentType" className="form-select form-select-sm bg-dark text-white border-secondary" required onChange={(e) => {
+                                                    const el = document.getElementById('rsHostelFields');
+                                                    if (el) el.classList.toggle('d-none', e.target.value !== 'Hosteller');
+                                                }}>
+                                                    <option value="">Select...</option>
+                                                    <option value="Hosteller">Hosteller</option>
+                                                    <option value="Day Scholar">Day Scholar</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div id="rsHostelFields" className="row g-2 mb-2 d-none">
+                                            <div className="col-md-6">
+                                                <label className="form-label small">Hostel Block</label>
+                                                <input type="text" id="rsHostelBlock" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. A Block" />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label small">Room Number</label>
+                                                <input type="text" id="rsRoomNumber" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. 204" />
+                                            </div>
+                                        </div>
+                                        <div className="row g-2 mb-3">
+                                            <div className="col-md-3">
+                                                <label className="form-label small">Department <span className="text-danger">*</span></label>
+                                                <input type="text" id="rsDept" list="deptDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. CSE" autoComplete="off" />
+                                            </div>
+                                            <div className="col-md-3">
+                                                <label className="form-label small">Class <span className="text-danger">*</span></label>
+                                                <input type="text" id="rsCourse" list="courseDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. BTECH-CSE" autoComplete="off" />
+                                            </div>
+                                            <div className="col-md-3">
+                                                <label className="form-label small">Section <span className="text-danger">*</span></label>
+                                                <input type="text" id="rsSection" list="sectionDatalist" className="form-control form-control-sm bg-dark text-white border-secondary" required placeholder="e.g. II CSE C" autoComplete="off" />
+                                            </div>
+                                            <div className="col-md-3">
+                                                <label className="form-label small">Semester <span className="text-danger">*</span></label>
+                                                <input type="number" id="rsSemester" className="form-control form-control-sm bg-dark text-white" required min="1" max="8" defaultValue="3" />
+                                            </div>
+                                        </div>
+                                        <button type="submit" className="btn btn-sm btn-warning font-semibold"><i className="fa-solid fa-check me-1"></i> Save Student</button>
+                                    </form>
+                                </div>
+
+                                <div className="table-responsive" style={{ maxHeight: "350px", overflowY: "auto" }}>
+                                    <table className="table table-dark table-striped table-hover align-middle text-sm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Roll No</th>
+                                                <th>Name</th>
+                                                <th>Department & Sec</th>
+                                                <th>Email</th>
+                                                <th>Phone (SMS)</th>
+                                                <th className="text-center">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="enrolledStudentsRosterBody">
+                                            <tr><td colSpan="6" className="text-center text-muted">Select filters to view students</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            </div>
+
+
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="modal fade" id="manageSectionsModal" tabIndex="-1">
+                <div className="modal-dialog modal-lg modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-folder-tree me-2"></i> Manage Sections</h5>
+                            <div>
+                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                        </div>
+                        <div className="modal-body">
+                            <div className="row g-3">
+                                <div className="col-md-6">
+                                    <div className="card card-body bg-secondary border-0">
+                                        <h6 className="fw-bold text-info"><i className="fa-solid fa-folder-plus me-1"></i> Add New Section</h6>
+                                        <form id="addSectionForm" onSubmit={(event) => window.handleAddSection(event)} >
+                                            <div className="mb-2">
+                                                <label className="form-label small">Department <span className="text-danger">*</span></label>
+                                                <input type="text" id="secDept" list="secDeptList" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. CSE" required autoComplete="off" />
+                                                <datalist id="secDeptList">
+                                                    <option value="CSE">CSE - Computer Science & Engg</option>
+                                                    <option value="IT">IT - Information Technology</option>
+                                                    <option value="AIDS">AI&DS - Artificial Intelligence & DS</option>
+                                                    <option value="ECE">ECE - Electronics & Comm</option>
+                                                    <option value="EEE">EEE - Electrical & Electronics</option>
+                                                    <option value="MECH">MECH - Mechanical Engg</option>
+                                                </datalist>
+                                            </div>
+                                            <div className="mb-2">
+                                                <label className="form-label small">Section Name</label>
+                                                <input type="text" id="secName" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. II CSE D" required />
+                                            </div>
+                                            <div className="mb-2">
+                                                <label className="form-label small">Assigned Classroom</label>
+                                                <input type="text" id="secClassroom" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. SF 05" required />
+                                            </div>
+                                            <div className="mb-2">
+                                                <label className="form-label small">Max Capacity</label>
+                                                <input type="number" id="secCapacity" min="0" max="80" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Max 80" defaultValue="60" required />
+                                            </div>
+                                            <button type="submit" className="btn btn-sm btn-info w-100 font-semibold"><i className="fa-solid fa-plus me-1"></i> Create Section</button>
                                         </form>
                                     </div>
-
-                                    <div className="table-responsive" style={{ maxHeight: "350px", overflowY: "auto" }}>
-                                        <table className="table table-dark table-striped table-hover align-middle text-sm mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th>Roll No</th>
-                                                    <th>Name</th>
-                                                    <th>Department & Sec</th>
-                                                    <th>Email</th>
-                                                    <th>Phone (SMS)</th>
-                                                    <th className="text-center">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="enrolledStudentsRosterBody">
-                                                <tr><td colSpan="6" className="text-center text-muted">Select filters to view students</td></tr>
-                                            </tbody>
-                                        </table>
+                                </div>
+                                <div className="col-md-6">
+                                    <div className="card card-body bg-secondary border-0">
+                                        <ul className="list-group list-group-flush rounded bg-dark" id="sectionsList">
+                                        </ul>
                                     </div>
-
                                 </div>
-
-
-                                
-            </div>
-        </div>
-    </div>
-</div>
-
-<div className="modal fade" id="manageSectionsModal" tabIndex="-1">
-    <div className="modal-dialog modal-lg modal-dialog-centered">
-        <div className="modal-content bg-dark text-white border-secondary">
-            <div className="modal-header border-secondary">
-                <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-folder-tree me-2"></i> Manage Sections</h5>
-                <div>
-                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-            </div>
-            <div className="modal-body">
-                <div className="row g-3">
-                    <div className="col-md-6">
-                        <div className="card card-body bg-secondary border-0">
-                            <h6 className="fw-bold text-info"><i className="fa-solid fa-folder-plus me-1"></i> Add New Section</h6>
-                            <form id="addSectionForm" onSubmit={(event) => window.handleAddSection(event)} >
-                                <div className="mb-2">
-                                    <label className="form-label small">Department <span className="text-danger">*</span></label>
-                                    <input type="text" id="secDept" list="secDeptList" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. CSE" required autoComplete="off" />
-                                    <datalist id="secDeptList">
-                                        <option value="CSE">CSE - Computer Science & Engg</option>
-                                        <option value="IT">IT - Information Technology</option>
-                                        <option value="AIDS">AI&DS - Artificial Intelligence & DS</option>
-                                        <option value="ECE">ECE - Electronics & Comm</option>
-                                        <option value="EEE">EEE - Electrical & Electronics</option>
-                                        <option value="MECH">MECH - Mechanical Engg</option>
-                                    </datalist>
-                                </div>
-                                <div className="mb-2">
-                                    <label className="form-label small">Section Name</label>
-                                    <input type="text" id="secName" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. II CSE D" required />
-                                </div>
-                                <div className="mb-2">
-                                    <label className="form-label small">Assigned Classroom</label>
-                                    <input type="text" id="secClassroom" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. SF 05" required />
-                                </div>
-                                <div className="mb-2">
-                                    <label className="form-label small">Max Capacity</label>
-                                    <input type="number" id="secCapacity" min="0" max="80" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Max 80" defaultValue="60" required />
-                                </div>
-                                <button type="submit" className="btn btn-sm btn-info w-100 font-semibold"><i className="fa-solid fa-plus me-1"></i> Create Section</button>
-                            </form>
-                        </div>
-                    </div>
-                    <div className="col-md-6">
-                        <div className="card card-body bg-secondary border-0">
-                            <ul className="list-group list-group-flush rounded bg-dark" id="sectionsList">
-                            </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
 
-<div className="modal fade" id="viewSectionsModal" tabIndex="-1">
-    <div className="modal-dialog modal-lg modal-dialog-centered">
-        <div className="modal-content bg-dark text-white border-secondary">
-            <div className="modal-header border-secondary">
-                <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-folder-tree me-2"></i> View Sections</h5>
-                <div>
-                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-            </div>
-            <div className="modal-body">
-                <div className="row g-3">
-                    <div className="col-12">
-                        <div className="card card-body bg-secondary border-0">
-                            <ul className="list-group list-group-flush rounded bg-dark" id="sectionsListOnly">
-                            </ul>
+            <div className="modal fade" id="viewSectionsModal" tabIndex="-1">
+                <div className="modal-dialog modal-lg modal-dialog-centered">
+                    <div className="modal-content bg-dark text-white border-secondary">
+                        <div className="modal-header border-secondary">
+                            <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-folder-tree me-2"></i> View Sections</h5>
+                            <div>
+                                <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                        </div>
+                        <div className="modal-body">
+                            <div className="row g-3">
+                                <div className="col-12">
+                                    <div className="card card-body bg-secondary border-0">
+                                        <ul className="list-group list-group-flush rounded bg-dark" id="sectionsListOnly">
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
 
 
 
@@ -1637,13 +1637,13 @@ export default function DashboardLayout() {
 
                                 <div className="tab-pane fade" id="tabMyLeave">
                                     <div className="mb-2">
-                                            <label className="form-label small">Who are you in the staff directory?</label>
-                                            <select id="myStaffIdentitySelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onStaffIdentityChange()} >
-                                                <option value="">-- Select your name --</option>
+                                        <label className="form-label small">Who are you in the staff directory?</label>
+                                        <select id="myStaffIdentitySelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onStaffIdentityChange()} >
+                                            <option value="">-- Select your name --</option>
 
-                                            </select>
-                                            <div className="form-text text-muted">Remembered for next time you log in.</div>
-                                        </div>
+                                        </select>
+                                        <div className="form-text text-muted">Remembered for next time you log in.</div>
+                                    </div>
                                     <div className="mb-3">
                                         <label className="form-label small">Reason (optional)</label>
                                         <input type="text" id="leaveReasonInput" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Medical leave, personal work" />
@@ -1734,7 +1734,7 @@ export default function DashboardLayout() {
                 </div>
             </div>
 
-                        {/* Edit Student Modal */}
+            {/* Edit Student Modal */}
             <div className="modal fade" id="editStudentModal" tabIndex="-1" style={{ zIndex: 1060 }}>
                 <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                     <div className="modal-content bg-dark text-white border-secondary">
@@ -1744,7 +1744,7 @@ export default function DashboardLayout() {
                         </div>
                         <div className="modal-body">
                             <div id="editStudentAlert" className="alert d-none small py-2"></div>
-                            <form id="editStudentForm" onSubmit={(e) => { e.preventDefault(); try { window.submitEditStudentForm(e); } catch(err) { alert("Error submitting form: " + err.message); } }}>
+                            <form id="editStudentForm" onSubmit={(e) => { e.preventDefault(); try { window.submitEditStudentForm(e); } catch (err) { alert("Error submitting form: " + err.message); } }}>
                                 <input type="hidden" id="esId" />
                                 <div className="row g-2 mb-2">
                                     <div className="col-md-4">
@@ -1845,7 +1845,7 @@ export default function DashboardLayout() {
                         </div>
                         <div className="modal-body">
                             <div id="manageStudentsAlert" className="alert d-none small py-2"></div>
-                            <form id="manageStudentsForm" onSubmit={(e) => { e.preventDefault(); try { window.submitManageStudentForm(e); } catch(err) { alert("Error submitting form: " + err.message); } }}>
+                            <form id="manageStudentsForm" onSubmit={(e) => { e.preventDefault(); try { window.submitManageStudentForm(e); } catch (err) { alert("Error submitting form: " + err.message); } }}>
                                 <div className="row g-2 mb-2">
                                     <div className="col-md-4">
                                         <label className="form-label small">First Name <span className="text-danger">*</span></label>
@@ -2476,8 +2476,8 @@ export default function DashboardLayout() {
                             <div className="bg-white p-2 d-inline-block rounded mb-3 shadow" id="qrCodeContainer">
                                 <img src="" id="loginQrCodeImage" alt="Login QR Code" style={{ width: "160px", height: "160px", objectFit: "contain" }} />
                             </div>
-                            
-                            <div className="input-group input-group-sm mb-4 mx-auto" style={{maxWidth: "300px"}}>
+
+                            <div className="input-group input-group-sm mb-4 mx-auto" style={{ maxWidth: "300px" }}>
                                 <input type="text" id="shareAppLinkInput" className="form-control bg-dark text-white border-secondary" readOnly />
                                 <button className="btn btn-outline-secondary" type="button" onClick={() => {
                                     const link = document.getElementById('shareAppLinkInput').value;
@@ -2490,13 +2490,13 @@ export default function DashboardLayout() {
 
                             <p className="text-muted small mb-3">Or share via link:</p>
                             <div className="d-flex justify-content-center gap-3">
-                                <button className="btn btn-outline-success rounded-circle" style={{width: "50px", height: "50px"}} onClick={() => window.shareViaWhatsApp && window.shareViaWhatsApp()} title="WhatsApp">
+                                <button className="btn btn-outline-success rounded-circle" style={{ width: "50px", height: "50px" }} onClick={() => window.shareViaWhatsApp && window.shareViaWhatsApp()} title="WhatsApp">
                                     <i className="fa-brands fa-whatsapp fs-4"></i>
                                 </button>
-                                <button className="btn btn-outline-primary rounded-circle" style={{width: "50px", height: "50px"}} onClick={() => window.shareViaMessage && window.shareViaMessage()} title="Message (SMS)">
+                                <button className="btn btn-outline-primary rounded-circle" style={{ width: "50px", height: "50px" }} onClick={() => window.shareViaMessage && window.shareViaMessage()} title="Message (SMS)">
                                     <i className="fa-solid fa-comment-sms fs-4"></i>
                                 </button>
-                                <button className="btn btn-outline-light rounded-circle" style={{width: "50px", height: "50px"}} onClick={() => window.shareViaWebAPI && window.shareViaWebAPI()} title="More Options / Copy Link">
+                                <button className="btn btn-outline-light rounded-circle" style={{ width: "50px", height: "50px" }} onClick={() => window.shareViaWebAPI && window.shareViaWebAPI()} title="More Options / Copy Link">
                                     <i className="fa-solid fa-share fs-4"></i>
                                 </button>
                             </div>
@@ -2550,7 +2550,7 @@ export default function DashboardLayout() {
                                     </button>
                                 </div>
                             </div>
-                            
+
                             <div id="mcTtGridContainer" className="d-none">
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <h6 className="text-warning mb-0" id="mcTtTitle">Editing: II CSE C</h6>
@@ -2580,7 +2580,7 @@ export default function DashboardLayout() {
                 </div>
             </div>
 
-        
+
 
             {/* ===== Admin: View & Edit Faculty Timetable Modal ===== */}
             <div className="modal fade" id="adminFacultyTimetableModal" tabIndex="-1">
@@ -2688,8 +2688,8 @@ export default function DashboardLayout() {
                                         <span className="badge bg-info text-dark" id="uatTargetSectionBadge">II CSE C</span>
                                     </div>
                                     <div className="row g-2">
-                                        <div className="col-md-3">
-                                            <label className="form-label small text-muted mb-1">Class / Department *</label>
+                                        <div className="col-md-2">
+                                            <label className="form-label small text-muted mb-1">Class / Dept *</label>
                                             <select id="uatDeptSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="CSE" onChange={() => window.updateUploadAssignSectionBadge?.()}>
                                                 <option value="CSE">CSE</option>
                                                 <option value="IT">IT</option>
@@ -2711,6 +2711,19 @@ export default function DashboardLayout() {
                                             </select>
                                         </div>
                                         <div className="col-md-2">
+                                            <label className="form-label small text-muted mb-1">Semester *</label>
+                                            <select id="uatSemSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="3" onChange={() => window.updateUploadAssignSectionBadge?.()}>
+                                                <option value="1">Sem 1</option>
+                                                <option value="2">Sem 2</option>
+                                                <option value="3">Sem 3</option>
+                                                <option value="4">Sem 4</option>
+                                                <option value="5">Sem 5</option>
+                                                <option value="6">Sem 6</option>
+                                                <option value="7">Sem 7</option>
+                                                <option value="8">Sem 8</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-md-2">
                                             <label className="form-label small text-muted mb-1">Section *</label>
                                             <input type="text" id="uatSecInput" list="uatSecSuggestions" className="form-control form-control-sm bg-dark text-white border-secondary" defaultValue="C" placeholder="e.g. A, B, C" onInput={() => window.updateUploadAssignSectionBadge?.()} required />
                                             <datalist id="uatSecSuggestions">
@@ -2720,7 +2733,7 @@ export default function DashboardLayout() {
                                                 <option value="D" />
                                             </datalist>
                                         </div>
-                                        <div className="col-md-5">
+                                        <div className="col-md-4">
                                             <label className="form-label small text-muted mb-1">Class Advisor *</label>
                                             <select id="uatAdvisorSelect" className="form-select form-select-sm bg-dark text-white border-secondary">
                                                 <option value="">-- Select Class Advisor --</option>
@@ -2787,7 +2800,7 @@ export default function DashboardLayout() {
                         <div className="modal-body p-4">
                             <div className="p-3 rounded border border-secondary bg-secondary bg-opacity-10 mb-3">
                                 <div className="row g-2 align-items-end">
-                                    <div className="col-md-3">
+                                    <div className="col-md-2">
                                         <label className="form-label small text-muted mb-1">Department</label>
                                         <select id="vstDeptSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onVstFilterChange?.('dept')}>
                                             <option value="CSE">CSE</option>
@@ -2802,7 +2815,7 @@ export default function DashboardLayout() {
                                             <option value="IV">IV Year</option>
                                         </select>
                                     </div>
-                                    <div className="col-md-3">
+                                    <div className="col-md-2">
                                         <label className="form-label small text-muted mb-1">Class / Program</label>
                                         <select id="vstClassSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onVstFilterChange?.('class')}>
                                             <option value="">All Classes</option>
@@ -2812,6 +2825,20 @@ export default function DashboardLayout() {
                                         <label className="form-label small text-muted mb-1">Section</label>
                                         <select id="vstSectionSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.loadAdminViewStudentTt?.()}>
                                             <option value="A">A</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-md-2">
+                                        <label className="form-label small text-muted mb-1">Semester</label>
+                                        <select id="vstSemSelect" className="form-select form-select-sm bg-dark text-white border-secondary" defaultValue="" onChange={() => window.loadAdminViewStudentTt?.()}>
+                                            <option value="">Active Sem</option>
+                                            <option value="1">Sem 1</option>
+                                            <option value="2">Sem 2</option>
+                                            <option value="3">Sem 3</option>
+                                            <option value="4">Sem 4</option>
+                                            <option value="5">Sem 5</option>
+                                            <option value="6">Sem 6</option>
+                                            <option value="7">Sem 7</option>
+                                            <option value="8">Sem 8</option>
                                         </select>
                                     </div>
                                     <div className="col-md-2 d-grid">
@@ -2832,10 +2859,10 @@ export default function DashboardLayout() {
                                             <th style={{ width: "95px" }}>Day Order</th>
                                             <th>1<br /><small className="text-dim">08.40 - 09.40</small></th>
                                             <th>2<br /><small className="text-dim">09.40 - 10.40</small></th>
-                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>10.40<br/>-<br/>11.00</th>
+                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>10.40<br />-<br />11.00</th>
                                             <th>3<br /><small className="text-dim">11.00 - 12.00</small></th>
                                             <th>4<br /><small className="text-dim">12.00 - 01.00</small></th>
-                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>01.00<br/>-<br/>01.40</th>
+                                            <th className="text-warning text-center" style={{ width: "35px", lineHeight: "1.2", padding: "0.25rem" }}>01.00<br />-<br />01.40</th>
                                             <th>5<br /><small className="text-dim">01.40 - 02.30</small></th>
                                             <th>ACT<br /><small className="text-dim">Activity</small></th>
                                             <th>6<br /><small className="text-dim">02.30 - 03.20</small></th>
@@ -2926,7 +2953,7 @@ export default function DashboardLayout() {
                 </div>
             </div>
 
-</>
+        </>
     );
 }
 
