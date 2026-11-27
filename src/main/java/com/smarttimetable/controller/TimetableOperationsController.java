@@ -1,6 +1,8 @@
 package com.smarttimetable.controller;
 
 import com.smarttimetable.entity.*;
+import com.smarttimetable.repository.CoverageRequestRepository;
+import com.smarttimetable.repository.SubstitutionRepository;
 import com.smarttimetable.repository.TeacherRepository;
 import com.smarttimetable.repository.UserRepository;
 import com.smarttimetable.service.EmailNotificationService;
@@ -28,6 +30,12 @@ public class TimetableOperationsController {
 
         @Autowired
         private TeacherRepository teacherRepository;
+
+        @Autowired
+        private SubstitutionRepository substitutionRepository;
+
+        @Autowired
+        private CoverageRequestRepository coverageRequestRepository;
 
         @Autowired
         private EmailNotificationService emailNotificationService;
@@ -91,11 +99,13 @@ public class TimetableOperationsController {
 
         // Substitutions
         @GetMapping("/substitutions")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_STUDENT')")
         public List<Substitution> getSubstitutions() {
                 return service.getAllSubstitutions();
         }
 
         @PostMapping("/substitutions")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
         public ResponseEntity<?> saveSubstitution(@RequestBody Substitution sub, Authentication authentication) {
                 if (isFacultyRoleOnly(authentication)) {
                         Teacher self = resolveFacultyActor(authentication);
@@ -109,24 +119,66 @@ public class TimetableOperationsController {
         }
 
         @DeleteMapping("/substitutions/{id}")
-        public void deleteSubstitution(@PathVariable Long id) {
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+        public ResponseEntity<?> deleteSubstitution(@PathVariable Long id, Authentication authentication) {
+                Substitution sub = substitutionRepository.findById(id).orElse(null);
+                if (sub == null) {
+                        return ResponseEntity.notFound().build();
+                }
+                if (isFacultyRoleOnly(authentication)
+                                && !matchesTeacher(resolveFacultyActor(authentication), sub.getOriginalFaculty())) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                        .body(Map.of("error", "Faculty can only cancel their own substitutions."));
+                }
                 service.deleteSubstitution(id);
+                return ResponseEntity.noContent().build();
         }
 
         // Coverage
         @GetMapping("/coverage")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
         public List<CoverageRequest> getCoverageRequests() {
                 return service.getAllCoverageRequests();
         }
 
         @PostMapping("/coverage")
-        public CoverageRequest saveCoverageRequest(@RequestBody CoverageRequest req) {
-                return service.saveCoverageRequest(req);
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+        public ResponseEntity<?> saveCoverageRequest(@RequestBody CoverageRequest req, Authentication authentication) {
+                if (req.getDate() == null || req.getSectionName() == null || req.getSectionName().isBlank()
+                                || req.getDay() == null || req.getDay().isBlank() || req.getPeriodIndex() == null
+                                || req.getPeriodIndex() < 0 || req.getPeriodIndex() > 6) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "A date, section, day, and valid period are required."));
+                }
+                if (isFacultyRoleOnly(authentication)) {
+                        Teacher self = resolveFacultyActor(authentication);
+                        String status = req.getStatus() != null ? req.getStatus().trim().toUpperCase() : "OPEN";
+                        String actorName = "REQUESTED".equals(status) ? req.getRequestedBy() : req.getAbsentStaff();
+                        if (!matchesTeacher(self, actorName)) {
+                                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                                .body(Map.of("error", "Faculty can only update coverage requests involving their own periods."));
+                        }
+                }
+                if (req.getStatus() == null || req.getStatus().isBlank()) {
+                        req.setStatus("OPEN");
+                }
+                return ResponseEntity.ok(service.saveCoverageRequest(req));
         }
 
         @DeleteMapping("/coverage/{id}")
-        public void deleteCoverageRequest(@PathVariable Long id) {
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+        public ResponseEntity<?> deleteCoverageRequest(@PathVariable Long id, Authentication authentication) {
+                CoverageRequest request = coverageRequestRepository.findById(id).orElse(null);
+                if (request == null) {
+                        return ResponseEntity.notFound().build();
+                }
+                if (isFacultyRoleOnly(authentication)
+                                && (!matchesTeacher(resolveFacultyActor(authentication), request.getAbsentStaff())
+                                                || !"OPEN".equalsIgnoreCase(request.getStatus()))) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                        .body(Map.of("error", "Faculty can only cancel their own open leave requests."));
+                }
                 service.deleteCoverageRequest(id);
+                return ResponseEntity.noContent().build();
         }
 
         // Custom Subjects

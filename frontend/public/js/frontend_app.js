@@ -475,6 +475,7 @@ const STAFF_STORAGE_KEY = 'sece_staff_directory_v1';
 const SUBSTITUTION_STORAGE_KEY = 'sece_substitutions_v1';
 const COVERAGE_REQUESTS_KEY = 'sece_coverage_requests_v1';
 const LEAVE_STATE_KEY_PREFIX = 'sece_on_leave_';
+const FACULTY_LEAVES_KEY = 'sece_faculty_leaves_v1';
 
 // =========================
 // PERSISTENT STUDENT ROSTER
@@ -765,7 +766,13 @@ function leaveStateKey(staffName) {
 
 // Returns true if the given staff name is recorded as on leave today
 function isStaffOnLeaveToday(staffName) {
-    return localStorage.getItem(leaveStateKey(staffName)) === 'true';
+    const staff = staffDirectory.find(item => isMatchingFaculty(item.name, { name: staffName, displayName: staffName }));
+    const hasSharedLeave = facultyLeaves.some(leave =>
+        leave.date === todayDateStr() &&
+        (isMatchingFaculty(leave.staffName, { name: staffName, displayName: staffName }) ||
+            (staff?.id && String(leave.teacherId) === String(staff.id)))
+    );
+    return hasSharedLeave || localStorage.getItem(leaveStateKey(staffName)) === 'true';
 }
 
 // Staff availability directory + today's period substitutions + leave/coverage requests
@@ -780,6 +787,7 @@ if (!staffDirectory.some(s => String(s.displayName || s.name).toLowerCase() === 
 const CLASS_ADVISOR_ASSIGNMENTS = { 'adkeerj012345': 'II CSE C' };
 let substitutions = loadSubstitutions();
 let coverageRequests = loadCoverageRequests();
+let facultyLeaves = loadFacultyLeaves();
 
 function loadStaffDirectory() {
     try {
@@ -809,6 +817,177 @@ function loadSubstitutions() {
 
 function saveSubstitutions() {
     localStorage.setItem(SUBSTITUTION_STORAGE_KEY, JSON.stringify(substitutions));
+}
+
+function loadFacultyLeaves() {
+    try {
+        const saved = localStorage.getItem(FACULTY_LEAVES_KEY);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Unable to load faculty leave records:', error);
+        return [];
+    }
+}
+
+function saveFacultyLeaves() {
+    localStorage.setItem(FACULTY_LEAVES_KEY, JSON.stringify(facultyLeaves));
+}
+
+async function operationsApiRequest(path, options = {}) {
+    const fetchFn = typeof apiFetch === 'function' ? apiFetch : fetch;
+    const response = await fetchFn(path, options);
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || `Request failed (${response.status})`);
+    }
+    if (response.status === 204) return null;
+    return response.json();
+}
+
+async function syncStaffDirectoryFromBackend() {
+    const teachers = await operationsApiRequest('/api/teachers');
+    if (!Array.isArray(teachers)) throw new Error('Faculty directory response was invalid.');
+
+    const previous = staffDirectory;
+    staffDirectory = teachers.map(teacher => {
+        const name = `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim();
+        const displayName = teacher.displayName || name;
+        const old = previous.find(staff =>
+            (teacher.employeeId && staff.employeeId === teacher.employeeId) ||
+            isMatchingFaculty(staff.name, { name, displayName })
+        );
+        return {
+            id: teacher.id,
+            employeeId: teacher.employeeId || '',
+            userUsername: teacher.user?.username || '',
+            name,
+            displayName,
+            dept: teacher.department?.code || teacher.department?.name || '',
+            status: 'Available',
+            personalEmail: teacher.personalEmail || old?.personalEmail || '',
+            collegeEmail: teacher.collegeEmail || old?.collegeEmail || '',
+            classAdvisorFor: teacher.classAdvisorFor || old?.classAdvisorFor || ''
+        };
+    }).filter(staff => staff.name);
+    saveStaffDirectory();
+}
+
+async function syncCoverageRequestsFromBackend() {
+    const rows = await operationsApiRequest('/api/operations/coverage');
+    if (!Array.isArray(rows)) throw new Error('Coverage request response was invalid.');
+    coverageRequests = {};
+    rows.forEach(row => {
+        const pIdx = Number(row.periodIndex);
+        if (!row.date || !row.sectionName || !row.day || !Number.isInteger(pIdx)) return;
+        const key = substitutionKey(row.date, row.sectionName, row.day, pIdx);
+        coverageRequests[key] = {
+            id: row.id,
+            date: row.date,
+            section: row.sectionName,
+            day: row.day,
+            pIdx,
+            subject: row.subjectName || '',
+            venue: row.venueName || '',
+            absentStaff: row.absentStaff || '',
+            reason: row.reason || '',
+            status: row.status || 'OPEN',
+            requestedBy: row.requestedBy || null,
+            requestedAt: row.requestedAt || null,
+            createdAt: row.createdAt || null
+        };
+    });
+    saveCoverageRequests();
+}
+
+async function syncSubstitutionsFromBackend() {
+    const rows = await operationsApiRequest('/api/operations/substitutions');
+    if (!Array.isArray(rows)) throw new Error('Substitution response was invalid.');
+    substitutions = {};
+    rows.forEach(row => {
+        const pIdx = Number(row.periodIndex);
+        if (!row.date || !row.sectionName || !row.day || !Number.isInteger(pIdx)) return;
+        const key = substitutionKey(row.date, row.sectionName, row.day, pIdx);
+        substitutions[key] = {
+            id: row.id,
+            date: row.date,
+            section: row.sectionName,
+            day: row.day,
+            pIdx,
+            originalFaculty: row.originalFaculty || '',
+            substituteFaculty: row.substituteFaculty || '',
+            reason: row.reason || '',
+            assignedBy: row.assignedBy || '',
+            assignedAt: row.assignedAt || ''
+        };
+    });
+    saveSubstitutions();
+}
+
+async function syncFacultyAssignedPeriodsFromBackend(faculty = resolveLoggedInFacultyRecord()) {
+    if (!faculty?.id) {
+        throw new Error('Your faculty profile is not linked to this account.');
+    }
+    const rows = await operationsApiRequest(`/api/timetable/teacher/${encodeURIComponent(faculty.id)}`);
+    if (!Array.isArray(rows)) throw new Error('Your assigned timetable response was invalid.');
+    window.currentFacultyTimetableEntries = rows;
+}
+
+async function syncFacultyLeavesFromBackend() {
+    const rows = await operationsApiRequest(`/api/faculty-leaves?date=${encodeURIComponent(todayDateStr())}`);
+    if (!Array.isArray(rows)) throw new Error('Faculty leave response was invalid.');
+    facultyLeaves = rows;
+    saveFacultyLeaves();
+}
+
+async function syncLeaveAndSubstitutionData() {
+    await syncStaffDirectoryFromBackend();
+    await syncSubstitutionsFromBackend();
+    if (currentUserRole !== 'STUDENT') {
+        await Promise.all([syncCoverageRequestsFromBackend(), syncFacultyLeavesFromBackend()]);
+    } else {
+        await syncFacultyLeavesFromBackend();
+    }
+}
+
+async function saveCoverageRequestToBackend(request) {
+    return operationsApiRequest('/api/operations/coverage', {
+        method: 'POST',
+        body: JSON.stringify({
+            id: request.id,
+            date: request.date,
+            sectionName: request.section,
+            day: request.day,
+            periodIndex: request.pIdx,
+            subjectName: request.subject || '',
+            venueName: request.venue || '',
+            absentStaff: request.absentStaff,
+            reason: request.reason || '',
+            status: request.status || 'OPEN',
+            requestedBy: request.requestedBy || null,
+            requestedAt: request.requestedAt || null,
+            decidedAt: request.decidedAt || null,
+            declinedAt: request.declinedAt || null,
+            createdAt: request.createdAt || null
+        })
+    });
+}
+
+async function saveSubstitutionToBackend(substitution) {
+    return operationsApiRequest('/api/operations/substitutions', {
+        method: 'POST',
+        body: JSON.stringify({
+            id: substitution.id,
+            date: substitution.date,
+            sectionName: substitution.section,
+            day: substitution.day,
+            periodIndex: substitution.pIdx,
+            originalFaculty: substitution.originalFaculty,
+            substituteFaculty: substitution.substituteFaculty,
+            reason: substitution.reason || '',
+            assignedBy: substitution.assignedBy || '',
+            assignedAt: substitution.assignedAt || null
+        })
+    });
 }
 
 function todayDateStr() {
@@ -937,16 +1116,16 @@ function renderStaffAvailability() {
         staffDirectory.forEach((staff, idx) => {
             const dayKey = 'sece_staff_availability_' + dateStr;
             const daily = JSON.parse(localStorage.getItem(dayKey) || '{}');
-            const isAvailable = daily[staff.name] !== false;
             const onLeave = isStaffOnLeaveToday(staff.name);
+            const isAvailable = !onLeave && daily[staff.name] !== false && staff.status === 'Available';
             const isSelfRow = isFacultyOnly && myRec && isMatchingFaculty(staff.name, myRec);
             const canToggleRow = currentUserRole === 'ADMIN' || isSelfRow;
 
             let statusBadge;
-            if (isAvailable) {
-                statusBadge = '<span class="badge bg-success">Available</span>';
-            } else if (onLeave) {
+            if (onLeave) {
                 statusBadge = '<span class="badge bg-danger me-1">Unavailable</span><span class="badge bg-warning text-dark"><i class="fa-solid fa-house-medical me-1"></i>On Leave</span>';
+            } else if (isAvailable) {
+                statusBadge = '<span class="badge bg-success">Available</span>';
             } else {
                 statusBadge = '<span class="badge bg-secondary">Unavailable</span>';
             }
@@ -959,10 +1138,9 @@ function renderStaffAvailability() {
                     <td>${staff.dept}</td>
                     <td>${statusBadge}</td>
                     <td class="text-center">
-                        ${canManage ? `<button class="btn btn-sm ${isAvailable ? 'btn-outline-danger' : 'btn-outline-success'} py-0" onclick="toggleStaffAvailability(${idx})">
-                        ${canToggleRow ? `<button class="btn btn-sm ${isAvailable ? 'btn-outline-danger' : 'btn-outline-success'} py-0" onclick="toggleStaffAvailability(${idx})">
-                            ${isAvailable ? 'Mark Unavailable' : 'Mark Available'}
-                        </button>` : '<span class="text-muted small">View only</span>'}
+                        ${canManage && canToggleRow
+                            ? `<button class="btn btn-sm ${isAvailable ? 'btn-outline-danger' : 'btn-outline-success'} py-0" onclick="toggleStaffAvailability(${idx})">${isAvailable ? 'Mark Unavailable' : 'Mark Available'}</button>`
+                            : '<span class="text-muted small">View only</span>'}
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -989,7 +1167,6 @@ async function toggleStaffAvailability(idx) {
         alert('Access denied. Only Faculty and Admin can update staff availability.');
         return;
     }
-    const name = staffDirectory[idx].name;
     const staffObj = staffDirectory[idx];
     if (!staffObj) return;
     if (currentUserRole === 'FACULTY') {
@@ -1001,11 +1178,21 @@ async function toggleStaffAvailability(idx) {
     }
     const name = staffObj.name;
     const isLeave = isStaffOnLeaveToday(name);
-    if (isLeave) {
-        await cancelStaffLeave(name);
-    } else {
-        await markStaffOnLeave(name, "Admin marked as unavailable");
-        await markStaffOnLeave(name, currentUserRole === 'FACULTY' ? 'Faculty on leave' : 'Admin marked as unavailable');
+    try {
+        if (isLeave) {
+            await cancelStaffLeave(name);
+        } else {
+            await syncFacultyAssignedPeriodsFromBackend(staffObj);
+            await markStaffOnLeave(name, currentUserRole === 'FACULTY' ? 'Faculty on leave' : 'Admin marked as unavailable');
+        }
+    } catch (error) {
+        console.error('Unable to update faculty leave:', error);
+        showToast(
+            error.leaveSaved ? 'Leave Saved with Update Errors' : 'Leave Update Failed',
+            error.leaveSaved
+                ? `The leave record was saved, but coverage or notifications could not be completed: ${error.message}`
+                : error.message || 'Could not update faculty leave.'
+        );
     }
 }
 
@@ -1108,9 +1295,15 @@ function onSubPeriodChange() {
 function populateSubstituteFacultyOptions() {
     const select = document.getElementById('subSubstituteFaculty');
     if (!select) return;
-    const available = staffDirectory.filter(s => s.status === 'Available');
     const myRec = currentUserRole === 'FACULTY' ? resolveLoggedInFacultyRecord() : null;
-    const available = staffDirectory.filter(s => s.status === 'Available' && (!myRec || !isMatchingFaculty(s.name, myRec)));
+    const dateStr = todayDateStr();
+    const daily = JSON.parse(localStorage.getItem('sece_staff_availability_' + dateStr) || '{}');
+    const available = staffDirectory.filter(s =>
+        s.status === 'Available' &&
+        daily[s.name] !== false &&
+        !isStaffOnLeaveToday(s.name) &&
+        (!myRec || !isMatchingFaculty(s.name, myRec))
+    );
     select.innerHTML = available.length
         ? available.map(s => `<option value="${s.name}">${s.name} (${s.dept})</option>`).join('')
         : '<option value="">No staff currently marked Available</option>';
@@ -1124,31 +1317,25 @@ async function handleArrangeSubstitution(e) {
     }
     const todayName = getTodayDayName();
     if (todayName === 'Sunday') {
-        alert('No classes scheduled on Sunday - nothing to substitute.');
         alert('No classes scheduled on Sunday - nothing to substitute.');
         return;
     }
-    const pIdx = parseInt(document.getElementById('subPeriodSelect').value);
-    if (isNaN(pIdx)) {
-        const selVal = parseInt(document.getElementById('subPeriodSelect').value);
-        if (isNaN(selVal)) {
-            alert('Please select a valid period.');
-            return;
-        }
-        const substituteFaculty = document.getElementById('subSubstituteFaculty').value;
-        if (!substituteFaculty) {
-            alert('Please select an available substitute staff member.');
-            return;
-        }
-        const reason = document.getElementById('subReason').value;
-        const originalFaculty = document.getElementById('subOriginalFaculty').value;
-
-        const key = substitutionKey(todayDateStr(), currentSection, todayName, pIdx);
-        let targetSection = currentSection;
-        let pIdx = selVal;
-        let originalFaculty = document.getElementById('subOriginalFaculty').value;
-        let subjectName = '';
-        let venueName = document.getElementById('subVenue')?.value || '';
+    const selVal = Number.parseInt(document.getElementById('subPeriodSelect').value, 10);
+    if (!Number.isInteger(selVal) || selVal < 0) {
+        alert('Please select a valid period.');
+        return;
+    }
+    const substituteFaculty = document.getElementById('subSubstituteFaculty').value;
+    if (!substituteFaculty) {
+        alert('Please select an available substitute staff member.');
+        return;
+    }
+    const reason = document.getElementById('subReason').value;
+    let targetSection = currentSection;
+    let pIdx = selVal;
+    let originalFaculty = document.getElementById('subOriginalFaculty').value;
+    let subjectName = '';
+    let venueName = document.getElementById('subVenue')?.value || '';
 
         if (currentUserRole === 'FACULTY') {
             const myRec = resolveLoggedInFacultyRecord();
@@ -1174,69 +1361,68 @@ async function handleArrangeSubstitution(e) {
             venueName = venueName || periodEntry.venue || '';
         }
 
-        const subNotifDate = todayDateStr();
-        const key = substitutionKey(subNotifDate, targetSection, todayName, pIdx);
-        substitutions[key] = {
-            date: todayDateStr(),
-            section: currentSection,
-            date: subNotifDate,
-            section: targetSection,
-            day: todayName,
-            pIdx: pIdx,
-            originalFaculty: originalFaculty,
-            substituteFaculty: substituteFaculty,
-            reason: reason,
-            assignedBy: localStorage.getItem('sece_logged_in_user') || currentUserRole,
-            assignedAt: new Date().toISOString()
-        };
-        saveSubstitutions();
-
-        // Save substitution notification to backend API so all users can see it
-        const todayName2 = todayName;
-        const subNotifDate = todayDateStr();
-        const dayData2 = (timetableData[currentSection] || {})[todayName2] || [];
-        const periodEntry = dayData2[pIdx] || {};
-        await savePeriodNotificationToAPI({
-            date: subNotifDate,
-            day: todayName2,
-            day: todayName,
-            period: pIdx + 1,
-            section: currentSection,
-            section: targetSection,
-            originalFaculty: originalFaculty,
-            staff: substituteFaculty,
-            subject: periodEntry.sub || reason || 'Substitution',
-            subject: subjectName || reason || 'Substitution',
-            reason: reason || 'Substitution arranged',
-            source: 'substitution'
-        });
-
-        const mailRes = await notifyClassStudentsViaEmail('SUBSTITUTION', {
-            sectionName: targetSection,
-            date: subNotifDate,
-            day: todayName,
-            periodNumber: pIdx + 1,
-            subject: subjectName || 'Scheduled Class',
-            venue: venueName,
-            originalFaculty,
-            substituteFaculty,
-            reason: reason || 'Substitution arranged'
-        });
-
-        renderTimetableGrid();
-        renderTodaysSubstitutions();
-        document.getElementById('arrangeSubForm').reset();
-        populateSubPeriodOptions();
-        populateSubstituteFacultyOptions();
-
-        showToast('Substitute Assigned!', `${substituteFaculty} will cover Period ${pIdx + 1} today in place of ${originalFaculty}. Reverts automatically tomorrow.`);
-        const mailNote = mailRes && mailRes.totalRecipients > 0
-            ? ` Emailed ${mailRes.totalRecipients} verified student(s) in ${targetSection}.`
-            : ` Website Period Notification posted for ${targetSection} students.`;
-        showToast('Substitute Assigned!', `${substituteFaculty} will cover Period ${pIdx + 1} (${targetSection}) today in place of ${originalFaculty}.${mailNote}`);
+    const subNotifDate = todayDateStr();
+    const periodEntry = ((timetableData[targetSection] || {})[todayName] || [])[pIdx] || {};
+    const key = substitutionKey(subNotifDate, targetSection, todayName, pIdx);
+    const substitution = {
+        date: subNotifDate,
+        section: targetSection,
+        day: todayName,
+        pIdx,
+        originalFaculty,
+        substituteFaculty,
+        reason,
+        assignedBy: localStorage.getItem('sece_logged_in_user') || currentUserRole,
+        assignedAt: new Date().toISOString()
+    };
+    try {
+        const saved = await saveSubstitutionToBackend(substitution);
+        substitution.id = saved.id;
+    } catch (error) {
+        console.error('Unable to save substitution:', error);
+        showToast('Substitution Not Saved', error.message || 'Could not save this substitution.');
+        return;
     }
+    substitutions[key] = substitution;
+    saveSubstitutions();
 
-    function renderTodaysSubstitutions() {
+    await savePeriodNotificationToAPI({
+        date: subNotifDate,
+        day: todayName,
+        period: pIdx + 1,
+        section: targetSection,
+        originalFaculty,
+        staff: substituteFaculty,
+        subject: subjectName || periodEntry.sub || reason || 'Substitution',
+        reason: reason || 'Substitution arranged',
+        source: 'substitution'
+    });
+
+    const mailRes = await notifyClassStudentsViaEmail('SUBSTITUTION', {
+        sectionName: targetSection,
+        date: subNotifDate,
+        day: todayName,
+        periodNumber: pIdx + 1,
+        subject: subjectName || periodEntry.sub || 'Scheduled Class',
+        venue: venueName || periodEntry.venue || '',
+        originalFaculty,
+        substituteFaculty,
+        reason: reason || 'Substitution arranged'
+    });
+
+    renderTimetableGrid();
+    renderTodaysSubstitutions();
+    document.getElementById('arrangeSubForm').reset();
+    populateSubPeriodOptions();
+    populateSubstituteFacultyOptions();
+
+    const mailNote = mailRes && mailRes.totalRecipients > 0
+        ? ` Emailed ${mailRes.totalRecipients} verified student(s) in ${targetSection}.`
+        : ` Website Period Notification posted for ${targetSection} students.`;
+    showToast('Substitute Assigned!', `${substituteFaculty} will cover Period ${pIdx + 1} (${targetSection}) today in place of ${originalFaculty}.${mailNote}`);
+}
+
+function renderTodaysSubstitutions() {
         const list = document.getElementById('todaysSubstitutionsList');
         if (!list) return;
         const todayName = getTodayDayName();
@@ -1246,39 +1432,36 @@ async function handleArrangeSubstitution(e) {
             if (typeof currentStudentRecord === 'function') {
                 const rec = currentStudentRecord();
                 if (rec && rec.sec) filterSection = rec.sec;
-                const myRec = currentUserRole === 'FACULTY' ? resolveLoggedInFacultyRecord() : null;
-
-                const relevant = Object.entries(substitutions).filter(([key, s]) => {
-                    if (s.date !== dateStr || s.day !== todayName) return false;
-                    if (currentUserRole === 'FACULTY' && myRec) {
-                        return isMatchingFaculty(s.originalFaculty, myRec) || normalizeSectionCompare(s.section) === normalizeSectionCompare(currentSection);
-                    }
-                }
-    const relevant = Object.entries(substitutions).filter(([key, s]) =>
-                    s.date === dateStr && s.section === filterSection && s.day === todayName
-                );
-                return normalizeSectionCompare(s.section) === normalizeSectionCompare(currentSection);
-            });
-
-            if (relevant.length === 0) {
-                list.innerHTML = '<li class="list-group-item bg-dark text-muted small">No substitutions arranged for today in this section.</li>';
-                list.innerHTML = '<li class="list-group-item bg-dark text-muted small">No substitutions arranged for today.</li>';
-                return;
             }
+        }
 
-            list.innerHTML = relevant.map(([key, s]) => `
-    list.innerHTML = relevant.map(([key, s]) => {
-        const canCancelThis = currentUserRole === 'ADMIN' || (currentUserRole === 'FACULTY' && myRec && isMatchingFaculty(s.originalFaculty, myRec));
-        return `
-                < li class= "list-group-item bg-dark text-white d-flex justify-content-between align-items-center small" >
-                <span>Period ${s.pIdx + 1}: <strong class='text-danger'>${s.originalFaculty} is Absent</strong>. <strong class='text-success'>${s.substituteFaculty}</strong> is substituted.${s.reason ? ' - ' + s.reason : ''}</span>
-            ${ canManageSubstitutions() ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="cancelSubstitution('${key}')">Cancel</button>` : ''}
-        </li >
-            `).join('');
-            <span><strong>${s.section}</strong> &bull; Period ${s.pIdx + 1}: <strong class='text-danger'>${s.originalFaculty} is Absent</strong>. <strong class='text-success'>${s.substituteFaculty}</strong> is substituted.${s.reason ? ' - ' + s.reason : ''}</span>
-            ${canCancelThis ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="cancelSubstitution('${key}')">Cancel</button>` : ''}
-        </li>`;
-    }).join('');
+        const myRec = currentUserRole === 'FACULTY' ? resolveLoggedInFacultyRecord() : null;
+        const relevant = Object.entries(substitutions).filter(([key, s]) => {
+            if (s.date !== dateStr || s.day !== todayName) return false;
+            if (currentUserRole === 'STUDENT') {
+                return normalizeSectionCompare(s.section) === normalizeSectionCompare(filterSection);
+            }
+            if (currentUserRole === 'FACULTY' && myRec) {
+                return isMatchingFaculty(s.originalFaculty, myRec)
+                    || normalizeSectionCompare(s.section) === normalizeSectionCompare(currentSection);
+            }
+            return true;
+        });
+
+        if (relevant.length === 0) {
+            list.innerHTML = '<li class="list-group-item bg-dark text-muted small">No substitutions arranged for today.</li>';
+            return;
+        }
+
+        list.innerHTML = relevant.map(([key, s]) => {
+            const canCancelThis = currentUserRole === 'ADMIN'
+                || (currentUserRole === 'FACULTY' && myRec && isMatchingFaculty(s.originalFaculty, myRec));
+            return `
+                <li class="list-group-item bg-dark text-white d-flex justify-content-between align-items-center small">
+                    <span><strong>${s.section}</strong> &bull; Period ${s.pIdx + 1}: <strong class="text-danger">${s.originalFaculty} is Absent</strong>. <strong class="text-success">${s.substituteFaculty}</strong> is substituted.${s.reason ? ' - ' + s.reason : ''}</span>
+                    ${canCancelThis ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="cancelSubstitution('${key}')">Cancel</button>` : ''}
+                </li>`;
+        }).join('');
 }
 
 async function cancelSubstitution(key) {
@@ -1294,34 +1477,42 @@ async function cancelSubstitution(key) {
             return;
         }
     }
-    delete substitutions[key];
-    saveSubstitutions();
-    // If this substitution came from an accepted coverage request, reopen it
-    if (coverageRequests[key] && coverageRequests[key].status === 'ACCEPTED') {
-        coverageRequests[key].status = 'OPEN';
-        coverageRequests[key].requestedBy = null;
+    try {
+        if (cancelledSub?.id) {
+            await operationsApiRequest(`/api/operations/substitutions/${cancelledSub.id}`, { method: 'DELETE' });
+        }
+        const coverage = coverageRequests[key];
+        if (coverage?.status === 'ACCEPTED') {
+            const reopened = {
+                ...coverage,
+                status: 'OPEN',
+                requestedBy: null,
+                requestedAt: null
+            };
+            const saved = await saveCoverageRequestToBackend(reopened);
+            coverageRequests[key] = { ...reopened, id: saved.id };
+        }
+        if (cancelledSub) {
+            const cancelDate = cancelledSub.date || todayDateStr();
+            await fetchPeriodNotificationsFromAPI();
+            const notifications = purgeExpiredPeriodNotifications();
+            const matching = notifications.filter(n =>
+                n.date === cancelDate &&
+                n.section === cancelledSub.section &&
+                Number(n.period) === cancelledSub.pIdx + 1 &&
+                n.source === 'substitution'
+            );
+            await Promise.all(matching.map(n => n._id ? deletePeriodNotificationFromAPI(n) : null));
+            savePeriodNotifications(purgeExpiredPeriodNotifications());
+        }
+        delete substitutions[key];
+        saveSubstitutions();
         saveCoverageRequests();
         renderCoverageRequests();
-    }
-    // Also remove the matching period notification from the backend API
-    if (cancelledSub) {
-        const cancelDate = cancelledSub.date || todayDateStr();
-        // Force refresh from API to ensure we have the IDs
-        await fetchPeriodNotificationsFromAPI();
-        const cancelNotifArr = purgeExpiredPeriodNotifications();
-
-        const toDelete = cancelNotifArr.filter(n =>
-        (n.date === cancelDate && n.section === cancelledSub.section &&
-            Number(n.period) === cancelledSub.pIdx + 1 &&
-            (n.source === 'auto' || n.source === 'substitution'))
-        );
-        await Promise.all(toDelete.map(n => {
-            if (n._id) return deletePeriodNotificationFromAPI(n);
-            return Promise.resolve();
-        }));
-
-        const cancelNotifFiltered = purgeExpiredPeriodNotifications(); // Re-purge after delete updates cache
-        savePeriodNotifications(cancelNotifFiltered);
+    } catch (error) {
+        console.error('Unable to cancel substitution:', error);
+        showToast('Cancellation Failed', error.message || 'Could not cancel this substitution.');
+        return;
     }
     renderTimetableGrid();
     renderTodaysSubstitutions();
@@ -1350,20 +1541,24 @@ function saveCoverageRequests() {
 function findTodaysPeriodsForStaff(staffName) {
     const todayName = getTodayDayName();
     const results = [];
-    const seen = new Set(); // Avoid duplicates
-    const targetRec = { name: staffName, displayName: staffName };
+    const seen = new Set();
+    const targetRec = staffDirectory.find(staff => isMatchingFaculty(staffName, staff))
+        || { name: staffName, displayName: staffName };
 
-    // Primary: search the real backend-loaded timetable entries
-    // 1. Primary: search the real backend-loaded timetable entries
-    if (window.currentTimetableEntries && window.currentTimetableEntries.length > 0) {
-        window.currentTimetableEntries.forEach(entry => {
-            if (!entry.teacherName || !entry.teacherName.includes(staffName)) return;
-            if (!entry.teacherName || !isMatchingFaculty(entry.teacherName, targetRec)) return;
-            const entryDay = entry.day;
-            if (entryDay !== todayName) return;
-            const pIdx = (entry.slotNumber || 1) - 1;
-            const section = entry.sectionName || currentSection || entry.section || '';
-            const key = `${section}_${pIdx}`;
+    const timetableEntries = [
+        ...(Array.isArray(window.currentFacultyTimetableEntries) ? window.currentFacultyTimetableEntries : []),
+        ...(Array.isArray(window.currentTimetableEntries) ? window.currentTimetableEntries : [])
+    ];
+    if (timetableEntries.length > 0) {
+        timetableEntries.forEach(entry => {
+            const matchesTeacherId = targetRec.id && entry.teacherId && String(targetRec.id) === String(entry.teacherId);
+            if (!matchesTeacherId && !isMatchingFaculty(entry.teacherName, targetRec)) return;
+            if (String(entry.day || '').toLowerCase() !== todayName.toLowerCase()) return;
+            const slotNumber = Number(entry.slotNumber);
+            if (!Number.isInteger(slotNumber) || slotNumber < 1 || slotNumber > 7) return;
+            const pIdx = slotNumber - 1;
+            const section = entry.sectionName || entry.section || '';
+            if (!section) return;
             const key = `${normalizeSectionCompare(section)}_${pIdx}`;
             if (seen.has(key)) return;
             seen.add(key);
@@ -1377,25 +1572,19 @@ function findTodaysPeriodsForStaff(staffName) {
         });
     }
 
-    // Fallback / supplement: search local static timetableData
-    // 2. Search loaded section timetableData grids
     Object.keys(timetableData).forEach(section => {
         const dayData = timetableData[section] && timetableData[section][todayName];
         if (!dayData) return;
         dayData.forEach((p, pIdx) => {
-            if (p && p.faculty && p.faculty.includes(staffName)) {
-                const key = `${section}_${pIdx}`;
-                if (p && p.faculty && isMatchingFaculty(p.faculty, targetRec)) {
-                    const key = `${normalizeSectionCompare(section)}_${pIdx}`;
-                    if (seen.has(key)) return;
-                    seen.add(key);
-                    results.push({ section, day: todayName, pIdx, subject: p.sub, venue: p.venue });
-                }
-            });
+            if (!p || !p.faculty) return;
+            if (!p.faculty.includes(staffName) && !isMatchingFaculty(p.faculty, targetRec)) return;
+            const key = `${normalizeSectionCompare(section)}_${pIdx}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            results.push({ section, day: todayName, pIdx, subject: p.sub, venue: p.venue });
+        });
     });
-    return results;
 
-    // 3. Also include periods assigned in the logged-in faculty's own Personal Timetable
     const myRec = resolveLoggedInFacultyRecord();
     if (myRec && isMatchingFaculty(staffName, myRec)) {
         try {
@@ -1477,85 +1666,122 @@ function onStaffIdentityChange() {
 
 async function markStaffOnLeave(name, reason) {
     const staffIdx = staffDirectory.findIndex(s => s.name === name);
-    if (staffIdx > -1) staffDirectory[staffIdx].status = 'Unavailable';
-    saveStaffDirectory();
-
     const dateStr = todayDateStr();
-    const dayKey = 'sece_staff_availability_' + dateStr;
-    const daily = JSON.parse(localStorage.getItem(dayKey) || '{}');
-    daily[name] = false;
-    localStorage.setItem(dayKey, JSON.stringify(daily));
+    const staff = staffDirectory[staffIdx];
+    if (!staff?.id) {
+        throw new Error('Could not find this faculty member in the server directory. Refresh and try again.');
+    }
 
-    localStorage.setItem(leaveStateKey(name), 'true');
+    let leaveSaved = false;
+    try {
+        const leave = await operationsApiRequest('/api/faculty-leaves', {
+            method: 'POST',
+            body: JSON.stringify({ teacherId: staff.id, date: dateStr, reason })
+        });
+        leaveSaved = true;
+        facultyLeaves = facultyLeaves.filter(item =>
+            !(String(item.teacherId) === String(staff.id) && item.date === dateStr)
+        );
+        facultyLeaves.push(leave);
+        saveFacultyLeaves();
 
-    const periods = findTodaysPeriodsForStaff(name);
-    periods.forEach(p => {
-        const key = substitutionKey(dateStr, p.section, p.day, p.pIdx);
-        if (!coverageRequests[key] || coverageRequests[key].date !== dateStr) {
-            coverageRequests[key] = {
-                date: dateStr, section: p.section, day: p.day, pIdx: p.pIdx,
-                subject: p.subject, venue: p.venue,
-                absentStaff: name, reason: reason,
-                status: 'OPEN', requestedBy: null,
+        staff.status = 'Unavailable';
+        saveStaffDirectory();
+        const dayKey = 'sece_staff_availability_' + dateStr;
+        const daily = JSON.parse(localStorage.getItem(dayKey) || '{}');
+        daily[name] = false;
+        localStorage.setItem(dayKey, JSON.stringify(daily));
+
+        localStorage.setItem(leaveStateKey(name), 'true');
+
+        const periods = findTodaysPeriodsForStaff(name);
+        for (const p of periods) {
+            const key = substitutionKey(dateStr, p.section, p.day, p.pIdx);
+            const request = coverageRequests[key] || {
+                date: dateStr,
+                section: p.section,
+                day: p.day,
+                pIdx: p.pIdx,
+                subject: p.subject,
+                venue: p.venue,
+                absentStaff: name,
+                status: 'OPEN',
+                requestedBy: null,
                 createdAt: new Date().toISOString()
             };
+            request.reason = reason;
+            coverageRequests[key] = await saveCoverageRequestToBackend(request);
+            coverageRequests[key] = {
+                ...request,
+                id: coverageRequests[key].id,
+                date: request.date,
+                section: request.section,
+                day: request.day,
+                pIdx: request.pIdx,
+                subject: request.subject,
+                venue: request.venue,
+                absentStaff: request.absentStaff,
+                status: request.status,
+                requestedBy: request.requestedBy
+            };
         }
-    });
-    saveCoverageRequests();
+        saveCoverageRequests();
 
-    // Save leave notifications to backend API (shared across all users)
-    await Promise.all(periods.map(p => savePeriodNotificationToAPI({
-        date: dateStr,
-        day: p.day,
-        period: p.pIdx + 1,
-        section: p.section,
-        originalFaculty: name,
-        staff: '- (Coverage Needed)',
-        subject: reason + ' - Period open for substitution.',
-        reason: reason + ' - Period open for substitution.',
-        source: 'leave'
-    })));
-    // Save leave notifications to backend API + email ONLY students of each affected class/section
-    await Promise.all(periods.map(async p => {
-        await savePeriodNotificationToAPI({
-            date: dateStr,
-            day: p.day,
-            period: p.pIdx + 1,
-            section: p.section,
-            originalFaculty: name,
-            staff: '-  (Coverage Needed)',
-            subject: reason + ' -  Period open for substitution.',
-            reason: reason + ' -  Period open for substitution.',
-            source: 'leave'
-        });
-        await notifyClassStudentsViaEmail('ABSENT', {
-            sectionName: p.section,
-            date: dateStr,
-            day: p.day,
-            periodNumber: p.pIdx + 1,
-            subject: p.subject || 'Scheduled Period',
-            venue: p.venue || '',
-            originalFaculty: name,
-            substituteFaculty: '',
-            reason: reason || 'Faculty on leave'
-        });
-    }));
+        await Promise.all(periods.map(async p => {
+            await savePeriodNotificationToAPI({
+                date: dateStr,
+                day: p.day,
+                period: p.pIdx + 1,
+                section: p.section,
+                originalFaculty: name,
+                staff: 'Coverage pending',
+                subject: `${reason || 'Faculty on leave'} - Period open for substitution.`,
+                reason: `${reason || 'Faculty on leave'} - Period open for substitution.`,
+                source: 'leave'
+            });
+            await notifyClassStudentsViaEmail('ABSENT', {
+                sectionName: p.section,
+                date: dateStr,
+                day: p.day,
+                periodNumber: p.pIdx + 1,
+                subject: p.subject || 'Scheduled Period',
+                venue: p.venue || '',
+                originalFaculty: name,
+                substituteFaculty: '',
+                reason: reason || 'Faculty on leave'
+            });
+        }));
 
-    renderStaffAvailability();
-    populateSubstituteFacultyOptions();
-    renderCoverageRequests();
-    updateLeaveButtonState();
+        renderStaffAvailability();
+        populateSubstituteFacultyOptions();
+        renderCoverageRequests();
+        updateLeaveButtonState();
 
-    showToast('Marked as On Leave',
-        periods.length
-            ? `${name} is on leave today. ${periods.length} period(s) flagged for coverage - other staff have been notified.`
-                ? `${name} is on leave today. ${periods.length} period(s) flagged - affected class students notified via website and email.`
+        showToast('Marked as On Leave',
+            periods.length
+                ? `${name} is on leave today. ${periods.length} period(s) flagged for coverage; affected class students and staff have been notified.`
                 : `${name} is marked on leave today (no periods scheduled).`
-    );
+        );
+    } catch (error) {
+        const failure = new Error(error.message || 'Could not complete the leave workflow.');
+        failure.leaveSaved = leaveSaved;
+        throw failure;
+    }
 }
 
 async function cancelStaffLeave(name) {
     const dateStr = todayDateStr();
+    const staff = staffDirectory.find(item => isMatchingFaculty(item.name, { name, displayName: name }));
+    const leave = facultyLeaves.find(item =>
+        item.date === dateStr &&
+        (String(item.teacherId) === String(staff?.id) ||
+            isMatchingFaculty(item.staffName, { name, displayName: name }))
+    );
+    if (leave?.id) {
+        await operationsApiRequest(`/api/faculty-leaves/${leave.id}`, { method: 'DELETE' });
+    }
+    facultyLeaves = facultyLeaves.filter(item => item !== leave);
+    saveFacultyLeaves();
 
     localStorage.removeItem(leaveStateKey(name));
 
@@ -1569,13 +1795,16 @@ async function cancelStaffLeave(name) {
     saveStaffDirectory();
 
     let removedCount = 0;
-    Object.keys(coverageRequests).forEach(key => {
+    for (const key of Object.keys(coverageRequests)) {
         const req = coverageRequests[key];
         if (req.absentStaff === name && req.date === dateStr && req.status === 'OPEN') {
+            if (req.id) {
+                await operationsApiRequest(`/api/operations/coverage/${req.id}`, { method: 'DELETE' });
+            }
             delete coverageRequests[key];
             removedCount++;
         }
-    });
+    }
     saveCoverageRequests();
 
     // Force refresh from API to guarantee we have the IDs
@@ -1583,10 +1812,7 @@ async function cancelStaffLeave(name) {
     const notifArr = purgeExpiredPeriodNotifications();
     // Find matching notifications and delete them from the backend API
     const toDelete = notifArr.filter(n => (n.source === 'leave' && n.originalFaculty === name && n.date === dateStr));
-    await Promise.all(toDelete.map(n => {
-        if (n._id) return deletePeriodNotificationFromAPI(n);
-        return Promise.resolve();
-    }));
+    await Promise.all(toDelete.map(n => deletePeriodNotificationFromAPI(n)));
 
     const cleaned = purgeExpiredPeriodNotifications(); // Re-purge after delete updates cache
     savePeriodNotifications(cleaned);
@@ -1608,18 +1834,36 @@ window.markMyselfOnLeave = async function () {
         alert('Only Faculty and Admin can mark themselves on leave.');
         return;
     }
-    const name = document.getElementById('myStaffIdentitySelect').value;
-    const name = currentUserRole === 'FACULTY'
+    let name = currentUserRole === 'FACULTY'
         ? (resolveLoggedInFacultyRecord()?.name || '')
         : (document.getElementById('myStaffIdentitySelect')?.value || '');
     if (!name) {
-        alert('Please select which staff member you are first.');
-        alert('Could not resolve your staff profile. Please ensure your faculty record exists.');
+        alert(currentUserRole === 'FACULTY'
+            ? 'Could not resolve your faculty profile. Please ensure your account is linked to a faculty record.'
+            : 'Please select which staff member you are first.');
         return;
     }
-    setMyStaffIdentity(name);
-    const reason = document.getElementById('leaveReasonInput').value || 'On Leave';
-    await markStaffOnLeave(name, reason);
+    try {
+        await syncStaffDirectoryFromBackend();
+        const staff = staffDirectory.find(item => isMatchingFaculty(item.name, { name, displayName: name }));
+        if (!staff?.id) {
+            throw new Error('Could not find this faculty member in the server directory.');
+        }
+        name = staff.name;
+        await syncFacultyAssignedPeriodsFromBackend(staff);
+        setMyStaffIdentity(name);
+        const reason = document.getElementById('leaveReasonInput').value || 'On Leave';
+        await markStaffOnLeave(name, reason);
+    } catch (error) {
+        console.error('Unable to save faculty leave:', error);
+        showToast(
+            error.leaveSaved ? 'Leave Saved with Update Errors' : 'Leave Not Saved',
+            error.leaveSaved
+                ? `The leave record was saved, but coverage or notifications could not be completed: ${error.message}`
+                : error.message || 'Could not save your leave. Please try again.'
+        );
+        return;
+    }
     document.getElementById('leaveReasonInput').value = '';
 }
 
@@ -1628,16 +1872,19 @@ window.cancelMyLeave = async function () {
         alert('Only Faculty and Admin can cancel their leave.');
         return;
     }
-    const name = getMyStaffIdentity() || document.getElementById('myStaffIdentitySelect')?.value;
     const name = currentUserRole === 'FACULTY'
         ? (resolveLoggedInFacultyRecord()?.name || '')
         : (getMyStaffIdentity() || document.getElementById('myStaffIdentitySelect')?.value);
     if (!name) {
-        alert('No staff identity found. Please select your name first.');
         alert('No staff identity found.');
         return;
     }
-    await cancelStaffLeave(name);
+    try {
+        await cancelStaffLeave(name);
+    } catch (error) {
+        console.error('Unable to cancel faculty leave:', error);
+        showToast('Leave Cancellation Failed', error.message || 'Could not cancel this leave.');
+    }
 }
 
 // Dynamically updates the leave action button group
@@ -1663,7 +1910,7 @@ function updateLeaveButtonState() {
     }
 }
 
-function requestToCover(key) {
+async function requestToCover(key) {
     if (!canManageSubstitutions()) {
         alert('Only Faculty and Admin can request to cover a period.');
         return;
@@ -1675,7 +1922,7 @@ function requestToCover(key) {
     }
     const req = coverageRequests[key];
     if (!req) return;
-    if (req.absentStaff === myName) {
+    if (isMatchingFaculty(req.absentStaff, { name: myName, displayName: myName })) {
         alert('You cannot request to cover your own period.');
         return;
     }
@@ -1686,13 +1933,22 @@ function requestToCover(key) {
     req.status = 'REQUESTED';
     req.requestedBy = myName;
     req.requestedAt = new Date().toISOString();
+    try {
+        const saved = await saveCoverageRequestToBackend(req);
+        req.id = saved.id;
+    } catch (error) {
+        req.status = 'OPEN';
+        req.requestedBy = null;
+        req.requestedAt = null;
+        showToast('Request Not Sent', error.message || 'Could not save your coverage request.');
+        return;
+    }
     saveCoverageRequests();
     renderCoverageRequests();
     showToast('Request Sent', `Your request to cover ${req.subject} (Period ${req.pIdx + 1}, ${req.section}) was sent to ${req.absentStaff}. Waiting for their confirmation.`);
 }
 
-function respondToCoverageRequest(key, accept) {
-    async function respondToCoverageRequest(key, accept) {
+async function respondToCoverageRequest(key, accept) {
         const req = coverageRequests[key];
         if (!req) return;
         const myName = getMyStaffIdentity();
@@ -1702,57 +1958,70 @@ function respondToCoverageRequest(key, accept) {
             return;
         }
 
-        if (accept) {
-            req.status = 'ACCEPTED';
-            req.decidedAt = new Date().toISOString();
+        try {
+            if (accept) {
+                req.status = 'ACCEPTED';
+                req.decidedAt = new Date().toISOString();
 
-            const subKey = substitutionKey(req.date, req.section, req.day, req.pIdx);
-            substitutions[subKey] = {
-                date: req.date, section: req.section, day: req.day, pIdx: req.pIdx,
-                originalFaculty: req.absentStaff, substituteFaculty: req.requestedBy,
-                reason: req.reason,
-                assignedBy: localStorage.getItem('sece_logged_in_user') || currentUserRole,
-                assignedAt: new Date().toISOString()
-            };
-            saveSubstitutions();
+                const subKey = substitutionKey(req.date, req.section, req.day, req.pIdx);
+                const substitution = {
+                    date: req.date,
+                    section: req.section,
+                    day: req.day,
+                    pIdx: req.pIdx,
+                    originalFaculty: req.absentStaff,
+                    substituteFaculty: req.requestedBy,
+                    reason: req.reason,
+                    assignedBy: localStorage.getItem('sece_logged_in_user') || currentUserRole,
+                    assignedAt: new Date().toISOString()
+                };
+                const savedSubstitution = await saveSubstitutionToBackend(substitution);
+                substitutions[subKey] = { ...substitution, id: savedSubstitution.id };
 
-            // Add substitution to period notifications so it displays in the Day/Period Notifications modal
-            const notifArr = purgeExpiredPeriodNotifications();
-            notifArr.push({
-                // Persist substitution notification to backend API + notify that class's students via email
-                await savePeriodNotificationToAPI({
+                const savedRequest = await saveCoverageRequestToBackend(req);
+                req.id = savedRequest.id;
+
+                const notif = {
                     date: req.date,
                     day: req.day,
-                    period: parseInt(req.pIdx) + 1,
+                    period: req.pIdx + 1,
                     section: req.section,
                     originalFaculty: req.absentStaff,
                     staff: req.requestedBy,
                     subject: req.subject || 'Substitution accepted',
                     reason: req.reason || 'Substitution accepted',
                     source: 'substitution'
-                });
-                notifyClassStudentsViaEmail('SUBSTITUTION', {
+                };
+                await savePeriodNotificationToAPI(notif);
+                const mailRes = await notifyClassStudentsViaEmail('SUBSTITUTION', {
                     sectionName: req.section,
-                date: req.date,
-                day: req.day,
-                periodNumber: parseInt(req.pIdx) + 1,
-                subject: req.subject,
-                venue: req.venue,
-                reason: `Substitution accepted`,
-                source: 'auto'
-            originalFaculty: req.absentStaff,
-                substituteFaculty: req.requestedBy,
-                reason: req.reason || 'Substitution accepted'
-            });
-            savePeriodNotifications(notifArr);
-
-            showToast('Coverage Accepted', `${req.requestedBy} will cover ${req.subject} (Period ${req.pIdx + 1}) today.`);
-            showToast('Coverage Accepted', `${req.requestedBy} will cover ${req.subject} (Period ${req.pIdx + 1}, ${req.section}) today. Class students notified.`);
-        } else {
-            req.status = 'OPEN';
-            req.requestedBy = null;
-            req.declinedAt = new Date().toISOString();
-            showToast('Coverage Declined', 'Request declined. The period is open for other staff to request again.');
+                    date: req.date,
+                    day: req.day,
+                    periodNumber: req.pIdx + 1,
+                    subject: req.subject || 'Scheduled Class',
+                    venue: req.venue || '',
+                    originalFaculty: req.absentStaff,
+                    substituteFaculty: req.requestedBy,
+                    reason: req.reason || 'Substitution accepted'
+                });
+                saveSubstitutions();
+                showToast(
+                    'Coverage Accepted',
+                    `${req.requestedBy} will cover ${req.subject} (Period ${req.pIdx + 1}, ${req.section}) today.` +
+                        (mailRes?.totalRecipients ? ` Emailed ${mailRes.totalRecipients} verified student(s).` : ' In-app notice posted for the class.')
+                );
+            } else {
+                req.status = 'OPEN';
+                req.requestedBy = null;
+                req.declinedAt = new Date().toISOString();
+                const savedRequest = await saveCoverageRequestToBackend(req);
+                req.id = savedRequest.id;
+                showToast('Coverage Declined', 'Request declined. The period is open for other staff to request again.');
+            }
+        } catch (error) {
+            console.error('Unable to update coverage request:', error);
+            showToast('Coverage Update Failed', error.message || 'Could not update the coverage request.');
+            return;
         }
         saveCoverageRequests();
         renderCoverageRequests();
@@ -1773,7 +2042,7 @@ function respondToCoverageRequest(key, accept) {
         }
 
         list.innerHTML = todays.map(([key, r]) => {
-            const isMyLeave = r.absentStaff === myName;
+            const isMyLeave = isMatchingFaculty(r.absentStaff, { name: myName, displayName: myName });
             const isAdmin = currentUserRole === 'ADMIN';
             let actions = '';
             if (r.status === 'OPEN' && !isMyLeave) {
@@ -1851,19 +2120,30 @@ function respondToCoverageRequest(key, accept) {
         }
     });
 
-    function initSubstitutionModal() {
-        async function initSubstitutionModal() {
-            if (currentUserRole === 'FACULTY' && typeof window.syncFacultyPersonalTtFromBackend === 'function') {
-                try { await window.syncFacultyPersonalTtFromBackend(); } catch (_) { }
-            }
-            renderStaffAvailability();
-            populateSubstituteFacultyOptions();
-            populateSubPeriodOptions();
-            renderTodaysSubstitutions();
-            populateStaffIdentityDropdown();
-            renderCoverageRequests();
-            updateLeaveButtonState();
+async function initSubstitutionModal() {
+    try {
+        if (typeof window.loadTimetableData === 'function') {
+            await window.loadTimetableData();
         }
+        if (currentUserRole === 'FACULTY' && typeof window.syncFacultyPersonalTtFromBackend === 'function') {
+            await window.syncFacultyPersonalTtFromBackend();
+        }
+        await syncLeaveAndSubstitutionData();
+        if (currentUserRole === 'FACULTY') {
+            await syncFacultyAssignedPeriodsFromBackend();
+        }
+        renderStaffAvailability();
+        populateSubstituteFacultyOptions();
+        populateSubPeriodOptions();
+        renderTodaysSubstitutions();
+        populateStaffIdentityDropdown();
+        renderCoverageRequests();
+        updateLeaveButtonState();
+    } catch (error) {
+        console.error('Unable to load leave and substitution data:', error);
+        showToast('Availability Load Failed', error.message || 'Could not load leave and substitution data.');
+    }
+}
 
         function renderAdminLeaveNotifications() {
             const list = document.getElementById('adminAbsentNotifList');
@@ -2824,6 +3104,37 @@ function respondToCoverageRequest(key, accept) {
 
             renderNotificationStatus();
             toggleSubstitutionUI();
+            const refreshLeaveAndSubstitutionState = async () => {
+                try {
+                    await Promise.all([
+                        syncSubstitutionsFromBackend(),
+                        syncFacultyLeavesFromBackend(),
+                        role === 'STUDENT' ? Promise.resolve() : syncCoverageRequestsFromBackend(),
+                        fetchPeriodNotificationsFromAPI()
+                    ]);
+                    renderTimetableGrid();
+                    renderTodaysSubstitutions();
+                    renderCoverageRequests();
+                    renderStaffAvailability();
+                    updateLeaveButtonState();
+                    const notificationModal = document.getElementById('periodNotificationModal');
+                    if (notificationModal && !notificationModal.classList.contains('d-none')) {
+                        await renderPeriodNotifications();
+                    }
+                } catch (error) {
+                    console.error('Unable to refresh leave and substitution updates:', error);
+                    if (/Request failed \((401|403)\)/.test(error.message || '')) {
+                        clearInterval(window._leaveSubstitutionRefreshTimer);
+                        window._leaveSubstitutionRefreshTimer = null;
+                        showToast('Session Access Error', 'Sign in again to receive leave and substitution updates.');
+                    }
+                }
+            };
+            if (window._leaveSubstitutionRefreshTimer) {
+                clearInterval(window._leaveSubstitutionRefreshTimer);
+            }
+            refreshLeaveAndSubstitutionState();
+            window._leaveSubstitutionRefreshTimer = setInterval(refreshLeaveAndSubstitutionState, 30000);
             if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
             if (role === 'FACULTY') {
                 if (typeof window.syncFacultyPersonalTtFromBackend === 'function') {
@@ -5194,9 +5505,8 @@ function respondToCoverageRequest(key, accept) {
 
         async function fetchPeriodNotificationsFromAPI() {
             try {
-                const res = await fetch('/api/operations/period-notifications');
-                if (!res.ok) throw new Error('API error');
-                const data = await res.json();
+                const data = await operationsApiRequest('/api/operations/period-notifications');
+                if (!Array.isArray(data)) throw new Error('Period notification response was invalid.');
                 // Map backend PeriodNotification entity fields to frontend shape
                 _periodNotifCache = data.map(n => ({
                     _id: n.id,
@@ -5268,37 +5578,21 @@ function respondToCoverageRequest(key, accept) {
                 reason: notif.subject || notif.reason || '',
                 source: notif.source || 'manual'
             };
-            try {
-                const res = await fetch('/api/operations/period-notifications', {
-                    const res = await apiFetch('/api/operations/period-notifications', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if(!res.ok) throw new Error('Save failed');
-                const saved = await res.json();
-                // Refresh cache
-                await fetchPeriodNotificationsFromAPI();
-                return saved;
-            } catch (e) {
-                console.warn('Could not save notification to API, saving to localStorage:', e);
-                const arr = loadPeriodNotifications();
-                arr.push(notif);
-                localStorage.setItem(PERIOD_NOTIFICATIONS_KEY, JSON.stringify(arr));
-            }
+            const saved = await operationsApiRequest('/api/operations/period-notifications', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            await fetchPeriodNotificationsFromAPI();
+            return saved;
         }
 
         async function deletePeriodNotificationFromAPI(notif) {
             if (notif && notif._id) {
-                try {
-                    await fetch('/api/operations/period-notifications/' + notif._id, { method: 'DELETE' });
-                    await fetchPeriodNotificationsFromAPI();
-                    return;
-                } catch (e) { console.warn('Could not delete notification from API:', e); }
+                await operationsApiRequest('/api/operations/period-notifications/' + notif._id, { method: 'DELETE' });
+                await fetchPeriodNotificationsFromAPI();
+                return;
             }
-            // Fallback: remove from localStorage
-            const arr = loadPeriodNotifications().filter(n => n !== notif);
-            localStorage.setItem(PERIOD_NOTIFICATIONS_KEY, JSON.stringify(arr));
+            throw new Error('Cannot delete a notification that is not persisted on the server.');
         }
 
         function savePeriodNotifications(a) {
@@ -5332,7 +5626,6 @@ function respondToCoverageRequest(key, accept) {
             let filteredArr = arr;
             // Only strictly filter by section for Students. Faculty and Admins need to see all active notifications.
             if (currentUserRole === 'STUDENT') {
-                let studentSec = currentSection;
                 let studentSec = localStorage.getItem('sece_last_viewed_section') || currentSection || '';
                 if (typeof currentStudentRecord === 'function') {
                     const rec = currentStudentRecord();
@@ -5353,11 +5646,12 @@ function respondToCoverageRequest(key, accept) {
                         filteredArr = [];
                     }
                 }
+            }
 
-                if (filteredArr.length === 0) {
-                    el.innerHTML = '<div class="text-muted">No period notifications found for any upcoming days.</div>';
-                    return;
-                }
+            if (filteredArr.length === 0) {
+                el.innerHTML = '<div class="text-muted">No period notifications found for any upcoming days.</div>';
+                return;
+            }
 
                 let rowsHtml = filteredArr.map((n, i) => {
                     const isLeave = n.source === 'leave';
@@ -5450,7 +5744,7 @@ function respondToCoverageRequest(key, accept) {
             </tbody>
         </table>
     </div>`;
-            }
+        }
             window.handlePeriodNotification = async function (e) {
                 e.preventDefault(); if (!(currentUserRole === 'ADMIN' || currentUserRole === 'FACULTY')) return;
                 const day = document.getElementById('pnDay').value;
@@ -9070,9 +9364,7 @@ function respondToCoverageRequest(key, accept) {
                 const uname = String(targetUsername || localStorage.getItem('sece_logged_in_user') || '').trim().toLowerCase();
                 if (!uname) return null;
                 try {
-                    const res = await fetch(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`);
-                    if (!res.ok) return null;
-                    const body = await res.json();
+                    const body = await operationsApiRequest(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`);
                     if (body && body.dataJson && body.dataJson !== '{}') {
                         const parsed = _parseJsonSafe(body.dataJson, null);
                         if (parsed && Object.keys(parsed).length > 0) {
@@ -10805,7 +11097,6 @@ function respondToCoverageRequest(key, accept) {
                     );
                     itemsHtml = list.length ? list.map(s => {
                         const meta = [s.code && s.code !== s.label ? s.code : '', s.faculty, s.venue].filter(Boolean).join(' • ');
-...[truncated for diff preview]
                     return `<button type="button" class="btn btn-sm btn-outline-info text-start d-flex flex-column py-1 px-2" style="max-width:100%;" data-tt-pick="subject" data-val="${esc(s.label)}">
                 <span class="fw-bold text-white" style="font-size:0.78rem;">${esc(s.label)}</span>
                 ${meta ? `<span class="text-muted text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}

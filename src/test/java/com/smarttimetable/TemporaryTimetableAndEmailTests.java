@@ -51,6 +51,9 @@ class TemporaryTimetableAndEmailTests {
     @Autowired private SectionRepository sectionRepo;
     @Autowired private SubjectRepository subjectRepo;
     @Autowired private TeacherRepository teacherRepo;
+    @Autowired private FacultyLeaveRepository facultyLeaveRepo;
+    @Autowired private CoverageRequestRepository coverageRequestRepo;
+    @Autowired private SubstitutionRepository substitutionRepo;
     @Autowired private ClassroomRepository classroomRepo;
     @Autowired private TimeSlotRepository slotRepo;
     @Autowired private TimetableRepository timetableRepo;
@@ -549,5 +552,99 @@ class TemporaryTimetableAndEmailTests {
                 .toList();
         assertThat(classLogs).hasSize(1);
         assertThat(classLogs.get(0).getEmail()).isEqualTo("stu1_seca_zz@test.edu");
+    }
+
+    @Test
+    void testFacultyLeaveCoverageAndSubstitutionAreSharedWithStudentsAndOwnerProtected() throws Exception {
+        String fac1Jwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername("test_fac1_zz"), "ROLE_FACULTY");
+        String fac2Jwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername("test_fac2_zz"), "ROLE_FACULTY");
+        String adminJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername("test_admin_zz"), "ROLE_ADMIN");
+        String studentJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername("test_stu1_zz"), "ROLE_STUDENT");
+
+        String leavePayload = String.format(
+                "{\"teacherId\":%d,\"date\":\"%s\",\"reason\":\"Medical leave\"}",
+                fac1.getId(), nextMonday);
+        mockMvc.perform(post("/api/faculty-leaves")
+                        .header("Authorization", "Bearer " + fac1Jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(leavePayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.staffName").value("Mr. Kumar"))
+                .andExpect(jsonPath("$.date").value(nextMonday.toString()));
+
+        mockMvc.perform(post("/api/faculty-leaves")
+                        .header("Authorization", "Bearer " + fac1Jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format(
+                                "{\"teacherId\":%d,\"date\":\"%s\",\"reason\":\"Spoof\"}",
+                                fac2.getId(), nextMonday)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/faculty-leaves")
+                        .header("Authorization", "Bearer " + studentJwt)
+                        .param("date", nextMonday.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].staffName").value("Mr. Kumar"));
+
+        mockMvc.perform(get("/api/faculty-leaves")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .param("date", nextMonday.toString()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/timetable/teacher/" + fac1.getId())
+                        .header("Authorization", "Bearer " + fac1Jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sectionName").value(secA.getSectionName()))
+                .andExpect(jsonPath("$[0].slotNumber").value(3));
+
+        String coveragePayload = String.format(
+                "{\"date\":\"%s\",\"sectionName\":\"%s\",\"day\":\"Monday\",\"periodIndex\":2,\"subjectName\":\"Java Programming\",\"absentStaff\":\"Mr. Kumar\",\"status\":\"OPEN\"}",
+                nextMonday, secA.getSectionName());
+        mockMvc.perform(post("/api/operations/coverage")
+                        .header("Authorization", "Bearer " + fac1Jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(coveragePayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OPEN"));
+
+        mockMvc.perform(get("/api/operations/coverage")
+                        .header("Authorization", "Bearer " + studentJwt))
+                .andExpect(status().isForbidden());
+
+        String substitutionPayload = String.format(
+                "{\"date\":\"%s\",\"sectionName\":\"%s\",\"day\":\"Monday\",\"periodIndex\":2,\"originalFaculty\":\"Mr. Kumar\",\"substituteFaculty\":\"Ms. Priya\",\"reason\":\"Medical leave\"}",
+                nextMonday, secA.getSectionName());
+        mockMvc.perform(post("/api/operations/substitutions")
+                        .header("Authorization", "Bearer " + fac1Jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(substitutionPayload))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/operations/substitutions")
+                        .header("Authorization", "Bearer " + fac2Jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(substitutionPayload))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/operations/substitutions")
+                        .header("Authorization", "Bearer " + studentJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sectionName").value(secA.getSectionName()))
+                .andExpect(jsonPath("$[0].substituteFaculty").value("Ms. Priya"));
+
+        assertThat(facultyLeaveRepo.findByDate(nextMonday)).hasSize(1);
+        assertThat(coverageRequestRepo.findAll()).anySatisfy(request ->
+                assertThat(request.getAbsentStaff()).isEqualTo("Mr. Kumar"));
+        assertThat(substitutionRepo.findAll()).anySatisfy(substitution ->
+                assertThat(substitution.getOriginalFaculty()).isEqualTo("Mr. Kumar"));
+
+        Long leaveId = facultyLeaveRepo.findByDate(nextMonday).get(0).getId();
+        mockMvc.perform(delete("/api/faculty-leaves/" + leaveId)
+                        .header("Authorization", "Bearer " + fac2Jwt))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/faculty-leaves/" + leaveId)
+                        .header("Authorization", "Bearer " + fac1Jwt))
+                .andExpect(status().isNoContent());
+        assertThat(facultyLeaveRepo.findByDate(nextMonday)).isEmpty();
     }
 }
