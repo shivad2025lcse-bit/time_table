@@ -120,62 +120,139 @@ function injectQuizModals() {
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
         .sq-challenge-card {
-            background: linear-gradient(135deg, #101b3b, #1d0c3f);
-            border: 1px solid #4c1d95;
-            border-radius: 12px;
-            padding: 1rem 1.2rem;
-            margin-bottom: 0.85rem;
-            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+            background: linear-gradient(135deg, #2b1055, #43178a);
+            border: 2px solid #7c3aed;
+            border-bottom: 6px solid #4c1d95;
+            border-radius: 16px;
+            padding: 1.1rem 1.35rem;
+            margin-bottom: 0.95rem;
+            transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
         }
         .sq-challenge-card:hover {
-            transform: translateY(-2px);
-            border-color: #38bdf8;
-            box-shadow: 0 8px 20px rgba(56, 189, 248, 0.18);
+            transform: translateY(-3px);
+            border-color: #fbbf24;
+            box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35);
+        }
+        .sq-blooket-stage {
+            background: radial-gradient(circle at top right, #4f1d96 0%, #2a0a5e 55%, #19063c 100%);
+            border: 2px solid #6d28d9;
+            border-radius: 18px;
+            padding: 1.25rem;
+        }
+        .sq-blooket-hud {
+            background: rgba(15, 5, 38, 0.85);
+            border: 2px solid #5b21b6;
+            border-radius: 14px;
+            padding: 0.75rem 1rem;
+        }
+        .sq-blooket-qbox {
+            background: #ffffff;
+            color: #1e1b4b;
+            border-radius: 16px;
+            border-bottom: 6px solid #cbd5e1;
+            padding: 1.5rem 1.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.28);
+        }
+        .sq-blooket-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 16px;
+        }
+        @media (max-width: 640px) {
+            .sq-blooket-grid { grid-template-columns: 1fr; }
         }
         .sq-opt-tile {
-            background: #0a1628;
-            border: 1px solid #334155;
-            border-radius: 10px;
-            padding: 11px 16px;
-            margin-bottom: 8px;
+            position: relative;
+            border-radius: 14px;
+            padding: 18px 20px;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 14px;
+            min-height: 78px;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 1.04rem;
+            border: 3px solid rgba(255, 255, 255, 0.22);
+            user-select: none;
         }
         .sq-opt-tile:hover {
-            border-color: #60a5fa;
-            background: #0f2140;
+            transform: translateY(-2px);
+            filter: brightness(1.06);
+        }
+        .sq-opt-tile:active {
+            transform: translateY(3px);
+        }
+        .sq-blooket-tile-0 { background: #e11d48; border-bottom: 7px solid #9f1239; }
+        .sq-blooket-tile-1 { background: #2563eb; border-bottom: 7px solid #1e40af; }
+        .sq-blooket-tile-2 { background: #d97706; border-bottom: 7px solid #92400e; }
+        .sq-blooket-tile-3 { background: #059669; border-bottom: 7px solid #065f46; }
+        .sq-opt-shape {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.22);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
         }
         .sq-opt-tile.selected {
-            border-color: #10b981;
-            background: rgba(16, 185, 129, 0.14);
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+            border: 3px solid #fde047 !important;
+            box-shadow: 0 0 0 4px rgba(253, 224, 71, 0.45), 0 10px 24px rgba(0, 0, 0, 0.35);
+            transform: translateY(-2px);
         }
+        .sq-opt-selected-badge {
+            margin-left: auto;
+            background: #fde047;
+            color: #1e1b4b;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 3px 9px;
+            border-radius: 999px;
+            display: none;
+        }
+        .sq-opt-tile.selected .sq-opt-selected-badge {
+            display: inline-block;
+        }
+        .sq-play-3d-btn {
+            background: linear-gradient(180deg, #10b981, #059669);
+            color: #ffffff;
+            border: none;
+            border-bottom: 5px solid #065f46;
+            border-radius: 12px;
+            font-weight: 800;
+            padding: 10px 22px;
+            transition: transform 0.1s ease;
+        }
+        .sq-play-3d-btn:hover { color: #ffffff; filter: brightness(1.07); }
+        .sq-play-3d-btn:active { transform: translateY(3px); border-bottom-width: 2px; }
         .sq-q-pill {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: 1px solid #4c1d95;
-            background: #0a041f;
-            color: #cbd5e1;
-            font-weight: 700;
-            font-size: 0.8rem;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 2px solid #6d28d9;
+            background: #1a0536;
+            color: #e2e8f0;
+            font-weight: 800;
+            font-size: 0.82rem;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
         }
         .sq-q-pill.active {
-            border-color: #38bdf8;
-            background: #0284c7;
-            color: #fff;
+            border-color: #fde047;
+            background: #f59e0b;
+            color: #1e1b4b;
         }
         .sq-q-pill.answered {
-            border-color: #10b981;
-            background: rgba(16, 185, 129, 0.25);
-            color: #6ee7b7;
+            border-color: #34d399;
+            background: #059669;
+            color: #ffffff;
         }
         .sq-confetti-piece {
             position: fixed;
@@ -278,6 +355,51 @@ function injectQuizModals() {
                         <i class="fa-solid fa-microphone-slash me-1"></i> Voice recognition is disabled. Toggle <strong>Voice Commands</strong> in the header to enable Tamil / English / Tanglish speech control.
                     </div>
 
+                    <!-- STUDENT QUIZ VISIBILITY CONTROL (FACULTY: ENABLE / HIDE PER CLASS) -->
+                    <div class="p-3 rounded mb-3" style="background: rgba(15, 23, 42, 0.9); border: 1px solid #38bdf8;">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <div>
+                                <h6 class="fw-bold text-info mb-0">
+                                    <i class="fa-solid fa-eye me-2"></i>Class Quiz Visibility (Hide / Show for Selected Class)
+                                </h6>
+                                <small class="text-muted">Select Department, Year, Class &amp; Section to enable or disable the Quiz option for those students.</small>
+                            </div>
+                            <span id="fqVisStatusBadge" class="badge bg-secondary">Loading...</span>
+                        </div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-2">
+                                <label class="form-label small text-muted mb-1">Dept</label>
+                                <select id="fqVisDept" class="form-select form-select-sm cc-form-control" onchange="onFacultyQuizVisFilterChange()"></select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-muted mb-1">Year</label>
+                                <select id="fqVisYear" class="form-select form-select-sm cc-form-control" onchange="onFacultyQuizVisFilterChange()">
+                                    <option value="I">I Year</option>
+                                    <option value="II">II Year</option>
+                                    <option value="III">III Year</option>
+                                    <option value="IV">IV Year</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted mb-1">Class</label>
+                                <select id="fqVisClass" class="form-select form-select-sm cc-form-control" onchange="onFacultyQuizVisFilterChange()"></select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-muted mb-1">Section</label>
+                                <select id="fqVisSection" class="form-select form-select-sm cc-form-control" onchange="onFacultyQuizVisSectionChange()"></select>
+                            </div>
+                            <div class="col-md-3 d-flex gap-2">
+                                <button type="button" id="fqVisEnableBtn" class="btn btn-sm btn-success flex-fill fw-semibold" onclick="quizSetFacultyClassVisibility(true)">
+                                    <i class="fa-solid fa-eye me-1"></i> Enable Quiz
+                                </button>
+                                <button type="button" id="fqVisDisableBtn" class="btn btn-sm btn-danger flex-fill fw-semibold" onclick="quizSetFacultyClassVisibility(false)">
+                                    <i class="fa-solid fa-eye-slash me-1"></i> Disable Quiz
+                                </button>
+                            </div>
+                        </div>
+                        <div id="fqVisGlobalNote" class="small text-warning mt-2 d-none"></div>
+                    </div>
+
                     <div class="tab-content">
                         <!-- CREATE TAB -->
                         <div class="tab-pane fade show active" id="fqCreateTab" role="tabpanel">
@@ -320,7 +442,7 @@ function injectQuizModals() {
                                     </div>
                                     <div class="col-md-2">
                                         <label class="cc-form-label">Difficulty</label>
-                                        <select id="fqDifficulty" class="form-select cc-form-control">
+                                        <select id="fqDifficulty" class="form-select cc-form-control" onchange="quizOnCreateDifficultyChange(this.value)">
                                             <option value="Easy">Easy</option>
                                             <option value="Medium" selected>Medium</option>
                                             <option value="Hard">Hard</option>
@@ -338,11 +460,14 @@ function injectQuizModals() {
                                     </div>
                                 </div>
 
-                                <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2" style="border-color: #3b0764 !important;">
+                                <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2 flex-wrap gap-2" style="border-color: #3b0764 !important;">
                                     <h5 class="fw-bold mb-0" style="color: #eab308;"><i class="fa-solid fa-list-ul me-2"></i>Questions</h5>
-                                    <div class="d-flex gap-2">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" class="btn btn-outline-danger btn-sm px-3 fw-semibold" onclick="quizClearDraftQuestions()">
+                                            <i class="fa-solid fa-trash-can me-1"></i> Clear All
+                                        </button>
                                         <button type="button" class="btn cc-btn-gray btn-sm px-3 fw-semibold" onclick="quizShowAiPrompt()">
-                                            <i class="fa-solid fa-file-import me-1"></i> Import from AI
+                                            <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Generate with AI
                                         </button>
                                         <button type="button" class="btn cc-btn-purple btn-sm px-3 fw-semibold" onclick="quizAddQuestion()">
                                             + Add Question
@@ -388,39 +513,67 @@ function injectQuizModals() {
                         <div class="tab-pane fade" id="fqAiTab" role="tabpanel">
                             <form id="aiGenForm" onsubmit="quizGenerateAI(event)">
                                 <div class="row g-3 mb-3">
-                                    <div class="col-md-6">
+                                    <div class="col-md-5">
                                         <label class="cc-form-label">Topic *</label>
-                                        <input type="text" id="aiTopic" class="form-control cc-form-control" placeholder="e.g. Linked Lists in Data Structures" required>
+                                        <input type="text" id="aiTopic" class="form-control cc-form-control" placeholder="e.g. Linked Lists, Deadlocks, Normalization" required>
                                     </div>
-                                    <div class="col-md-2">
-                                        <label class="cc-form-label">Difficulty</label>
-                                        <select id="aiDifficulty" class="form-select cc-form-control">
-                                            <option value="Easy">Easy</option>
-                                            <option value="Medium" selected>Medium</option>
-                                            <option value="Hard">Hard</option>
+                                    <div class="col-md-3">
+                                        <label class="cc-form-label">AI Model / Provider</label>
+                                        <select id="aiProvider" class="form-select cc-form-control" onchange="quizOnAiProviderChange()">
+                                            <option value="AUTO" selected>Auto (Best Available AI)</option>
+                                            <option value="OPENAI">ChatGPT (OpenAI GPT-4o)</option>
+                                            <option value="PERPLEXITY">Perplexity (Sonar Pro)</option>
+                                            <option value="GEMINI">Google Gemini (2.5 Flash)</option>
+                                            <option value="GROQ">Groq (Llama 3.3 70B)</option>
+                                            <option value="BUILT_IN">Built-In Academic Engine</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="cc-form-label">No. Questions</label>
-                                        <input type="number" id="aiNumQ" class="form-control cc-form-control" value="5" min="1" max="15" required>
+                                        <label class="cc-form-label">Difficulty *</label>
+                                        <select id="aiDifficulty" class="form-select cc-form-control">
+                                            <option value="Easy">Easy (5m)</option>
+                                            <option value="Medium" selected>Medium (10m)</option>
+                                            <option value="Hard">Hard (15m)</option>
+                                        </select>
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-1">
+                                        <label class="cc-form-label">Count</label>
+                                        <input type="number" id="aiNumQ" class="form-control cc-form-control" value="5" min="1" max="20" required>
+                                    </div>
+                                    <div class="col-md-1">
                                         <label class="cc-form-label">Type</label>
                                         <select id="aiType" class="form-select cc-form-control">
                                             <option value="MCQ" selected>MCQ</option>
-                                            <option value="DESCRIPTIVE">Descriptive</option>
+                                            <option value="DESCRIPTIVE">Desc</option>
                                         </select>
                                     </div>
                                 </div>
-                                <div class="row g-3 mb-4">
-                                    <div class="col-12">
-                                        <label class="cc-form-label">Learning Objectives / Notes</label>
-                                        <textarea id="aiNotes" class="form-control cc-form-control" rows="4" placeholder="Paste your lesson notes or learning objectives here. The AI will generate questions based ONLY on this content..."></textarea>
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-8">
+                                        <label class="cc-form-label">Learning Objectives / Reference Notes</label>
+                                        <textarea id="aiNotes" class="form-control cc-form-control" rows="4" placeholder="Paste lesson notes, syllabus points, or code concepts here. Questions stay strictly unique and adapt directly to Easy / Medium / Hard difficulty..."></textarea>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="cc-form-label d-flex justify-content-between align-items-center">
+                                            <span>API Key (Optional Override)</span>
+                                            <span class="badge bg-secondary" id="aiKeyHintBadge">Server / Local</span>
+                                        </label>
+                                        <input type="password" id="aiApiKeyInput" class="form-control cc-form-control mb-2" placeholder="sk-... / pplx-... / AIza... / gsk_..." autocomplete="off" oninput="quizSaveLocalAiKey()">
+                                        <select id="aiInsertMode" class="form-select form-select-sm cc-form-control">
+                                            <option value="REPLACE" selected>Replace current draft questions</option>
+                                            <option value="APPEND">Append unique questions (no repeats)</option>
+                                        </select>
+                                        <small class="text-muted d-block mt-1" style="font-size:0.74rem;">
+                                            Leave API key empty to use the server key or Built-In Difficulty-Stratified Academic Engine.
+                                        </small>
                                     </div>
                                 </div>
-                                <button id="aiGenBtn" type="submit" class="btn cc-btn-purple fw-bold px-4 py-2">
-                                    <i class="fa-solid fa-robot me-2"></i> Generate Questions with AI
-                                </button>
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                    <button id="aiGenBtn" type="submit" class="btn cc-btn-purple fw-bold px-4 py-2">
+                                        <i class="fa-solid fa-wand-magic-sparkles me-2"></i> Generate Unique Questions with AI
+                                    </button>
+                                    <div id="fqAiStatusBadge" class="small text-info"></div>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -430,16 +583,16 @@ function injectQuizModals() {
     </div>
 
     <!-- ============================================================ -->
-    <!--  STUDENT: Take Quiz                                          -->
+    <!--  STUDENT: Take Quiz (play.blooket.com Arcade Selection UI)   -->
     <!-- ============================================================ -->
     <div class="modal fade" id="studentQuizModal" tabindex="-1"
          data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div id="sqModalDialog" class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content cc-modal-content">
                 <div class="modal-header cc-modal-header border-0">
-                    <h5 class="modal-title fw-bold">
-                        <i class="fa-solid fa-pen-to-square text-info me-2"></i>
-                        Class Quiz
+                    <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                        <span class="badge" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;font-size:0.85rem;"><i class="fa-solid fa-gamepad me-1"></i> PLAY</span>
+                        <span>Class Quiz Arena</span>
                     </h5>
                     <!-- No close button during active quiz - controlled by firewall -->
                     <button id="sqCloseBtn" type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -447,36 +600,49 @@ function injectQuizModals() {
                 <div class="modal-body p-4" style="background-color: #120326;">
                     <!-- List of quizzes -->
                     <div id="sqListContainer">
-                        <h6 class="fw-bold text-info mb-3">Available Quizzes</h6>
+                        <div class="p-3 rounded mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2" style="background:linear-gradient(90deg,#3b0764,#1e1b4b);border:1px solid #7c3aed;">
+                            <div>
+                                <h6 class="fw-bold text-warning mb-0"><i class="fa-solid fa-trophy me-2"></i>Available Quiz Challenges</h6>
+                                <small class="text-light opacity-75">Pick a challenge and answer on colored arcade tiles — your level graph updates on completion!</small>
+                            </div>
+                        </div>
                         <div id="sqQuizList" class="list-group mb-3"></div>
                         <div id="sqNoQuiz" class="text-muted" style="display:none;">No quizzes assigned for your section yet.</div>
                     </div>
 
-                    <!-- Active quiz view -->
-                    <div id="sqActiveContainer" style="display:none;">
-                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <!-- Active quiz view (Blooket style) -->
+                    <div id="sqActiveContainer" class="sq-blooket-stage" style="display:none;">
+                        <div class="sq-blooket-hud d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                             <div>
-                                <h5 id="sqQuizTitle" class="fw-bold text-info mb-0"></h5>
-                                <small id="sqQuizMetaLine" class="text-muted"></small>
+                                <h5 id="sqQuizTitle" class="fw-bold text-warning mb-0"></h5>
+                                <small id="sqQuizMetaLine" class="text-light opacity-75"></small>
                             </div>
-                            <div class="d-flex align-items-center gap-2">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span id="sqStreakBadge" class="badge bg-dark border border-warning text-warning fs-6 px-3 py-2">
+                                    <i class="fa-solid fa-fire text-danger me-1"></i><span id="sqAnsweredScoreText">0 Answered</span>
+                                </span>
+                                <span id="sqPointsBadge" class="badge bg-dark border border-success text-success fs-6 px-3 py-2">
+                                    <i class="fa-solid fa-coins text-warning me-1"></i><span id="sqPotentialPtsText">0 Pts</span>
+                                </span>
                                 <span id="sqTimerBadge" class="badge bg-info text-dark fs-6 px-3 py-2">
                                     <i class="fa-solid fa-stopwatch me-1"></i><span id="sqTimerText">15:00</span>
                                 </span>
-                                <span class="badge bg-warning text-dark py-2"><i class="fa-solid fa-lock me-1"></i> Quiz Active</span>
                             </div>
                         </div>
 
                         <!-- Progress & Navigation Strip -->
-                        <div class="p-3 rounded mb-3" style="background:#0a041f;border:1px solid #4c1d95;">
+                        <div class="p-3 rounded mb-3" style="background:rgba(10,4,31,0.85);border:1px solid #6d28d9;">
                             <div class="d-flex justify-content-between align-items-center small mb-2">
-                                <span id="sqProgressLabel" class="fw-bold text-info">Question 1 of 1 &bull; 0 Answered</span>
-                                <button type="button" id="sqViewModeBtn" class="btn btn-xs btn-outline-light py-0 px-2" onclick="quizToggleStudentViewMode()">
-                                    <i class="fa-solid fa-list me-1"></i> Show All
-                                </button>
+                                <span id="sqProgressLabel" class="fw-bold text-warning">Question 1 of 1 &bull; 0 Answered</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted d-none d-sm-inline" style="font-size:0.74rem;">Keys 1-4 / A-D supported</span>
+                                    <button type="button" id="sqViewModeBtn" class="btn btn-xs btn-outline-light py-0 px-2" onclick="quizToggleStudentViewMode()">
+                                        <i class="fa-solid fa-list me-1"></i> Show All
+                                    </button>
+                                </div>
                             </div>
-                            <div class="progress mb-2" style="height:8px; background:#1e1b4b;">
-                                <div id="sqProgressBar" class="progress-bar bg-success" role="progressbar" style="width:0%;"></div>
+                            <div class="progress mb-2" style="height:10px; background:#1e1b4b; border-radius:999px;">
+                                <div id="sqProgressBar" class="progress-bar bg-warning" role="progressbar" style="width:0%;"></div>
                             </div>
                             <div id="sqQuestionPills" class="d-flex flex-wrap gap-2 mt-2"></div>
                         </div>
@@ -485,15 +651,15 @@ function injectQuizModals() {
                             <div id="sqQuestionsBody"></div>
                             <div class="mt-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
                                 <div class="d-flex gap-2" id="sqStepNavBtns">
-                                    <button type="button" id="sqPrevQBtn" class="btn btn-outline-light btn-sm px-3" onclick="quizStudentGoStep(-1)">
+                                    <button type="button" id="sqPrevQBtn" class="btn btn-outline-light fw-bold px-3" onclick="quizStudentGoStep(-1)">
                                         <i class="fa-solid fa-arrow-left me-1"></i> Previous
                                     </button>
-                                    <button type="button" id="sqNextQBtn" class="btn btn-info text-dark btn-sm fw-bold px-3" onclick="quizStudentGoStep(1)">
+                                    <button type="button" id="sqNextQBtn" class="btn btn-warning text-dark fw-bold px-4" onclick="quizStudentGoStep(1)">
                                         Next <i class="fa-solid fa-arrow-right ms-1"></i>
                                     </button>
                                 </div>
-                                <button type="submit" class="btn fw-bold px-5 ms-auto" style="background:linear-gradient(135deg,#10b981,#3b82f6);color:#fff;">
-                                    <i class="fa-solid fa-paper-plane me-1"></i> Submit Quiz
+                                <button type="submit" class="sq-play-3d-btn px-5 ms-auto">
+                                    <i class="fa-solid fa-flag-checkered me-1"></i> Finish &amp; View Level Graph
                                 </button>
                             </div>
                         </form>
@@ -683,24 +849,67 @@ window.openFacultyQuizModal = async () => {
     document.getElementById('fqTeacherId').value = tchId;
     document.getElementById('fqTeacherDisplay').value = tchName;
     quizRefreshSummaryBadge();
+    if (typeof window.quizLoadVisibilityControls === 'function') {
+        window.quizLoadVisibilityControls();
+    }
+};
+
+window.quizOnAiProviderChange = () => {
+    const prov = document.getElementById('aiProvider')?.value || 'AUTO';
+    const keyInput = document.getElementById('aiApiKeyInput');
+    const badge = document.getElementById('aiKeyHintBadge');
+    if (keyInput) {
+        keyInput.value = localStorage.getItem('quiz_ai_key_' + prov) || '';
+    }
+    if (badge) {
+        const labels = {
+            AUTO: 'Server / Local',
+            OPENAI: 'ChatGPT Key',
+            PERPLEXITY: 'Perplexity Key',
+            GEMINI: 'Gemini Key',
+            GROQ: 'Groq Key',
+            BUILT_IN: 'No Key Needed'
+        };
+        badge.innerText = labels[prov] || 'Server / Local';
+    }
+};
+
+window.quizSaveLocalAiKey = () => {
+    const prov = document.getElementById('aiProvider')?.value || 'AUTO';
+    const val = document.getElementById('aiApiKeyInput')?.value || '';
+    if (val.trim()) {
+        localStorage.setItem('quiz_ai_key_' + prov, val.trim());
+    } else {
+        localStorage.removeItem('quiz_ai_key_' + prov);
+    }
 };
 
 window.quizShowAiPrompt = () => {
     const aiTab = new bootstrap.Tab(document.querySelector('button[data-bs-target="#fqAiTab"]'));
     aiTab.show();
+    window.quizOnAiProviderChange();
 };
 
 window.quizGenerateAI = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('aiGenBtn');
+    const statusEl = document.getElementById('fqAiStatusBadge');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Generating...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Generating Unique Questions...';
 
-    const topic = document.getElementById('aiTopic').value;
+    const topic = document.getElementById('aiTopic').value.trim();
     const diff = document.getElementById('aiDifficulty').value;
-    const num = document.getElementById('aiNumQ').value;
+    const num = parseInt(document.getElementById('aiNumQ').value, 10) || 5;
     const type = document.getElementById('aiType') ? document.getElementById('aiType').value : 'MCQ';
     const notes = document.getElementById('aiNotes') ? document.getElementById('aiNotes').value : '';
+    const provider = document.getElementById('aiProvider') ? document.getElementById('aiProvider').value : 'AUTO';
+    const apiKey = document.getElementById('aiApiKeyInput') ? document.getElementById('aiApiKeyInput').value.trim() : '';
+    const insertMode = document.getElementById('aiInsertMode') ? document.getElementById('aiInsertMode').value : 'REPLACE';
+
+    // Collect existing question texts so regenerations never repeat questions
+    const excludeQuestions = Array.from(document.querySelectorAll('#fqQuestionsWrap .q-text'))
+        .map(el => el.value.trim())
+        .filter(Boolean);
 
     try {
         const token = localStorage.getItem('jwt_token') || '';
@@ -710,13 +919,46 @@ window.quizGenerateAI = async (e) => {
         const res = await fetch('/api/quizzes/generate', {
             method: 'POST',
             headers,
-            body: JSON.stringify({ topic, notes, difficulty: diff, type, count: parseInt(num) })
+            body: JSON.stringify({
+                topic,
+                notes,
+                difficulty: diff,
+                type,
+                count: num,
+                provider,
+                apiKey,
+                excludeQuestions
+            })
         });
-        
+
         if (res.ok) {
-            const data = await res.json();
-            // Automatically fill questions
-            data.forEach(q => {
+            const payload = await res.json();
+            const list = Array.isArray(payload) ? payload : (payload.questions || []);
+            const wrap = document.getElementById('fqQuestionsWrap');
+
+            if (insertMode === 'REPLACE' && wrap) {
+                wrap.innerHTML = '';
+                _questionCount = 0;
+            } else if (wrap) {
+                // Remove untouched empty starter card when appending
+                const cards = wrap.querySelectorAll('.cc-q-card');
+                if (cards.length === 1 && !cards[0].querySelector('.q-text')?.value.trim()) {
+                    wrap.innerHTML = '';
+                    _questionCount = 0;
+                }
+            }
+
+            // Sync Create Quiz metadata with AI Topic & Difficulty
+            const fqTopic = document.getElementById('fqTopic');
+            const fqDiff = document.getElementById('fqDifficulty');
+            const fqTitle = document.getElementById('fqTitle');
+            const fqSubject = document.getElementById('fqSubject');
+            if (fqTopic && topic) fqTopic.value = topic;
+            if (fqDiff && diff) fqDiff.value = diff;
+            if (fqSubject && !fqSubject.value.trim() && topic) fqSubject.value = topic;
+            if (fqTitle && !fqTitle.value.trim() && topic) fqTitle.value = `${topic} (${diff} Level Quiz)`;
+
+            list.forEach(q => {
                 quizAddQuestion();
                 const cards = document.querySelectorAll('#fqQuestionsWrap .cc-q-card');
                 const lastCard = cards[cards.length - 1];
@@ -725,26 +967,33 @@ window.quizGenerateAI = async (e) => {
                 lastCard.querySelector('.q-text').value = q.questionText || '';
                 lastCard.querySelector('.q-type').value = q.type || 'MCQ';
                 quizToggleType(lastCard.querySelector('.q-type'), qid);
-                lastCard.querySelector('.q-marks').value = q.marks || 10;
+                lastCard.querySelector('.q-marks').value = q.marks || (diff === 'Hard' ? 15 : (diff === 'Easy' ? 5 : 10));
 
                 if ((q.type || 'MCQ') === 'MCQ') {
                     if (q.options) {
                         const optsArr = q.options.split(',');
                         const optInputs = lastCard.querySelectorAll('.q-opt');
                         optInputs.forEach((input, idx) => {
-                            if (optsArr[idx]) input.value = optsArr[idx].trim();
+                            input.value = optsArr[idx] ? optsArr[idx].trim() : '';
                         });
                     }
                     lastCard.querySelector('.q-answer').value = q.correctAnswer || '';
                 } else {
                     const descInput = lastCard.querySelector('.q-answer-desc');
-                    if(descInput) descInput.value = q.correctAnswer || q.explanation || '';
+                    if (descInput) descInput.value = q.correctAnswer || q.explanation || '';
                 }
             });
-            document.getElementById('aiGenForm').reset();
+
+            quizRefreshSummaryBadge();
+            const usedProv = payload.providerUsed || 'AI Generator';
+            const usedModel = payload.modelUsed || diff;
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="badge bg-success me-1">${usedProv}</span> ${usedModel} &bull; ${list.length} unique ${diff} question(s)${payload.warning ? ` <span class="text-warning">(${payload.warning})</span>` : ''}`;
+            }
+
             const createTab = new bootstrap.Tab(document.querySelector('button[data-bs-target="#fqCreateTab"]'));
             createTab.show();
-            _showSuccess(`Successfully generated ${data.length} questions!`);
+            _showSuccess(`Generated ${list.length} unique ${diff} question(s) using ${usedProv}!`);
         } else {
             const errText = await res.text();
             alert(`Failed to generate questions (Status: ${res.status}): ${errText}`);
@@ -754,7 +1003,7 @@ window.quizGenerateAI = async (e) => {
         alert('Network error while generating AI questions: ' + err.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-robot me-2"></i> Generate Questions with AI';
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles me-2"></i> Generate Unique Questions with AI';
     }
 };
 
@@ -780,6 +1029,25 @@ window.quizPickOptionAsAnswer = (qid, optIdx) => {
         ansInput.value = optVal;
         ansInput.focus();
     }
+};
+
+window.quizOnCreateDifficultyChange = (diff) => {
+    const aiDiff = document.getElementById('aiDifficulty');
+    if (aiDiff && diff) aiDiff.value = diff;
+    const targetMarks = diff === 'Hard' ? 15 : (diff === 'Easy' ? 5 : 10);
+    document.querySelectorAll('#fqQuestionsWrap .q-marks').forEach(inp => {
+        inp.value = targetMarks;
+    });
+    quizRefreshSummaryBadge();
+};
+
+window.quizClearDraftQuestions = () => {
+    const wrap = document.getElementById('fqQuestionsWrap');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    _questionCount = 0;
+    quizAddQuestion();
+    quizRefreshSummaryBadge();
 };
 
 window.quizAddQuestion = () => {
@@ -1251,6 +1519,7 @@ function _updateStudentQuizProgress() {
     if (!_currentQuizData || !Array.isArray(_currentQuizData.questions)) return;
     const qs = _currentQuizData.questions;
     let answered = 0;
+    let totalSelectedMarks = 0;
     const pillsWrap = document.getElementById('sqQuestionPills');
     let pillsHtml = '';
 
@@ -1261,7 +1530,10 @@ function _updateStudentQuizProgress() {
         } else {
             isAns = !!document.getElementById(`sq_desc_${q.id}`)?.value.trim();
         }
-        if (isAns) answered++;
+        if (isAns) {
+            answered++;
+            totalSelectedMarks += Number(q.marks || 10);
+        }
         const cls = (!_sqShowAllMode && idx === _sqCurrentStep) ? 'active' : (isAns ? 'answered' : '');
         pillsHtml += `<button type="button" class="sq-q-pill ${cls}" onclick="quizStudentJumpTo(${idx})">${idx + 1}</button>`;
     });
@@ -1271,6 +1543,10 @@ function _updateStudentQuizProgress() {
     if (labelEl) labelEl.innerText = _sqShowAllMode
         ? `Showing all ${qs.length} questions • ${answered}/${qs.length} Answered`
         : `Question ${_sqCurrentStep + 1} of ${qs.length} • ${answered}/${qs.length} Answered`;
+    const ansScoreEl = document.getElementById('sqAnsweredScoreText');
+    if (ansScoreEl) ansScoreEl.innerText = `${answered}/${qs.length} Answered`;
+    const ptsEl = document.getElementById('sqPotentialPtsText');
+    if (ptsEl) ptsEl.innerText = `${totalSelectedMarks} Pts`;
     const barEl = document.getElementById('sqProgressBar');
     if (barEl) barEl.style.width = `${qs.length ? Math.round((answered / qs.length) * 100) : 0}%`;
 
@@ -1296,6 +1572,20 @@ window.quizSelectOptionTile = (qId, optIdx) => {
     _updateStudentQuizProgress();
 };
 
+// Keyboard shortcuts 1-4 / A-D on active single-question Blooket stage
+document.addEventListener('keydown', (ev) => {
+    if (!_quizActive || !_currentQuizData || _sqShowAllMode) return;
+    const tag = (ev.target && ev.target.tagName) ? ev.target.tagName.toUpperCase() : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const q = _currentQuizData.questions?.[_sqCurrentStep];
+    if (!q || q.type !== 'MCQ') return;
+    const keyMap = { '1': 0, '2': 1, '3': 2, '4': 3, a: 0, b: 1, c: 2, d: 3 };
+    const idx = keyMap[String(ev.key || '').toLowerCase()];
+    if (idx !== undefined) {
+        window.quizSelectOptionTile(q.id, idx);
+    }
+});
+
 window.quizStudentJumpTo = (idx) => {
     if (!_currentQuizData || !_currentQuizData.questions.length) return;
     _sqShowAllMode = false;
@@ -1320,6 +1610,19 @@ window.quizToggleStudentViewMode = () => {
 
 // ── Student: Open Modal ──────────────────────────────────────────────────────
 window.openStudentQuizModal = async () => {
+    if (typeof window.refreshStudentQuizVisibility === 'function') {
+        const vis = await window.refreshStudentQuizVisibility();
+        if (vis && vis.visible === false) {
+            if (typeof showToast === 'function') {
+                showToast('Quiz Hidden', 'Quiz access is currently disabled for your class.', 'error');
+            } else {
+                alert('Quiz access is currently disabled for your class.');
+            }
+            return;
+        }
+    }
+    const dlg = document.getElementById('sqModalDialog');
+    if (dlg) dlg.className = 'modal-dialog modal-lg modal-dialog-scrollable';
     _clearStudentQuizTimer();
     document.getElementById('sqListContainer').style.display = 'block';
     document.getElementById('sqActiveContainer').style.display = 'none';
@@ -1335,6 +1638,13 @@ window.openStudentQuizModal = async () => {
         const secId = (info && info.sectionId) ? info.sectionId : 1;
 
         const res  = await fetch('/api/quizzes/section/' + secId, { headers: _authHeaders() });
+        if (res.status === 403) {
+            listEl.innerHTML = '';
+            noEl.style.display = 'block';
+            noEl.innerHTML = '<div class="alert alert-warning mb-0"><i class="fa-solid fa-eye-slash me-2"></i>Quiz access is currently disabled for your class by Faculty or Admin.</div>';
+            if (typeof window.refreshStudentQuizVisibility === 'function') window.refreshStudentQuizVisibility();
+            return;
+        }
         const list = await res.json();
 
         if (!list || list.length === 0) {
@@ -1357,16 +1667,16 @@ window.openStudentQuizModal = async () => {
                             ${q.subjectName ? `<span class="badge bg-info text-dark">${q.subjectName}</span>` : ''}
                             ${q.topic ? `<span class="badge bg-secondary">${q.topic}</span>` : ''}
                         </div>
-                        <h6 class="fw-bold text-white mb-1"><i class="fa-solid fa-bolt text-warning me-2"></i>${q.title}</h6>
-                        <div class="small text-muted">
+                        <h5 class="fw-bold text-white mb-1"><i class="fa-solid fa-bolt text-warning me-2"></i>${q.title}</h5>
+                        <div class="small text-light opacity-75">
                             <span><i class="fa-solid fa-list-check me-1 text-info"></i>${qCount} Questions</span> &bull;
                             <span><i class="fa-solid fa-trophy me-1 text-warning"></i>${totalM} Marks</span> &bull;
                             <span><i class="fa-solid fa-stopwatch me-1 text-success"></i>${dur} mins</span> &bull;
                             <span>Pass: ${passPct}%</span>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-info text-dark fw-bold px-3 py-2" onclick="quizStudentStart(${q.id})">
-                        <i class="fa-solid fa-rocket me-1"></i> Start Challenge
+                    <button type="button" class="sq-play-3d-btn" onclick="quizStudentStart(${q.id})">
+                        <i class="fa-solid fa-play me-1"></i> Play Quiz
                     </button>
                 </div>`;
             }).join('');
@@ -1394,6 +1704,8 @@ window.quizStudentStart = async (quizId) => {
         _sqCurrentStep = 0;
         _sqShowAllMode = false;
 
+        const dlg = document.getElementById('sqModalDialog');
+        if (dlg) dlg.className = 'modal-dialog modal-xl modal-dialog-scrollable';
         document.getElementById('sqCloseBtn').style.display = 'none';
         document.getElementById('sqListContainer').style.display = 'none';
         document.getElementById('sqResultContainer').style.display = 'none';
@@ -1429,35 +1741,47 @@ window.quizStudentStart = async (quizId) => {
             }
         }, 1000);
 
-        // Render interactive question tiles
+        // Render play.blooket.com style Question Stage + 2x2 Colored 3D Answer Grid
         const qBody = document.getElementById('sqQuestionsBody');
+        const blooketShapes = ['▲', '◆', '●', '■'];
+        const escHtml = v => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         qBody.innerHTML = quiz.questions.map((q, idx) => {
             const opts = q.type === 'MCQ'
                 ? (q.options || '').split(',').map(o => o.trim()).filter(o => o)
                 : [];
-            const letters = ['A', 'B', 'C', 'D'];
+            const diffBadge = q.difficulty || quiz.difficulty || 'Medium';
 
             const inputHtml = q.type === 'MCQ'
-                ? opts.map((opt, i) => `
-                    <div class="sq-opt-tile" id="sq_tile_${q.id}_${i}" data-q-tile="${q.id}" onclick="quizSelectOptionTile(${q.id}, ${i})">
-                        <input class="form-check-input m-0" type="radio" name="sq_q_${q.id}" id="sq_${q.id}_${i}" value="${opt}" style="pointer-events:none;">
-                        <span class="badge" style="background:#1d4ed8;">${letters[i] || i + 1}</span>
-                        <span class="text-white fw-semibold">${opt}</span>
-                    </div>`).join('')
-                : `<textarea name="sq_q_${q.id}" id="sq_desc_${q.id}" rows="5"
-                        class="form-control mt-2"
-                        style="background:#0a1628;color:#e0f0ff;border-color:#3b82f6;font-size:0.95rem;"
-                        oninput="_updateStudentQuizProgress()"
-                        placeholder="Write your clear answer here..."></textarea>`;
+                ? `<div class="sq-blooket-grid">` + opts.map((opt, i) => `
+                    <div class="sq-opt-tile sq-blooket-tile-${i % 4}" id="sq_tile_${q.id}_${i}" data-q-tile="${q.id}" onclick="quizSelectOptionTile(${q.id}, ${i})">
+                        <input class="form-check-input m-0 d-none" type="radio" name="sq_q_${q.id}" id="sq_${q.id}_${i}" value="${escHtml(opt)}">
+                        <span class="sq-opt-shape">${blooketShapes[i % 4]}</span>
+                        <span class="flex-grow-1" style="line-height:1.3;">${escHtml(opt)}</span>
+                        <span class="sq-opt-selected-badge"><i class="fa-solid fa-check me-1"></i>SELECTED</span>
+                    </div>`).join('') + `</div>`
+                : `<div class="mt-3 p-3 rounded" style="background:rgba(10,4,31,0.9);border:2px solid #7c3aed;">
+                        <textarea name="sq_q_${q.id}" id="sq_desc_${q.id}" rows="5"
+                            class="form-control"
+                            style="background:#0a1628;color:#e0f0ff;border-color:#3b82f6;font-size:0.98rem;"
+                            oninput="_updateStudentQuizProgress()"
+                            placeholder="Write your clear answer here..."></textarea>
+                   </div>`;
 
             return `
-            <div id="sq_qcard_${idx}" class="mb-3 p-3" style="background:#0d1a30;border-radius:12px;border-left:4px solid #7c3aed;">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                    <p class="fw-bold mb-0" style="color:#e2e8f0; font-size:1.05rem;">
-                        <span style="background:#7c3aed;color:#fff;border-radius:6px;padding:2px 10px;margin-right:8px;">Q${idx + 1}</span>
-                        ${q.questionText}
-                    </p>
-                    <span class="badge text-nowrap" style="background:#0f172a;border:1px solid #7c3aed;color:#c4b5fd;">${q.marks} Marks</span>
+            <div id="sq_qcard_${idx}" class="mb-3">
+                <div class="sq-blooket-qbox">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <span class="badge" style="background:#5b21b6;color:#fff;font-size:0.85rem;padding:6px 12px;">
+                            Question ${idx + 1} of ${quiz.questions.length}
+                        </span>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span class="badge bg-secondary">${escHtml(diffBadge)}</span>
+                            <span class="badge bg-warning text-dark fw-bold">+${q.marks} Pts</span>
+                        </div>
+                    </div>
+                    <h4 class="fw-bold mb-0 text-center py-2" style="color:#1e1b4b; line-height:1.4;">
+                        ${escHtml(q.questionText)}
+                    </h4>
                 </div>
                 ${inputHtml}
             </div>`;
@@ -1517,6 +1841,8 @@ window.quizStudentSubmit = async (e) => {
             _quizActive = false;
             _clearStudentQuizTimer();
 
+            const dlg = document.getElementById('sqModalDialog');
+            if (dlg) dlg.className = 'modal-dialog modal-lg modal-dialog-scrollable';
             document.getElementById('sqActiveContainer').style.display = 'none';
             document.getElementById('sqCloseBtn').style.display = 'block';
 
@@ -1681,6 +2007,17 @@ function _ensureChartJs(cb) {
 
 // ── Student Quiz History ──────────────────────────────────────────────────────
 window.openStudentQuizHistoryModal = async () => {
+    if (typeof window.refreshStudentQuizVisibility === 'function') {
+        const vis = await window.refreshStudentQuizVisibility();
+        if (vis && vis.visible === false) {
+            if (typeof showToast === 'function') {
+                showToast('Quiz Hidden', 'Quiz access is currently disabled for your class.', 'error');
+            } else {
+                alert('Quiz access is currently disabled for your class.');
+            }
+            return;
+        }
+    }
     document.getElementById('sqHistoryDetailContainer').style.display = 'none';
     document.getElementById('sqHistoryListContainer').style.display = 'block';
     const listEl = document.getElementById('sqHistoryList');
@@ -2405,4 +2742,424 @@ window._processFacultyVoiceCommand = (rawTranscript) => {
     }
 
     _setVoiceStatus(`Heard "${raw}" — try saying "Title ...", "Question ...", "Option A ...", or "Explain".`);
+};
+
+// ── Quiz Visibility Control (Faculty Per-Class & Admin Overall + Per-Class) ──
+let _quizVisSnapshot = { globalQuizEnabled: true, sections: [] };
+
+function _parseQuizVisMeta(secObj) {
+    const name = String(secObj.sectionName || '').trim();
+    const parts = name.split(/\s+/);
+    const romanMap = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV' };
+    let year = '';
+    if (secObj.year && romanMap[String(secObj.year)]) year = romanMap[String(secObj.year)];
+    else if (parts[0] && /^(I|II|III|IV)$/i.test(parts[0])) year = parts[0].toUpperCase();
+    else if (secObj.semester) year = romanMap[String(Math.ceil(secObj.semester / 2))] || 'II';
+    else year = 'II';
+
+    const dept = (secObj.departmentCode || (parts.length >= 2 ? parts[1] : 'CSE')).toUpperCase();
+    const classCode = secObj.classCode || ('BTECH-' + dept);
+    const secCode = (secObj.sectionIdentifier || (parts.length >= 3 ? parts.slice(2).join(' ') : name)).toUpperCase();
+
+    return {
+        id: secObj.id,
+        name,
+        year,
+        dept,
+        classCode,
+        secCode,
+        quizEnabled: secObj.quizEnabled !== false,
+        effectiveQuizVisible: secObj.effectiveQuizVisible !== false
+    };
+}
+
+function _quizVisEls(prefix) {
+    if (prefix === 'aqv') {
+        return {
+            dept: document.getElementById('aqvDeptSelect'),
+            year: document.getElementById('aqvYearSelect'),
+            cls: document.getElementById('aqvClassSelect'),
+            sec: document.getElementById('aqvSectionSelect'),
+            badge: document.getElementById('aqvStatusBadge')
+        };
+    }
+    return {
+        dept: document.getElementById('fqVisDept'),
+        year: document.getElementById('fqVisYear'),
+        cls: document.getElementById('fqVisClass'),
+        sec: document.getElementById('fqVisSection'),
+        badge: document.getElementById('fqVisStatusBadge')
+    };
+}
+
+function _populateQuizCascadeSelects(prefix, items) {
+    const els = _quizVisEls(prefix);
+    if (!els.dept) return;
+    const depts = new Set(items.map(s => s.dept).filter(Boolean));
+    if (depts.size === 0) depts.add('CSE');
+    const prevDept = els.dept.value;
+    els.dept.innerHTML = Array.from(depts).sort().map(d => `<option value="${d}">${d}</option>`).join('');
+    if (prevDept && depts.has(prevDept)) els.dept.value = prevDept;
+    else if (depts.has('CSE')) els.dept.value = 'CSE';
+
+    if (els.year && items.length > 0) {
+        const curDept = (els.dept.value || '').toUpperCase();
+        const curYear = (els.year.value || '').toUpperCase();
+        const hasMatch = items.some(s => s.dept === curDept && s.year === curYear);
+        if (!hasMatch) {
+            const firstForDept = items.find(s => s.dept === curDept) || items[0];
+            if (firstForDept) {
+                if (firstForDept.dept && depts.has(firstForDept.dept)) els.dept.value = firstForDept.dept;
+                if (firstForDept.year) els.year.value = firstForDept.year;
+            }
+        }
+    }
+    _updateQuizCascadeDependent(prefix, items);
+}
+
+function _updateQuizCascadeDependent(prefix, items) {
+    const els = _quizVisEls(prefix);
+    const dept = (els.dept?.value || 'CSE').toUpperCase();
+    const year = (els.year?.value || 'II').toUpperCase();
+    const classSel = els.cls;
+    const secSel = els.sec;
+
+    const byDeptYear = items.filter(s => s.dept === dept && s.year === year);
+    if (classSel) {
+        const prevClass = classSel.value;
+        const classes = new Set(byDeptYear.map(s => s.classCode).filter(Boolean));
+        if (classes.size === 0) classes.add('BTECH-' + dept);
+        classSel.innerHTML = '<option value="">All Classes</option>' +
+            Array.from(classes).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+        if (prevClass && classes.has(prevClass)) classSel.value = prevClass;
+    }
+
+    const selectedClass = classSel ? classSel.value : '';
+    const matching = byDeptYear.filter(s => !selectedClass || s.classCode === selectedClass);
+
+    if (secSel) {
+        const prevSec = secSel.value;
+        if (matching.length === 0) {
+            secSel.innerHTML = '<option value="">-- No sections found --</option>';
+        } else {
+            secSel.innerHTML = matching
+                .sort((a, b) => a.secCode.localeCompare(b.secCode))
+                .map(s => `<option value="${s.id}">${s.secCode} (${s.name})</option>`)
+                .join('');
+            if (prevSec && matching.some(s => String(s.id) === String(prevSec))) secSel.value = prevSec;
+        }
+    }
+    _syncQuizSelectionBadge(prefix, items);
+}
+
+function _syncQuizSelectionBadge(prefix, items) {
+    const els = _quizVisEls(prefix);
+    const secId = els.sec?.value;
+    const badge = els.badge;
+    const globalNote = document.getElementById('fqVisGlobalNote');
+    const match = items.find(s => String(s.id) === String(secId));
+    const globalOn = _quizVisSnapshot.globalQuizEnabled !== false;
+
+    if (globalNote) {
+        if (!globalOn) {
+            globalNote.classList.remove('d-none');
+            globalNote.innerHTML = '<i class="fa-solid fa-lock me-1"></i>Admin has disabled Overall Quiz Access for all classes right now.';
+        } else {
+            globalNote.classList.add('d-none');
+            globalNote.innerHTML = '';
+        }
+    }
+    if (!badge) return;
+    if (!match) {
+        badge.className = 'badge bg-secondary';
+        badge.innerText = 'No Section Selected';
+        return;
+    }
+    if (!globalOn) {
+        badge.className = 'badge bg-danger';
+        badge.innerText = `${match.name}: HIDDEN (Admin Global Lock)`;
+    } else if (match.quizEnabled) {
+        badge.className = 'badge bg-success';
+        badge.innerText = `${match.name}: VISIBLE to Students`;
+    } else {
+        badge.className = 'badge bg-warning text-dark';
+        badge.innerText = `${match.name}: HIDDEN from Students`;
+    }
+}
+
+async function _fetchQuizVisibilitySnapshot() {
+    const res = await fetch('/api/quizzes/visibility', { headers: _authHeaders() });
+    if (!res.ok) throw new Error('Could not load quiz visibility settings (' + res.status + ')');
+    const data = await res.json();
+    const parsed = Array.isArray(data.sections)
+        ? data.sections.map(_parseQuizVisMeta).filter(s => s.name && !/^\d+\s+CSE\s+II\s+CSE/i.test(s.name))
+        : [];
+    _quizVisSnapshot = {
+        globalQuizEnabled: data.globalQuizEnabled !== false,
+        sections: parsed
+    };
+    return _quizVisSnapshot;
+}
+
+window.quizLoadVisibilityControls = async () => {
+    try {
+        const snap = await _fetchQuizVisibilitySnapshot();
+        _populateQuizCascadeSelects('fqVis', snap.sections);
+    } catch (e) {
+        console.warn('Could not load faculty quiz visibility controls:', e);
+    }
+};
+
+window.onFacultyQuizVisFilterChange = () => {
+    _updateQuizCascadeDependent('fqVis', _quizVisSnapshot.sections || []);
+};
+
+window.onFacultyQuizVisSectionChange = () => {
+    _syncQuizSelectionBadge('fqVis', _quizVisSnapshot.sections || []);
+};
+
+window.quizSetFacultyClassVisibility = async (enabled) => {
+    const secId = document.getElementById('fqVisSection')?.value;
+    if (!secId) {
+        alert('Please select a Department, Year, Class, and Section.');
+        return;
+    }
+    try {
+        const res = await fetch(`/api/quizzes/visibility/section/${encodeURIComponent(secId)}`, {
+            method: 'PUT',
+            headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: !!enabled })
+        });
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err || 'Failed to update quiz visibility.');
+        }
+        const updated = await res.json();
+        await window.quizLoadVisibilityControls();
+        if (typeof showToast === 'function') {
+            showToast(
+                enabled ? 'Quiz Enabled' : 'Quiz Hidden',
+                `Quiz option is now ${enabled ? 'VISIBLE' : 'HIDDEN'} for ${updated.sectionName || 'the selected class'}.`
+            );
+        }
+    } catch (e) {
+        console.error('Error updating class quiz visibility:', e);
+        if (typeof showToast === 'function') {
+            showToast('Update Failed', e.message || 'Could not update quiz visibility.', 'error');
+        } else {
+            alert(e.message || 'Could not update quiz visibility.');
+        }
+    }
+};
+
+function _renderAdminQuizAccessUI() {
+    const globalOn = _quizVisSnapshot.globalQuizEnabled !== false;
+    const badge = document.getElementById('adminGlobalQuizBadge');
+    const sw = document.getElementById('adminGlobalQuizSwitch');
+    if (badge) {
+        badge.className = globalOn ? 'badge bg-success px-3 py-2' : 'badge bg-danger px-3 py-2';
+        badge.innerText = globalOn ? 'OVERALL QUIZ: ENABLED' : 'OVERALL QUIZ: DISABLED FOR ALL';
+    }
+    if (sw) sw.checked = globalOn;
+
+    _populateQuizCascadeSelects('aqv', _quizVisSnapshot.sections || []);
+
+    const tbody = document.getElementById('adminQuizAccessTableBody');
+    if (!tbody) return;
+    const rows = _quizVisSnapshot.sections || [];
+    if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No sections configured.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = rows.map(s => {
+        const secBadge = s.quizEnabled
+            ? '<span class="badge bg-success">Enabled</span>'
+            : '<span class="badge bg-warning text-dark">Disabled</span>';
+        const effBadge = (globalOn && s.quizEnabled)
+            ? '<span class="badge bg-info text-dark">Visible to Students</span>'
+            : '<span class="badge bg-danger">Hidden from Students</span>';
+        const nextVal = !s.quizEnabled;
+        return `
+        <tr>
+            <td>${s.dept}</td>
+            <td>${s.year} Year</td>
+            <td>${s.classCode}</td>
+            <td><strong>${s.name}</strong></td>
+            <td>${secBadge}</td>
+            <td>${effBadge}</td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm ${nextVal ? 'btn-outline-success' : 'btn-outline-danger'}" onclick="window.toggleAdminSectionQuizAccess(${s.id}, ${nextVal})">
+                    <i class="fa-solid ${nextVal ? 'fa-eye' : 'fa-eye-slash'} me-1"></i>${nextVal ? 'Enable' : 'Disable'}
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+window.openAdminQuizAccessModal = async () => {
+    try {
+        await _fetchQuizVisibilitySnapshot();
+        _renderAdminQuizAccessUI();
+    } catch (e) {
+        const alertEl = document.getElementById('adminQuizAccessAlert');
+        if (alertEl) {
+            alertEl.className = 'alert alert-danger small py-2 mb-3';
+            alertEl.innerText = e.message || 'Could not load quiz access settings.';
+        }
+    }
+};
+
+window.onAdminQuizFilterChange = () => {
+    _updateQuizCascadeDependent('aqv', _quizVisSnapshot.sections || []);
+};
+
+window.onAdminQuizSectionChange = () => {
+    _syncQuizSelectionBadge('aqv', _quizVisSnapshot.sections || []);
+};
+
+window.toggleGlobalQuizAccess = async (enabled) => {
+    try {
+        const res = await fetch('/api/quizzes/visibility/global', {
+            method: 'PUT',
+            headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: !!enabled })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        await _fetchQuizVisibilitySnapshot();
+        _renderAdminQuizAccessUI();
+        if (typeof showToast === 'function') {
+            showToast('Overall Quiz Updated', `Overall student quiz access is now ${enabled ? 'ENABLED' : 'DISABLED across all classes'}.`);
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('Update Failed', e.message || 'Could not update overall quiz access.', 'error');
+    }
+};
+
+window.setAllClassesQuizAccess = async (enabled) => {
+    try {
+        const res = await fetch('/api/quizzes/visibility/all', {
+            method: 'PUT',
+            headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: !!enabled })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        await _fetchQuizVisibilitySnapshot();
+        _renderAdminQuizAccessUI();
+        if (typeof showToast === 'function') {
+            showToast(
+                enabled ? 'All Classes Enabled' : 'All Classes Disabled',
+                `Quiz visibility is now ${enabled ? 'ENABLED' : 'DISABLED'} for all classes.`
+            );
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('Update Failed', e.message || 'Could not update all classes.', 'error');
+    }
+};
+
+window.toggleAdminSectionQuizAccess = async (sectionId, enabled) => {
+    try {
+        const res = await fetch(`/api/quizzes/visibility/section/${encodeURIComponent(sectionId)}`, {
+            method: 'PUT',
+            headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: !!enabled })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const updated = await res.json();
+        await _fetchQuizVisibilitySnapshot();
+        _renderAdminQuizAccessUI();
+        if (typeof showToast === 'function') {
+            showToast(
+                enabled ? 'Class Quiz Enabled' : 'Class Quiz Disabled',
+                `Quiz is now ${enabled ? 'enabled' : 'disabled'} for ${updated.sectionName || 'the selected class'}.`
+            );
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('Update Failed', e.message || 'Could not update class quiz access.', 'error');
+    }
+};
+
+window.setSelectedAdminClassQuizAccess = async (enabled) => {
+    const secId = document.getElementById('aqvSectionSelect')?.value;
+    if (!secId) {
+        alert('Please select a Department, Year, Class, and Section.');
+        return;
+    }
+    await window.toggleAdminSectionQuizAccess(secId, enabled);
+};
+
+window.refreshStudentQuizVisibility = async () => {
+    const takeBtn = document.getElementById('studentTakeQuizNavBtn');
+    const histBtn = document.getElementById('studentQuizHistoryNavBtn');
+    try {
+        const res = await fetch('/api/quizzes/visibility/student', { headers: _authHeaders() });
+        if (!res.ok) return null;
+        const vis = await res.json();
+        const visible = vis.visible !== false;
+        window._studentQuizVisible = visible;
+        if (takeBtn) takeBtn.classList.toggle('d-none', !visible);
+        if (histBtn) histBtn.classList.toggle('d-none', !visible);
+        return vis;
+    } catch (e) {
+        console.warn('Could not refresh student quiz visibility:', e);
+        return null;
+    }
+};
+
+window.refreshClassAdvisorQuizBar = async (sectionName) => {
+    const badge = document.getElementById('caQuizVisBadge');
+    if (!badge || !sectionName) return;
+    try {
+        const snap = await _fetchQuizVisibilitySnapshot();
+        const target = String(sectionName || '').trim().toLowerCase();
+        const match = (snap.sections || []).find(s => String(s.name || '').trim().toLowerCase() === target);
+        const globalOn = snap.globalQuizEnabled !== false;
+        if (!match) {
+            badge.className = 'badge bg-secondary ms-1';
+            badge.innerText = 'Not found in DB';
+            return;
+        }
+        if (!globalOn) {
+            badge.className = 'badge bg-danger ms-1';
+            badge.innerText = 'HIDDEN (Admin Global Lock)';
+        } else if (match.quizEnabled) {
+            badge.className = 'badge bg-success ms-1';
+            badge.innerText = 'VISIBLE to Students';
+        } else {
+            badge.className = 'badge bg-warning text-dark ms-1';
+            badge.innerText = 'HIDDEN from Students';
+        }
+    } catch (e) {
+        badge.className = 'badge bg-secondary ms-1';
+        badge.innerText = 'Unavailable';
+    }
+};
+
+window.toggleClassAdvisorQuizVisibility = async (sectionName, enabled) => {
+    try {
+        const snap = await _fetchQuizVisibilitySnapshot();
+        const target = String(sectionName || '').trim().toLowerCase();
+        const match = (snap.sections || []).find(s => String(s.name || '').trim().toLowerCase() === target);
+        if (!match) {
+            throw new Error(`Section "${sectionName}" could not be resolved.`);
+        }
+        const res = await fetch(`/api/quizzes/visibility/section/${encodeURIComponent(match.id)}`, {
+            method: 'PUT',
+            headers: { ..._authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: !!enabled })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        await window.refreshClassAdvisorQuizBar(sectionName);
+        if (typeof showToast === 'function') {
+            showToast(
+                enabled ? 'Quiz Enabled' : 'Quiz Hidden',
+                `Quiz option is now ${enabled ? 'VISIBLE' : 'HIDDEN'} for ${match.name}.`
+            );
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') {
+            showToast('Update Failed', e.message || 'Could not update quiz visibility.', 'error');
+        } else {
+            alert(e.message || 'Could not update quiz visibility.');
+        }
+    }
 };

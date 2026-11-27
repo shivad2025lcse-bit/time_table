@@ -18,6 +18,7 @@ public interface EmailNotificationLogRepository extends JpaRepository<EmailNotif
 
     List<EmailNotificationLog> findTop250ByOrderBySentAtDesc();
     List<EmailNotificationLog> findByTemporaryChangeIdOrderBySentAtDesc(Long temporaryChangeId);
+    List<EmailNotificationLog> findByUserId(Long userId);
     long countByNotificationStatusIn(Collection<String> statuses);
     long countByNotificationStatus(String notificationStatus);
 }

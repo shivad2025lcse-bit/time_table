@@ -70,7 +70,7 @@ public class DataInitializerService implements CommandLineRunner {
             System.out.println(">>> INITIALIZING SRI ESHWAR COLLEGE OF ENGINEERING TIME TABLE GENERATOR DEMO DATA...");
 
             // 1. Create Users
-            User adminUser = userRepository.save(new User("shiva25012007", passwordEncoder.encode("shiv2501"), "shiv2501", Role.ROLE_ADMIN, "admin@sece.ac.in", true));
+            User adminUser = userRepository.save(new User("shiva25012007", passwordEncoder.encode("password123"), "password123", Role.ROLE_ADMIN, "admin@sece.ac.in", true));
             User facultyUser1 = userRepository.save(new User("fkeerj012345", passwordEncoder.encode("keerj012345"), "keerj012345", Role.ROLE_FACULTY, "faculty1@sece.ac.in", true));
             User facultyUser2 = userRepository.save(new User("fsarae012345", passwordEncoder.encode("sarae012345"), "sarae012345", Role.ROLE_FACULTY, "faculty2@sece.ac.in", true));
             User facultyUser3 = userRepository.save(new User("fmurun012345", passwordEncoder.encode("murun012345"), "murun012345", Role.ROLE_FACULTY, "murugavelli@sece.ac.in", true));

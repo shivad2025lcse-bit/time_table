@@ -101,15 +101,42 @@ public class StudentController {
             Object semObj = request.get("newSemester");
             Integer newSemester = semObj != null ? Integer.valueOf(semObj.toString()) : null;
             String note = request.get("note") != null ? request.get("note").toString() : "";
+            boolean completedSem8 = Boolean.TRUE.equals(request.get("completedSem8"));
+            if (completedSem8 && newSemester == null) {
+                newSemester = 8;
+            }
+            if (completedSem8 && (note == null || note.trim().isEmpty())) {
+                note = "Sem 8 Completed";
+            }
 
             List<Student> updated = studentService.updateStudentsSemester(studentIds, newSemester, note);
             return ResponseEntity.ok(java.util.Map.of(
                     "updatedCount", updated.size(),
                     "newSemester", newSemester,
+                    "completedSem8", completedSem8,
                     "students", updated
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Semester update failed"));
+        }
+    }
+
+    @PostMapping("/bulk-delete")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    public ResponseEntity<?> bulkDeleteStudents(@RequestBody java.util.Map<String, Object> request) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Object> rawIds = (List<Object>) request.get("studentIds");
+            List<Long> studentIds = new java.util.ArrayList<>();
+            if (rawIds != null) {
+                for (Object idObj : rawIds) {
+                    if (idObj != null) studentIds.add(Long.valueOf(idObj.toString()));
+                }
+            }
+            java.util.Map<String, Object> result = studentService.deleteStudentsBulk(studentIds);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Bulk delete failed"));
         }
     }
 

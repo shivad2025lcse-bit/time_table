@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -83,6 +84,47 @@ public class TeacherController {
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Teacher> createTeacher(@RequestBody Teacher teacher) {
         return ResponseEntity.ok(teacherService.saveTeacher(teacher));
+    }
+
+    @PutMapping("/{id}/class-advisor")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional
+    public ResponseEntity<?> assignClassAdvisor(@PathVariable Long id, @RequestBody Map<String, String> request) {
+        String sectionName = request.get("sectionName");
+        if (sectionName == null || sectionName.isBlank()) {
+            return ResponseEntity.badRequest().body("Class/section is required.");
+        }
+
+        Teacher advisor = teacherRepository.findById(id).orElse(null);
+        if (advisor == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String assignedSection = sectionName.trim();
+        for (Teacher teacher : teacherRepository.findAll()) {
+            if (!id.equals(teacher.getId())
+                    && teacher.getClassAdvisorFor() != null
+                    && assignedSection.equalsIgnoreCase(teacher.getClassAdvisorFor())) {
+                teacher.setClassAdvisorFor("");
+                teacherRepository.save(teacher);
+            }
+        }
+
+        advisor.setClassAdvisorFor(assignedSection);
+        return ResponseEntity.ok(teacherRepository.save(advisor));
+    }
+
+    @DeleteMapping("/{id}/class-advisor")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Void> removeClassAdvisor(@PathVariable Long id) {
+        Teacher advisor = teacherRepository.findById(id).orElse(null);
+        if (advisor == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        advisor.setClassAdvisorFor("");
+        teacherRepository.save(advisor);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}")

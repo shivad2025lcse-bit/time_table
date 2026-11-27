@@ -10,6 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.smarttimetable.service.AiQuizGeneratorService;
+import com.smarttimetable.service.QuizVisibilityService;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +21,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/quizzes")
+@CrossOrigin(origins = "*")
 public class QuizController {
 
     @Autowired
@@ -27,6 +32,73 @@ public class QuizController {
 
     @Autowired
     private AiQuizGeneratorService aiQuizGeneratorService;
+
+    @Autowired
+    private QuizVisibilityService quizVisibilityService;
+
+    @Autowired
+    private com.smarttimetable.repository.QuizRepository quizRepository;
+
+    @Autowired
+    private com.smarttimetable.repository.StudentRepository studentRepository;
+
+    private boolean isStudentOnly(Authentication authentication) {
+        if (authentication == null) return false;
+        boolean hasStudent = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_STUDENT".equals(a.getAuthority()));
+        boolean hasPrivileged = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_FACULTY".equals(a.getAuthority()));
+        return hasStudent && !hasPrivileged;
+    }
+
+    @GetMapping("/visibility")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    public ResponseEntity<Map<String, Object>> getQuizVisibility() {
+        return ResponseEntity.ok(quizVisibilityService.getVisibilitySnapshot());
+    }
+
+    @GetMapping("/visibility/student")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> getStudentQuizVisibility(
+            Authentication authentication,
+            @RequestParam(required = false) Long sectionId) {
+        return ResponseEntity.ok(quizVisibilityService.getStudentQuizVisibility(authentication, sectionId));
+    }
+
+    @PutMapping("/visibility/section/{sectionId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_FACULTY', 'ROLE_ADMIN')")
+    public ResponseEntity<?> updateSectionQuizVisibility(
+            @PathVariable Long sectionId,
+            @RequestBody Map<String, Object> body,
+            Authentication authentication) {
+        boolean enabled = body != null && Boolean.parseBoolean(String.valueOf(body.get("enabled")));
+        String actor = authentication != null ? authentication.getName() : "system";
+        try {
+            return ResponseEntity.ok(quizVisibilityService.setSectionQuizEnabled(sectionId, enabled, actor));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @PutMapping("/visibility/global")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> updateGlobalQuizVisibility(
+            @RequestBody Map<String, Object> body,
+            Authentication authentication) {
+        boolean enabled = body != null && Boolean.parseBoolean(String.valueOf(body.get("enabled")));
+        String actor = authentication != null ? authentication.getName() : "admin";
+        return ResponseEntity.ok(quizVisibilityService.setGlobalQuizEnabled(enabled, actor));
+    }
+
+    @PutMapping("/visibility/all")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> updateAllClassesQuizVisibility(
+            @RequestBody Map<String, Object> body,
+            Authentication authentication) {
+        boolean enabled = body != null && Boolean.parseBoolean(String.valueOf(body.get("enabled")));
+        String actor = authentication != null ? authentication.getName() : "admin";
+        return ResponseEntity.ok(quizVisibilityService.setAllSectionsQuizEnabled(enabled, actor));
+    }
 
     @PostMapping
     public ResponseEntity<?> createQuiz(@RequestBody QuizCreateRequest request) {
@@ -39,23 +111,43 @@ public class QuizController {
     }
 
     @PostMapping("/generate")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     public ResponseEntity<?> generateQuestions(@RequestBody Map<String, Object> request) {
         try {
-            String topic = (String) request.get("topic");
-            String notes = (String) request.get("notes");
-            String difficulty = (String) request.getOrDefault("difficulty", "Medium");
-            String type = (String) request.getOrDefault("type", "MCQ");
+            String topic = request.get("topic") != null ? request.get("topic").toString().trim() : "";
+            String notes = request.get("notes") != null ? request.get("notes").toString() : "";
+            String difficulty = String.valueOf(request.getOrDefault("difficulty", "Medium"));
+            String type = String.valueOf(request.getOrDefault("type", "MCQ"));
             int count = Integer.parseInt(request.getOrDefault("count", "5").toString());
+            String provider = request.get("provider") != null ? request.get("provider").toString() : "AUTO";
+            String apiKey = request.get("apiKey") != null ? request.get("apiKey").toString() : "";
+            String model = request.get("model") != null ? request.get("model").toString() : "";
+            @SuppressWarnings("unchecked")
+            List<String> excludeQuestions = request.get("excludeQuestions") instanceof List
+                    ? (List<String>) request.get("excludeQuestions")
+                    : java.util.Collections.emptyList();
 
-            List<QuizQuestion> questions = aiQuizGeneratorService.generateQuestions(topic, notes, difficulty, type, count);
-            return ResponseEntity.ok(questions);
+            AiQuizGeneratorService.GenerationResult result = aiQuizGeneratorService.generateQuestionsWithMeta(
+                    topic, notes, difficulty, type, count, provider, apiKey, model, excludeQuestions);
+            return ResponseEntity.ok(Map.of(
+                    "questions", result.questions(),
+                    "providerUsed", result.providerUsed(),
+                    "modelUsed", result.modelUsed(),
+                    "difficultyApplied", result.difficultyApplied(),
+                    "usedExternalAi", result.usedExternalAi(),
+                    "warning", result.warning() != null ? result.warning() : ""
+            ));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage() != null ? e.getMessage() : "AI generation failed"));
         }
     }
 
     @GetMapping("/section/{sectionId}")
-    public ResponseEntity<List<Quiz>> getQuizzesBySection(@PathVariable Long sectionId) {
+    public ResponseEntity<?> getQuizzesBySection(@PathVariable Long sectionId, Authentication authentication) {
+        if (isStudentOnly(authentication) && !quizVisibilityService.isQuizVisibleForSection(sectionId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Quiz access is currently disabled for your class."));
+        }
         return ResponseEntity.ok(quizService.getQuizzesBySection(sectionId));
     }
 
@@ -65,8 +157,16 @@ public class QuizController {
     }
 
     @PostMapping("/{quizId}/submit")
-    public ResponseEntity<?> submitQuiz(@PathVariable Long quizId, @RequestBody QuizSubmitRequest request) {
+    public ResponseEntity<?> submitQuiz(@PathVariable Long quizId, @RequestBody QuizSubmitRequest request, Authentication authentication) {
         try {
+            if (isStudentOnly(authentication)) {
+                Quiz quiz = quizRepository.findById(quizId).orElse(null);
+                Long secId = (quiz != null && quiz.getSection() != null) ? quiz.getSection().getId() : null;
+                if (!quizVisibilityService.isQuizVisibleForSection(secId)) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body("Quiz access is currently disabled for your class.");
+                }
+            }
             List<StudentAnswer> answers = new ArrayList<>();
             for (QuizSubmitRequest.AnswerDto dto : request.answers) {
                 StudentAnswer sa = new StudentAnswer();
@@ -129,7 +229,15 @@ public class QuizController {
 
     // Student: view entire quiz history with answers
     @GetMapping("/student/{studentId}/history")
-    public ResponseEntity<List<QuizSubmission>> getStudentQuizHistory(@PathVariable Long studentId) {
+    public ResponseEntity<?> getStudentQuizHistory(@PathVariable Long studentId, Authentication authentication) {
+        if (isStudentOnly(authentication)) {
+            Student stu = studentRepository.findById(studentId).orElse(null);
+            Long secId = (stu != null && stu.getSection() != null) ? stu.getSection().getId() : null;
+            if (!quizVisibilityService.isQuizVisibleForSection(secId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Quiz access is currently disabled for your class."));
+            }
+        }
         return ResponseEntity.ok(quizService.getStudentQuizHistory(studentId));
     }
 

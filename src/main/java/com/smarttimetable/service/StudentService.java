@@ -30,6 +30,21 @@ public class StudentService {
     private com.smarttimetable.repository.UserRepository userRepository;
 
     @org.springframework.beans.factory.annotation.Autowired
+    private com.smarttimetable.repository.QuizSubmissionRepository quizSubmissionRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.smarttimetable.repository.TopicPerformanceRepository topicPerformanceRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.smarttimetable.repository.EmailSubscriptionRepository emailSubscriptionRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.smarttimetable.repository.EmailNotificationLogRepository emailNotificationLogRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.smarttimetable.repository.StudentNotificationRepository studentNotificationRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public List<Student> getAllStudents() {
@@ -177,14 +192,85 @@ public class StudentService {
         return studentRepository.saveAll(targets);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void deleteStudent(Long id) {
+        if (id == null) return;
         Student student = studentRepository.findById(id).orElse(null);
-        if (student != null) {
-            User user = student.getUser();
-            studentRepository.deleteById(id);
-            if (user != null) {
-                userRepository.delete(user);
+        if (student == null) return;
+
+        // Remove dependent quiz and notification records so deletion succeeds cleanly
+        var submissions = quizSubmissionRepository.findByStudentId(id);
+        if (submissions != null && !submissions.isEmpty()) {
+            quizSubmissionRepository.deleteAll(submissions);
+        }
+        var topicPerfs = topicPerformanceRepository.findByStudentId(id);
+        if (topicPerfs != null && !topicPerfs.isEmpty()) {
+            topicPerformanceRepository.deleteAll(topicPerfs);
+        }
+        for (String mail : java.util.Arrays.asList(student.getEmail(), student.getCollegeEmail())) {
+            if (mail != null && !mail.trim().isEmpty()) {
+                var regs = studentNotificationRepository.findByEmail(mail.trim());
+                if (regs != null && !regs.isEmpty()) {
+                    studentNotificationRepository.deleteAll(regs);
+                }
             }
         }
+
+        // Gather linked website login account + any student user matching register number
+        java.util.LinkedHashMap<Long, User> usersToDelete = new java.util.LinkedHashMap<>();
+        if (student.getUser() != null && student.getUser().getId() != null) {
+            usersToDelete.put(student.getUser().getId(), student.getUser());
+        }
+        if (student.getRegisterNumber() != null && !student.getRegisterNumber().trim().isEmpty()) {
+            userRepository.findByUsernameIgnoreCase(student.getRegisterNumber().trim())
+                    .filter(u -> u.getRole() == com.smarttimetable.entity.Role.ROLE_STUDENT)
+                    .ifPresent(u -> usersToDelete.put(u.getId(), u));
+        }
+
+        student.setUser(null);
+        studentRepository.save(student);
+        studentRepository.delete(student);
+        studentRepository.flush();
+
+        for (User u : usersToDelete.values()) {
+            emailSubscriptionRepository.findByUserId(u.getId())
+                    .ifPresent(emailSubscriptionRepository::delete);
+            var emailLogs = emailNotificationLogRepository.findByUserId(u.getId());
+            if (emailLogs != null && !emailLogs.isEmpty()) {
+                emailLogs.forEach(log -> log.setUser(null));
+                emailNotificationLogRepository.saveAll(emailLogs);
+            }
+            userRepository.delete(u);
+        }
+        userRepository.flush();
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public java.util.Map<String, Object> deleteStudentsBulk(List<Long> studentIds) {
+        if (studentIds == null || studentIds.isEmpty()) {
+            throw new IllegalArgumentException("Please select at least one student to delete.");
+        }
+        List<Student> targets = studentRepository.findAllById(studentIds);
+        List<String> deletedRolls = new java.util.ArrayList<>();
+        List<String> deletedUsers = new java.util.ArrayList<>();
+        int deletedCount = 0;
+
+        for (Student st : targets) {
+            if (st.getRegisterNumber() != null) {
+                deletedRolls.add(st.getRegisterNumber());
+            }
+            if (st.getUser() != null && st.getUser().getUsername() != null) {
+                deletedUsers.add(st.getUser().getUsername());
+            }
+            deleteStudent(st.getId());
+            deletedCount++;
+        }
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("deletedCount", deletedCount);
+        result.put("deletedRegisterNumbers", deletedRolls);
+        result.put("removedUsernames", deletedUsers);
+        result.put("message", "Permanently deleted " + deletedCount + " student(s) from database and revoked their website login access.");
+        return result;
     }
 }

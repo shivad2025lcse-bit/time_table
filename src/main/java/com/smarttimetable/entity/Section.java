@@ -35,6 +35,9 @@ public class Section {
     @Column(name = "section_identifier")
     private String sectionIdentifier;
 
+    @Column(name = "quiz_enabled")
+    private Boolean quizEnabled = true;
+
     public Section() {}
 
     public Section(String sectionName, Course course, Integer semester, Integer studentCount) {
@@ -82,4 +85,7 @@ public class Section {
 
     public String getSectionIdentifier() { return sectionIdentifier; }
     public void setSectionIdentifier(String sectionIdentifier) { this.sectionIdentifier = sectionIdentifier; }
+
+    public Boolean getQuizEnabled() { return quizEnabled == null ? Boolean.TRUE : quizEnabled; }
+    public void setQuizEnabled(Boolean quizEnabled) { this.quizEnabled = quizEnabled == null ? Boolean.TRUE : quizEnabled; }
 }

@@ -3199,6 +3199,9 @@ async function initSubstitutionModal() {
                 if (typeof window.loadStudentClassDocuments === 'function') {
                     window.loadStudentClassDocuments();
                 }
+                if (typeof window.refreshStudentQuizVisibility === 'function') {
+                    window.refreshStudentQuizVisibility();
+                }
             } else {
                 if (typeof window.loadTimetableData === 'function') {
                     window.loadTimetableData().then(() => {
@@ -3229,6 +3232,9 @@ async function initSubstitutionModal() {
                     renderCoverageRequests();
                     renderStaffAvailability();
                     updateLeaveButtonState();
+                    if (role === 'STUDENT' && typeof window.refreshStudentQuizVisibility === 'function') {
+                        await window.refreshStudentQuizVisibility();
+                    }
                     const notificationModal = document.getElementById('periodNotificationModal');
                     if (notificationModal && !notificationModal.classList.contains('d-none')) {
                         await renderPeriodNotifications();
@@ -3842,6 +3848,217 @@ async function initSubstitutionModal() {
             });
         }
 
+        function _getAdminEnrolledVenuesList() {
+            const builtInVenueNames = new Set([
+                'SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'
+            ]);
+            courseReferenceList.forEach(c => { if (c.venue && c.venue !== '-' && c.venue !== 'TBD') builtInVenueNames.add(c.venue.trim()); });
+            activeSections.forEach(s => { if (s.classroom && s.classroom !== '-' && s.classroom !== 'TBD') builtInVenueNames.add(s.classroom.trim()); });
+
+            let builtInVenueOverrides = {};
+            let hiddenBuiltInVenues = [];
+            try {
+                builtInVenueOverrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}');
+                hiddenBuiltInVenues = JSON.parse(localStorage.getItem('sece_hidden_builtin_venues') || '[]');
+            } catch (e) { }
+
+            const customList = (Array.isArray(adminResources.venues) ? adminResources.venues : []).map(v => ({
+                name: String(v.name || v || '').trim(),
+                type: v.type || 'Custom',
+                block: v.block || '',
+                capacity: v.capacity || '',
+                isCustom: true
+            })).filter(v => v.name);
+
+            const builtInList = Array.from(builtInVenueNames)
+                .filter(name => !hiddenBuiltInVenues.includes(name))
+                .map(origName => {
+                    const ov = builtInVenueOverrides[origName] || {};
+                    return {
+                        name: ov.name || origName,
+                        type: ov.type || 'Built-in',
+                        block: ov.block || '',
+                        capacity: ov.capacity || '',
+                        isCustom: false
+                    };
+                });
+
+            return { customList, builtInList };
+        }
+
+        async function _loadReadOnlyEnrolledCatalog() {
+            const deptsEl = document.getElementById('viewEnrolledDeptsBadges');
+            const secBody = document.getElementById('viewEnrolledSectionsTableBody');
+            const venueBody = document.getElementById('viewEnrolledVenuesBody');
+            if (!deptsEl && !secBody && !venueBody) return;
+
+            const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            try {
+                const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
+                const [secRes, deptRes, roomRes, labRes, customVenueRes, ttRes] = await Promise.all([
+                    fetchFn('/api/sections').catch(() => null),
+                    fetchFn('/api/departments').catch(() => null),
+                    fetchFn('/api/classrooms').catch(() => null),
+                    fetchFn('/api/laboratories').catch(() => null),
+                    fetchFn('/api/operations/custom-venues').catch(() => null),
+                    fetchFn('/api/timetable').catch(() => null)
+                ]);
+
+                const sections = (secRes && secRes.ok) ? await secRes.json() : [];
+                const depts = (deptRes && deptRes.ok) ? await deptRes.json() : [];
+                const rooms = (roomRes && roomRes.ok) ? await roomRes.json() : [];
+                const labs = (labRes && labRes.ok) ? await labRes.json() : [];
+                const customVenues = (customVenueRes && customVenueRes.ok) ? await customVenueRes.json() : [];
+                const ttEntries = (ttRes && ttRes.ok) ? await ttRes.json() : [];
+
+                if (deptsEl) {
+                    const deptMap = new Map();
+                    (Array.isArray(depts) ? depts : []).forEach(d => {
+                        const code = String(d.code || d.name || '').trim();
+                        if (code) deptMap.set(code.toUpperCase(), { code, name: d.name || code });
+                    });
+                    (Array.isArray(sections) ? sections : []).forEach(s => {
+                        const code = String(s.course?.department?.code || s.course?.department?.name || '').trim();
+                        if (code && !deptMap.has(code.toUpperCase())) deptMap.set(code.toUpperCase(), { code, name: s.course?.department?.name || code });
+                    });
+                    (Array.isArray(activeSections) ? activeSections : []).forEach(s => {
+                        const code = String(s.dept || '').trim();
+                        if (code && !deptMap.has(code.toUpperCase())) deptMap.set(code.toUpperCase(), { code, name: code });
+                    });
+                    const deptList = Array.from(deptMap.values());
+                    deptsEl.innerHTML = deptList.length > 0
+                        ? deptList.map(d => `<span class="badge bg-primary px-3 py-2">${esc(d.code)}${d.name && d.name !== d.code ? ` — ${esc(d.name)}` : ''}</span>`).join('')
+                        : '<span class="text-muted small">No departments enrolled yet.</span>';
+                }
+
+                if (secBody) {
+                    const cleanSecs = (Array.isArray(sections) ? sections : []).filter(s => s.sectionName && !/^\d+\s+CSE\s+II\s+CSE/i.test(s.sectionName));
+                    const mergedRows = [];
+                    const seenSec = new Set();
+                    cleanSecs.forEach(s => {
+                        const nm = String(s.sectionName || '').trim();
+                        if (nm) { seenSec.add(nm.toLowerCase()); mergedRows.push(s); }
+                    });
+                    (Array.isArray(activeSections) ? activeSections : []).forEach((a, idx) => {
+                        const nm = String(a.name || '').trim();
+                        if (nm && !seenSec.has(nm.toLowerCase())) {
+                            seenSec.add(nm.toLowerCase());
+                            mergedRows.push({
+                                id: idx + 1000,
+                                sectionName: nm,
+                                course: { code: 'BTECH-' + (a.dept || 'CSE'), department: { code: a.dept || '-' } },
+                                classroom: a.classroom || '-',
+                                year: '',
+                                semester: ''
+                            });
+                        }
+                    });
+
+                    if (mergedRows.length === 0) {
+                        secBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No sections enrolled yet.</td></tr>';
+                    } else {
+                        secBody.innerHTML = mergedRows.map((s, idx) => {
+                            const secName = s.sectionName || s.name || '-';
+                            const deptCode = s.course?.department?.code || s.course?.department?.name || (secName.split(/\s+/)[1] || '-');
+                            const classCode = s.course?.code || s.course?.name || ('BTECH-' + deptCode);
+                            const localMatch = (Array.isArray(activeSections) ? activeSections : []).find(a => String(a.name || '').toLowerCase() === secName.toLowerCase());
+                            let venue = s.classroom || (localMatch ? localMatch.classroom : '') || '';
+                            if (!venue && Array.isArray(ttEntries)) {
+                                const ttHit = ttEntries.find(e =>
+                                    String(e.sectionName || e.section?.sectionName || '').toLowerCase() === secName.toLowerCase()
+                                    && (e.roomNumber || e.classroom?.roomNumber)
+                                );
+                                if (ttHit) venue = ttHit.roomNumber || ttHit.classroom?.roomNumber || '';
+                            }
+                            const yrSem = [s.year ? `Year ${s.year}` : '', s.semester ? `Sem ${s.semester}` : ''].filter(Boolean).join(' • ') || '-';
+                            return `
+                            <tr>
+                                <td class="text-muted">${idx + 1}</td>
+                                <td><strong class="text-info">${esc(secName)}</strong></td>
+                                <td>${esc(classCode)}</td>
+                                <td><span class="badge bg-primary">${esc(deptCode)}</span></td>
+                                <td><span class="badge bg-secondary">${esc(venue || 'TBA')}</span></td>
+                                <td>${esc(yrSem)}</td>
+                            </tr>`;
+                        }).join('');
+                    }
+                }
+
+                if (venueBody) {
+                    const venueMap = new Map();
+                    const addVenueEntry = (entry) => {
+                        const nm = String(entry.name || '').trim();
+                        if (!nm || nm === '-' || nm === 'TBD') return;
+                        const key = nm.toLowerCase();
+                        const prev = venueMap.get(key);
+                        if (!prev) {
+                            venueMap.set(key, {
+                                name: nm,
+                                building: entry.building || '-',
+                                type: entry.type || 'Built-in',
+                                capacity: entry.capacity || '-',
+                                isCustom: !!entry.isCustom
+                            });
+                        } else {
+                            if ((!prev.building || prev.building === '-') && entry.building && entry.building !== '-') prev.building = entry.building;
+                            if ((!prev.capacity || prev.capacity === '-') && entry.capacity && entry.capacity !== '-') prev.capacity = entry.capacity;
+                            if (entry.type && prev.type === 'Built-in') prev.type = entry.type;
+                            if (entry.isCustom) prev.isCustom = true;
+                        }
+                    };
+
+                    const { customList, builtInList } = _getAdminEnrolledVenuesList();
+                    customList.forEach(v => addVenueEntry({
+                        name: v.name,
+                        building: v.block ? `Block ${v.block}` : '-',
+                        type: v.type || 'Custom',
+                        capacity: v.capacity || '-',
+                        isCustom: true
+                    }));
+                    (Array.isArray(customVenues) ? customVenues : []).forEach(v => addVenueEntry({
+                        name: v.name || v.venueName,
+                        building: v.block ? `Block ${v.block}` : '-',
+                        type: v.venueType || 'Custom',
+                        capacity: v.capacity || '-',
+                        isCustom: true
+                    }));
+                    builtInList.forEach(v => addVenueEntry({
+                        name: v.name,
+                        building: v.block ? `Block ${v.block}` : '-',
+                        type: v.type || 'Built-in',
+                        capacity: v.capacity || '-',
+                        isCustom: false
+                    }));
+                    (Array.isArray(rooms) ? rooms : []).forEach(r => addVenueEntry({
+                        name: r.roomNumber,
+                        building: r.building || '-',
+                        type: r.roomType || 'CLASSROOM',
+                        capacity: r.capacity ?? '-'
+                    }));
+                    (Array.isArray(labs) ? labs : []).forEach(l => addVenueEntry({
+                        name: l.labName,
+                        building: l.building || '-',
+                        type: l.labType || 'LAB',
+                        capacity: l.capacity ?? '-'
+                    }));
+
+                    const combinedVenues = Array.from(venueMap.values());
+                    venueBody.innerHTML = combinedVenues.length > 0
+                        ? combinedVenues.map((v, idx) => `
+                            <tr>
+                                <td class="text-muted">${idx + 1}</td>
+                                <td><strong class="text-success">${esc(v.name)}</strong>${v.isCustom ? ' <span class="badge bg-success ms-1" style="font-size:0.65rem;">Custom</span>' : ''}</td>
+                                <td>${esc(v.building)}</td>
+                                <td><span class="badge bg-secondary">${esc(v.type)}</span></td>
+                                <td>${esc(v.capacity)}</td>
+                            </tr>`).join('')
+                        : '<tr><td colspan="5" class="text-center text-muted py-3">No venues enrolled yet.</td></tr>';
+                }
+            } catch (err) {
+                console.warn('Could not load read-only enrolled catalog:', err);
+            }
+        }
+
         function renderSectionsList() {
             const ul = document.getElementById('sectionsList');
             const ul2 = document.getElementById('sectionsListOnly');
@@ -3870,6 +4087,7 @@ async function initSubstitutionModal() {
             });
             populateSectionSelects();
             renderAdminResourcesUI();
+            _loadReadOnlyEnrolledCatalog();
         }
 
         function handleAddSection(e) {
@@ -3990,6 +4208,21 @@ async function initSubstitutionModal() {
                 <div class="alert alert-info py-2 small mb-0 flex-grow-1">Only this Class Advisor's assigned class is shown.</div>
                 <button class="btn btn-sm btn-success text-nowrap" onclick="document.getElementById('caAddStudentForm').classList.toggle('d-none')"><i class="fa-solid fa-user-plus me-1"></i> Add Student</button>
             </div>
+            <div id="caQuizVisBar" class="p-2 px-3 rounded border border-info bg-dark mb-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="small">
+                    <i class="fa-solid fa-clipboard-question text-info me-2"></i>
+                    Student Quiz Option for <strong class="text-warning">${section}</strong>:
+                    <span id="caQuizVisBadge" class="badge bg-secondary ms-1">Checking...</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-xs btn-outline-success py-1 px-2" onclick="window.toggleClassAdvisorQuizVisibility?.('${String(section).replace(/'/g, "\\'")}', true)">
+                        <i class="fa-solid fa-eye me-1"></i> Enable Quiz
+                    </button>
+                    <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2" onclick="window.toggleClassAdvisorQuizVisibility?.('${String(section).replace(/'/g, "\\'")}', false)">
+                        <i class="fa-solid fa-eye-slash me-1"></i> Disable Quiz
+                    </button>
+                </div>
+            </div>
 
             <div id="caAddStudentForm" class="card card-body bg-secondary border-0 mb-3 d-none">
                 <h6 class="fw-bold text-warning mb-2">Register New Student</h6>
@@ -4090,15 +4323,27 @@ async function initSubstitutionModal() {
                             <option value="6">Semester 6</option>
                             <option value="7">Semester 7</option>
                             <option value="8">Semester 8</option>
+                            <option value="8-completed">Semester 8 (Completed / Passed Out)</option>
                         </select>
                     </div>
                     <div class="col-md-5">
                         <label class="form-label small text-muted mb-1">Semester Change Remark / Mark</label>
-                        <input type="text" id="caSemChangeNote" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Promoted to Even Sem" />
+                        <input type="text" id="caSemChangeNote" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Promoted to Even Sem / Sem 8 Completed" />
                     </div>
                     <div class="col-md-4 d-grid">
                         <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="window.applyClassAdvisorSemChanges?.()">
                             <i class="fa-solid fa-check-double me-1"></i> Mark Semester Changes
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 pt-2 border-top border-secondary">
+                    <small class="text-muted">Sem 8 Completed Cleanup: select passed-out Sem 8 students and remove them from website &amp; database.</small>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-info fw-semibold" onclick="window.selectSem8CompletedStudents?.()">
+                            <i class="fa-solid fa-user-graduate me-1"></i> Select Sem 8 Completed
+                        </button>
+                        <button type="button" id="caDeleteSelectedBtn" class="btn btn-sm btn-danger fw-bold" onclick="window.deleteSelectedClassAdvisorStudents?.()">
+                            <i class="fa-solid fa-user-xmark me-1"></i> Delete Selected (DB &amp; Website Access)
                         </button>
                     </div>
                 </div>
@@ -4123,16 +4368,21 @@ async function initSubstitutionModal() {
                         </tr>
                     </thead>
                     <tbody>${students.map((s, i) => {
+                    const isSem8Completed = Number(s.semester) === 8 || /sem\s*8\s*completed|passed\s*out/i.test(String(s.semesterChangeNote || ''));
+                    const sem8Badge = isSem8Completed
+                        ? ` <span class="badge bg-info text-dark ms-1">Sem 8 / Passed Out</span>`
+                        : '';
                     const semBadge = s.semesterMarked
                         ? `<span class="badge bg-success ms-1" title="${String(s.semesterChangeNote || '').replace(/"/g, '&quot;')}">Marked</span><div class="text-info" style="font-size:0.7rem;">${s.semesterChangeNote || ''}</div>`
                         : '';
+                    const fullName = `${(s.firstName || '')} ${(s.lastName || '')}`.trim();
                     return `<tr class="${s.semesterMarked ? 'table-active' : ''}">
-                            <td><input type="checkbox" class="form-check-input ca-student-chk" value="${s.id}" onchange="window.updateCaSelectedCount?.()" /></td>
+                            <td><input type="checkbox" class="form-check-input ca-student-chk" value="${s.id}" data-sem="${s.semester || ''}" data-sem8-completed="${isSem8Completed ? 'true' : 'false'}" data-roll="${String(s.registerNumber || '').replace(/"/g, '&quot;')}" data-name="${fullName.replace(/"/g, '&quot;')}" onchange="window.updateCaSelectedCount?.()" /></td>
                             <td class="text-muted">${i + 1}</td>
                             <td><code class="text-warning fw-bold">${s.registerNumber || '-'}</code></td>
-                            <td><strong>${(s.firstName || '')} ${(s.lastName || '')}</strong></td>
+                            <td><strong>${fullName}</strong></td>
                             <td><span class="badge bg-primary">${s.section ? (s.section.sectionName || '-') : '-'}</span></td>
-                            <td class="text-center"><span class="fw-bold text-white">Sem ${s.semester || '-'}</span>${semBadge}</td>
+                            <td class="text-center"><span class="fw-bold text-white">Sem ${s.semester || '-'}</span>${sem8Badge}${semBadge}</td>
                             <td><small>${s.email || '-'}</small></td>
                             <td><small>${s.collegeEmail || '-'}</small></td>
                             <td>${s.phone || '-'}</td>
@@ -4178,6 +4428,7 @@ async function initSubstitutionModal() {
                 window._caCurrentSection = section;
                 window._caCurrentFaculty = faculty;
                 window.loadCaPublishedDocuments?.(section);
+                window.refreshClassAdvisorQuizBar?.(section);
             } catch (e) {
                 body.innerHTML = '<div class="alert alert-danger">Error loading students from server.</div>';
             }
@@ -4359,21 +4610,11 @@ async function initSubstitutionModal() {
         }
 
         window.openAddStudentDirectly = function () {
-            const rosterModalEl = document.getElementById('manageRosterModal');
-            if (!rosterModalEl) return;
-            const rosterModal = new bootstrap.Modal(rosterModalEl);
-            rosterModal.show();
-
-            setTimeout(() => {
-                const addStudentTab = document.querySelector('button[data-bs-target="#tabStudents"]');
-                if (addStudentTab) {
-                    new bootstrap.Tab(addStudentTab).show();
-                    const card = document.getElementById('addStudentCard');
-                    if (card && card.classList.contains('d-none')) {
-                        card.classList.remove('d-none');
-                    }
-                }
-            }, 200);
+            const studentsModalEl = document.getElementById('manageStudentsModal');
+            if (!studentsModalEl) return;
+            const studentsModal = bootstrap.Modal.getOrCreateInstance(studentsModalEl);
+            studentsModal.show();
+            window.openManageStudentsModal?.();
         }
 
         window.renderFacultyDetailsView = async function () {
@@ -4737,22 +4978,27 @@ async function initSubstitutionModal() {
             }
 
             if (venueList) {
-                // Collect built-in venues from defaults and active sections
-                const builtInVenueNames = new Set([
-                    'SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'
-                ]);
+                const { customList, builtInList } = _getAdminEnrolledVenuesList();
 
-                courseReferenceList.forEach(c => { if (c.venue && c.venue !== '-' && c.venue !== 'TBD') builtInVenueNames.add(c.venue.trim()); });
-                activeSections.forEach(s => { if (s.classroom && s.classroom !== '-' && s.classroom !== 'TBD') builtInVenueNames.add(s.classroom.trim()); });
+                if (currentUserRole === 'ADMIN' && !window._customVenuesSyncedToBackend && typeof apiFetch === 'function' && localStorage.getItem('jwt_token') && customList.length > 0) {
+                    window._customVenuesSyncedToBackend = true;
+                    apiFetch('/api/operations/custom-venues').then(r => r && r.ok ? r.json() : []).then(existing => {
+                        const existingNames = new Set((existing || []).map(v => String(v.name || '').trim().toLowerCase()));
+                        customList.forEach(cv => {
+                            if (cv.name && !existingNames.has(cv.name.toLowerCase())) {
+                                apiFetch('/api/operations/custom-venues', {
+                                    method: 'POST',
+                                    body: JSON.stringify({ name: cv.name, venueType: cv.type, block: cv.block, capacity: cv.capacity })
+                                }).catch(() => {});
+                            }
+                        });
+                    }).catch(() => {});
+                }
 
-                const builtInVenues = Array.from(builtInVenueNames).map(name => ({ name, type: 'Built-in', block: '', capacity: '' }));
-
-                // Load venue overrides
+                // Load venue overrides for Edited badge
                 let builtInVenueOverrides = {};
-                let hiddenBuiltInVenues = [];
                 try {
                     builtInVenueOverrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}');
-                    hiddenBuiltInVenues = JSON.parse(localStorage.getItem('sece_hidden_builtin_venues') || '[]');
                 } catch (e) { }
 
                 const customRows = adminResources.venues.map((v, i) =>
@@ -4769,14 +5015,12 @@ async function initSubstitutionModal() {
             </div>`
                 ).join('');
 
-                const builtInRows = builtInVenues
-                    .filter(v => !hiddenBuiltInVenues.includes(v.name))
+                const builtInRows = builtInList
                     .map(v => {
-                        const ov = builtInVenueOverrides[v.name] || {};
-                        const name = ov.name || v.name;
-                        const type = ov.type || v.type;
-                        const block = ov.block || v.block;
-                        const capacity = ov.capacity || v.capacity;
+                        const name = v.name;
+                        const type = v.type;
+                        const block = v.block;
+                        const capacity = v.capacity;
                         const isEdited = !!builtInVenueOverrides[v.name];
 
                         return `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center">
@@ -5107,8 +5351,15 @@ async function initSubstitutionModal() {
 
             if (type === 'custom') {
                 if (!confirm('Are you sure you want to delete this custom venue?')) return;
-                adminResources.venues.splice(id, 1);
+                const removed = adminResources.venues.splice(id, 1)[0];
+                const removedName = String(removed?.name || removed || '').trim().toLowerCase();
                 saveAdminResources();
+                if (removedName && typeof apiFetch === 'function' && localStorage.getItem('jwt_token')) {
+                    apiFetch('/api/operations/custom-venues').then(r => r && r.ok ? r.json() : []).then(list => {
+                        (list || []).filter(item => String(item.name || '').trim().toLowerCase() === removedName)
+                            .forEach(item => apiFetch(`/api/operations/custom-venues/${item.id}`, { method: 'DELETE' }).catch(() => {}));
+                    }).catch(() => {});
+                }
                 renderAdminResourcesUI();
                 showToast('Venue Deleted', `Custom venue removed.`);
             } else {
@@ -5125,62 +5376,115 @@ async function initSubstitutionModal() {
         };
 
 
-        function importAdminSubjectExcel(event) {
+        async function importAdminSubjectExcel(event) {
             if (!adminOnly()) return;
             const file = event.target.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const data = e.target.result;
-                    const workbook = XLSX.read(data, { type: 'binary' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            try {
+                const { rows, matrix } = await _readExcelTable(file);
+                if (!matrix.length) {
+                    alert('The imported file is empty.');
+                    return;
+                }
 
-                    if (rows.length < 2) {
-                        alert('The imported file is empty or missing headers.');
-                        return;
-                    }
+                const existingCodes = new Set([
+                    ...(adminResources.subjects || []).map(s => String(s.code || '').trim().toUpperCase()),
+                    ...(courseReferenceList || []).map(s => String(s.code || '').trim().toUpperCase())
+                ].filter(Boolean));
 
-                    let addedCount = 0;
-                    for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        if (!row || row.length === 0) continue;
+                let addedCount = 0;
+                let skippedCount = 0;
+                let dbFailedCount = 0;
+                const hasHeaders = rows.length > 0 && (
+                    _pickCol(rows[0], ['Subject Code', 'Code', 'Course Code', 'subjectCode']) ||
+                    _pickCol(rows[0], ['Subject Title', 'Subject Name', 'Title', 'Name', 'subjectName'])
+                );
 
-                        const code = String(row[0] || '').trim().toUpperCase();
-                        const title = String(row[1] || '').trim();
-                        const faculty = String(row[2] || '').trim();
-                        const venue = String(row[3] || '').trim();
+                const workList = hasHeaders
+                    ? rows.map(r => ({
+                        code: _pickCol(r, ['Subject Code', 'Code', 'Course Code', 'subjectCode']).toUpperCase(),
+                        short: _pickCol(r, ['Short Name', 'Short', 'Abbreviation', 'shortName']).toUpperCase(),
+                        title: _pickCol(r, ['Subject Title', 'Subject Name', 'Title', 'Name', 'subjectName']),
+                        faculty: _pickCol(r, ['Faculty', 'Handling Faculty', 'Teacher', 'faculty']),
+                        venue: _pickCol(r, ['Venue', 'Room', 'Classroom', 'venue']),
+                        category: _pickCol(r, ['Category', 'Type', 'category'])
+                    }))
+                    : matrix.slice(1).map(row => ({
+                        code: String(row[0] || '').trim().toUpperCase(),
+                        short: '',
+                        title: String(row[1] || '').trim(),
+                        faculty: String(row[2] || '').trim(),
+                        venue: String(row[3] || '').trim(),
+                        category: String(row[4] || '').trim()
+                    }));
 
-                        if (!code || !title) continue;
+                for (const item of workList) {
+                    const code = item.code;
+                    const title = item.title;
+                    if (!code || !title) { skippedCount++; continue; }
+                    if (existingCodes.has(code)) { skippedCount++; continue; }
 
-                        const short = code;
-                        if (!adminResources.subjects.some(s => s.code === code) &&
-                            !courseReferenceList.some(s => s.code === code || s.short === short)) {
-                            adminResources.subjects.push({ short, code, title, faculty, category: 'cat-theory', venue });
-                            addedCount++;
+                    const short = item.short || code;
+                    const isLab = /lab/i.test(item.category || '') || /lab/i.test(title);
+                    const category = item.category && item.category.startsWith('cat-')
+                        ? item.category
+                        : (isLab ? 'cat-lab' : 'cat-theory');
+                    const subjObj = { short, code, title, faculty: item.faculty, category, venue: item.venue };
+
+                    adminResources.subjects.push(subjObj);
+                    existingCodes.add(code);
+                    addedCount++;
+
+                    if (typeof apiFetch === 'function' && localStorage.getItem('jwt_token')) {
+                        try {
+                            const opRes = await apiFetch('/api/operations/custom-subjects', {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    shortName: short,
+                                    subjectCode: code,
+                                    title: title,
+                                    faculty: item.faculty,
+                                    category: category,
+                                    venue: item.venue
+                                })
+                            });
+                            if (!opRes || !opRes.ok) dbFailedCount++;
+                            await apiFetch('/api/subjects', {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    subjectCode: code,
+                                    subjectName: title,
+                                    type: isLab ? 'LAB' : 'THEORY',
+                                    credits: 3
+                                })
+                            }).catch(() => {});
+                        } catch (syncErr) {
+                            dbFailedCount++;
                         }
                     }
-
-                    if (addedCount > 0) {
-                        saveAdminResources();
-                        mergeCustomSubjectsIntoCourseList();
-                        renderAdminResourcesUI();
-                        renderCourseRefTable();
-                        populateEditSubjectSelect();
-                        showToast('Import Successful', `Successfully imported ${addedCount} subjects.`);
-                    } else {
-                        alert('No new subjects were imported. Ensure codes are unique and headers are correct.');
-                    }
-                } catch (error) {
-                    console.error('Error parsing Excel:', error);
-                    alert('Error parsing the Excel file. Please ensure it is a valid .xlsx or .csv format.');
                 }
-            };
-            reader.readAsBinaryString(file);
-            event.target.value = '';
+
+                if (addedCount > 0) {
+                    saveAdminResources();
+                    mergeCustomSubjectsIntoCourseList();
+                    renderAdminResourcesUI();
+                    renderCourseRefTable();
+                    populateEditSubjectSelect();
+                    if (typeof window.invalidateTtSuggestionCatalog === 'function') {
+                        window.invalidateTtSuggestionCatalog(true);
+                    }
+                    const note = dbFailedCount > 0 ? ` (${dbFailedCount} failed DB sync)` : ' & saved to database';
+                    showToast('Import Successful', `Imported ${addedCount} subject(s)${note}${skippedCount ? `, ${skippedCount} skipped` : ''}.`);
+                } else {
+                    alert('No new subjects were imported. Ensure Subject Code and Subject Title/Name columns are populated and unique.');
+                }
+            } catch (error) {
+                console.error('Error parsing Excel:', error);
+                alert('Error parsing the Excel file: ' + (error.message || 'Please ensure it is a valid .xlsx, .xls, or .csv format.'));
+            } finally {
+                event.target.value = '';
+            }
         }
 
         function removeAdminSubject(idx) {
@@ -5244,64 +5548,110 @@ async function initSubstitutionModal() {
             const venueObj = { name: venueName, type: type, block: block, capacity: capacity };
             adminResources.venues.push(venueObj);
             saveAdminResources();
+            if (typeof apiFetch === 'function' && localStorage.getItem('jwt_token')) {
+                apiFetch('/api/operations/custom-venues', {
+                    method: 'POST',
+                    body: JSON.stringify({ name: venueName, venueType: type, block: block, capacity: capacity })
+                }).catch(() => {});
+            }
             renderAdminResourcesUI();
             populateEditVenueSelect();
             document.getElementById('adminVenueForm').reset();
             showToast('Venue Added', `${venueName} is now available in Edit Period.`);
         }
 
-        function importAdminVenueExcel(event) {
+        async function importAdminVenueExcel(event) {
             if (!adminOnly()) return;
             const file = event.target.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const data = e.target.result;
-                    const workbook = XLSX.read(data, { type: 'binary' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            try {
+                const { rows, matrix } = await _readExcelTable(file);
+                if (!matrix.length) {
+                    alert('The imported file is empty.');
+                    return;
+                }
 
-                    if (rows.length < 2) {
-                        alert('The imported file is empty or missing headers.');
-                        return;
-                    }
+                const existingVenues = new Set(
+                    (adminResources.venues || []).map(v => String(typeof v === 'string' ? v : (v.name || '')).trim().toLowerCase()).filter(Boolean)
+                );
 
-                    let addedCount = 0;
-                    for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        if (!row || row.length === 0) continue;
+                const hasHeaders = rows.length > 0 && Boolean(
+                    _pickCol(rows[0], ['Venue Name', 'Venue', 'Room', 'Room Number', 'Name', 'name'])
+                );
 
-                        const venueName = String(row[0] || '').trim();
-                        const type = String(row[1] || '').trim();
-                        const block = String(row[2] || '').trim();
-                        const capacity = String(row[3] || '').trim();
+                const workList = hasHeaders
+                    ? rows.map(r => ({
+                        venueName: _pickCol(r, ['Venue Name', 'Venue', 'Room', 'Room Number', 'Name', 'name']),
+                        type: _pickCol(r, ['Type', 'Venue Type', 'venueType', 'Category']),
+                        block: _pickCol(r, ['Block', 'Building', 'block']),
+                        capacity: _pickCol(r, ['Capacity', 'Seats', 'capacity'])
+                    }))
+                    : matrix.slice(1).map(row => ({
+                        venueName: String(row[0] || '').trim(),
+                        type: String(row[1] || '').trim(),
+                        block: String(row[2] || '').trim(),
+                        capacity: String(row[3] || '').trim()
+                    }));
 
-                        if (!venueName) continue;
+                let addedCount = 0;
+                let skippedCount = 0;
+                let dbFailedCount = 0;
 
-                        if (!adminResources.venues.some(v => (typeof v === 'string' ? v.toLowerCase() : (v.name || '').toLowerCase()) === venueName.toLowerCase())) {
-                            adminResources.venues.push({ name: venueName, type: type, block: block, capacity: capacity });
-                            addedCount++;
+                for (const item of workList) {
+                    const venueName = item.venueName;
+                    if (!venueName) { skippedCount++; continue; }
+                    if (existingVenues.has(venueName.toLowerCase())) { skippedCount++; continue; }
+
+                    const venueObj = {
+                        name: venueName,
+                        type: item.type || 'Classroom',
+                        block: item.block || '',
+                        capacity: item.capacity || ''
+                    };
+                    adminResources.venues.push(venueObj);
+                    existingVenues.add(venueName.toLowerCase());
+                    addedCount++;
+
+                    if (typeof apiFetch === 'function' && localStorage.getItem('jwt_token')) {
+                        try {
+                            const opRes = await apiFetch('/api/operations/custom-venues', {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    name: venueObj.name,
+                                    venueType: venueObj.type,
+                                    block: venueObj.block,
+                                    capacity: String(venueObj.capacity || '')
+                                })
+                            });
+                            if (!opRes || !opRes.ok) dbFailedCount++;
+                        } catch (syncErr) {
+                            dbFailedCount++;
                         }
                     }
-
-                    if (addedCount > 0) {
-                        saveAdminResources();
-                        renderAdminResourcesUI();
-                        populateEditVenueSelect();
-                        showToast('Import Successful', `Successfully imported ${addedCount} venues.`);
-                    } else {
-                        alert('No new venues were imported. Ensure venue names are unique.');
-                    }
-                } catch (error) {
-                    console.error('Error parsing Excel:', error);
-                    alert('Error parsing the Excel file. Please ensure it is a valid .xlsx or .csv format.');
                 }
-            };
-            reader.readAsBinaryString(file);
-            event.target.value = '';
+
+                if (addedCount > 0) {
+                    saveAdminResources();
+                    renderAdminResourcesUI();
+                    populateEditVenueSelect();
+                    if (typeof _loadReadOnlyEnrolledCatalog === 'function') {
+                        await _loadReadOnlyEnrolledCatalog().catch(() => {});
+                    }
+                    if (typeof window.invalidateTtSuggestionCatalog === 'function') {
+                        window.invalidateTtSuggestionCatalog(true);
+                    }
+                    const note = dbFailedCount > 0 ? ` (${dbFailedCount} failed DB sync)` : ' & saved to database';
+                    showToast('Import Successful', `Imported ${addedCount} venue(s)${note}${skippedCount ? `, ${skippedCount} skipped` : ''}.`);
+                } else {
+                    alert('No new venues were imported. Ensure venue names are populated and unique.');
+                }
+            } catch (error) {
+                console.error('Error parsing Excel:', error);
+                alert('Error parsing the Excel file: ' + (error.message || 'Please ensure it is a valid .xlsx, .xls, or .csv format.'));
+            } finally {
+                event.target.value = '';
+            }
         }
 
         function removeAdminVenue(idx) {
@@ -5965,10 +6315,19 @@ async function initSubstitutionModal() {
             }
 
             // Toast Notification System
-            function showToast(title, message) {
+            function showToast(title, message, type) {
                 document.getElementById('toastTitle').innerText = title;
                 document.getElementById('toastBody').innerText = message;
                 document.getElementById('toastTime').innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                const iconEl = document.getElementById('toastIcon');
+                if (iconEl) {
+                    const isError = type === 'error' || type === 'danger' || /\b(failed|denied|error|required|invalid)\b/i.test(String(title || ''));
+                    const isInfo = type === 'info';
+                    iconEl.className = isError
+                        ? 'fa-solid fa-triangle-exclamation text-danger me-2'
+                        : (isInfo ? 'fa-solid fa-circle-info text-info me-2' : 'fa-solid fa-circle-check text-success me-2');
+                }
 
                 const toastEl = document.getElementById('seceToast');
                 const toast = new bootstrap.Toast(toastEl, { delay: 5000 });
@@ -8291,32 +8650,39 @@ async function initSubstitutionModal() {
             };
 
             window.importTimetableExcel = async function (event) {
-                const file = event.target.files[0];
+                const file = event.target.files?.[0];
                 if (!file) return;
 
-                const section = window.currentTimetableSection;
+                const section = window.currentTimetableSection || (typeof currentSection !== 'undefined' ? currentSection : '');
                 if (!section) {
                     alert("Please open a specific timetable section before importing.");
                     event.target.value = '';
                     return;
                 }
 
+                const semester = parseInt(window.currentTimetableSemester || '3', 10) || 3;
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('section', section);
+                formData.append('semester', String(semester));
 
-                showToast('Uploading Excel', 'Sending to backend for parsing...', 'info');
+                showToast('Uploading Excel', 'Extracting timetable and saving to database...', 'info');
 
                 try {
+                    const token = localStorage.getItem('jwt_token');
+                    const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
                     const response = await fetch('/api/timetable/import-excel', {
                         method: 'POST',
+                        headers,
                         body: formData
                     });
 
-                    const json = await response.json();
+                    const rawText = await response.text();
+                    let json = {};
+                    try { json = rawText ? JSON.parse(rawText) : {}; } catch (e) { }
 
                     if (!response.ok) {
-                        throw new Error(json.error || 'Backend failed to process Excel file');
+                        throw new Error(json.error || json.message || `Server returned HTTP ${response.status}`);
                     }
 
                     const gridData = json.grid;
@@ -8324,29 +8690,29 @@ async function initSubstitutionModal() {
 
                     const daysList = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                     daysList.forEach(day => {
-                        if (gridData[day]) {
-                            const rowData = gridData[day];
-                            for (let p = 1; p <= 7; p++) {
-                                const inputId = `ttb_${day}_P${p}`;
-                                const input = document.getElementById(inputId);
-                                if (input && rowData[`P${p}`] !== undefined) {
-                                    input.value = rowData[`P${p}`];
-                                }
+                        const rowData = gridData[day] || {};
+                        for (let p = 1; p <= 7; p++) {
+                            const inputId = `ttb_${day}_P${p}`;
+                            const input = document.getElementById(inputId);
+                            if (input) {
+                                input.value = rowData[`P${p}`] !== undefined ? rowData[`P${p}`] : '';
                             }
                         }
                     });
 
-                    // Save the builder automatically so the main timetable view updates!
-                    window.saveTimetableBuilder();
+                    await window.saveTimetableBuilder();
+                    if (typeof window.invalidateTtSuggestionCatalog === 'function') {
+                        window.invalidateTtSuggestionCatalog(true);
+                    }
 
                     showToast('Excel Imported Successfully', json.message || 'Timetable updated in database and UI refreshed.', 'success');
 
                 } catch (error) {
                     console.error('Error importing Excel via API:', error);
-                    alert('Error parsing the Excel file: ' + error.message);
+                    alert('Error importing the Excel file: ' + error.message);
+                } finally {
+                    event.target.value = '';
                 }
-
-                event.target.value = '';
             };
 
             window.fetchStudentDynamicDashboard = async function () {
@@ -8727,7 +9093,7 @@ async function initSubstitutionModal() {
                 container.innerHTML = html;
             };
 
-            window.saveMyTimetable = function () {
+            window.saveMyTimetable = async function () {
                 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 const data = {};
 
@@ -8752,12 +9118,18 @@ async function initSubstitutionModal() {
                 const jsonStr = JSON.stringify(data);
                 localStorage.setItem(_getFacultyTTKey(), jsonStr);
 
+                let syncedToDb = false;
                 const uname = String(localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
                 if (uname && localStorage.getItem('jwt_token')) {
-                    apiFetch(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`, {
-                        method: 'POST',
-                        body: JSON.stringify({ dataJson: jsonStr })
-                    }).catch(err => console.warn('Could not sync faculty timetable to backend:', err));
+                    try {
+                        const res = await apiFetch(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`, {
+                            method: 'POST',
+                            body: JSON.stringify({ dataJson: jsonStr })
+                        });
+                        syncedToDb = Boolean(res && res.ok);
+                    } catch (err) {
+                        console.warn('Could not sync faculty timetable to backend:', err);
+                    }
                 }
 
                 if (typeof bootstrap !== 'undefined') {
@@ -8767,8 +9139,9 @@ async function initSubstitutionModal() {
                         if (modal) modal.hide();
                     }
                 }
-                showToast('Success', 'Your timetable has been saved.');
+                showToast('Success', syncedToDb ? 'Your timetable has been saved to database.' : 'Your timetable has been saved.');
                 if (window.renderFacultyPersonalTT) window.renderFacultyPersonalTT();
+                return syncedToDb;
             };
 
 
@@ -9074,41 +9447,34 @@ async function initSubstitutionModal() {
 
 
             window.handleChangePasswordSubmit = async function (e) {
-                e.preventDefault();
-                const cpCurrent = document.getElementById('cpCurrentPassword').value;
-                const cpNew = document.getElementById('cpNewPassword').value;
-                const cpConfirm = document.getElementById('cpConfirmPassword').value;
+                if (e && e.preventDefault) e.preventDefault();
+                const currentPassword = document.getElementById('cpCurrentPassword')?.value || '';
+                const newPassword = document.getElementById('cpNewPassword')?.value || '';
+                const confirmPassword = document.getElementById('cpConfirmPassword')?.value || '';
 
-                if (cpNew !== cpConfirm) {
-                    alert("New passwords do not match.");
+                if (!currentPassword || !newPassword || !confirmPassword) {
+                    alert("Please fill in all password fields.");
                     return;
                 }
-
+                if (newPassword !== confirmPassword) {
+                    alert("New password and confirmation do not match.");
+                    return;
+                }
                 try {
-                    const formData = new URLSearchParams();
-                    formData.append('currentPassword', cpCurrent);
-                    formData.append('newPassword', cpNew);
-
-                    const res = await apiFetch('/api/auth/change-password', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: formData.toString()
-                    });
-
-                    if (res.ok) {
-                        alert("Password updated successfully!");
-                        document.getElementById('changePasswordForm').reset();
+                    const params = new URLSearchParams({ currentPassword, newPassword });
+                    const res = await apiFetch('/api/auth/change-password?' + params.toString(), { method: 'POST' });
+                    const data = await res.json().catch(() => ({}));
+                    if (res && res.ok) {
                         const modalEl = document.getElementById('changePasswordModal');
-                        if (modalEl) {
-                            const modal = bootstrap.Modal.getInstance(modalEl);
-                            if (modal) modal.hide();
+                        if (modalEl && typeof bootstrap !== 'undefined') {
+                            bootstrap.Modal.getInstance(modalEl)?.hide();
                         }
+                        document.getElementById('changePasswordForm')?.reset();
+                        showToast('Password Updated', data.message || 'Password updated successfully.');
                     } else {
-                        const err = await res.text();
-                        alert("Failed to change password: " + err);
+                        alert(data.message || data.error || 'Failed to change password.');
                     }
-                } catch (e) {
-                    console.error(e);
+                } catch (err) {
                     alert("An error occurred while changing password.");
                 }
             };
@@ -9194,144 +9560,190 @@ async function initSubstitutionModal() {
                 if (selClass) selClass.innerHTML = '<option value="">-- Loading Classes --</option>';
                 if (tbody) tbody.innerHTML = '<tr><td colSpan="3" class="text-center text-muted">Loading...</td></tr>';
 
-                // Fetch faculties from API
-                let faculties = [];
                 try {
                     const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
-                    const res = await fetchFn('/api/teachers');
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (Array.isArray(data)) faculties = data;
-                    }
-                } catch (e) {
-                    console.error("Error fetching teachers:", e);
-                }
-
-                if (!faculties || faculties.length === 0) {
-                    faculties = window.staffDirectory || [];
-                }
-
-                if (selFac) {
-                    const facOptions = faculties.map(f => {
-                        const val = f.employeeId || f.name || f.displayName || f.username || f.firstName;
-                        const disp = f.displayName || f.name || (f.firstName ? f.firstName + ' ' + (f.lastName || '') : val);
-                        const dept = f.department ? (f.department.name || f.department) : (f.dept || '-');
-                        return `<option value="${val}">${disp} (${dept})</option>`;
-                    }).join('');
-                    selFac.innerHTML = '<option value="">-- Choose Faculty --</option>' + facOptions;
-                }
-
-                // Use activeSections for classes, matching the View Sections modal
-                let sections = (typeof activeSections !== 'undefined' && Array.isArray(activeSections))
-                    ? activeSections.map(s => s.name)
-                    : [];
-
-                if (!sections || sections.length === 0) {
-                    if (window.studentsData && window.studentsData.length > 0) {
-                        sections = [...new Set(window.studentsData.map(s => s.sec).filter(s => s && s.trim() !== ''))];
-                    } else {
-                        const ttSections = Object.keys(window.timetableData || {}).filter(k => k !== 'null' && k !== '');
-                        sections = [...new Set([...ttSections, 'II CSE C', 'II CSE D', 'II IT A', 'II AI&DS A'])];
-                    }
-                }
-
-                sections = [...new Set(sections)].sort();
-
-                if (selClass) {
-                    selClass.innerHTML = '<option value="">-- Choose Class --</option>' + sections.map(s =>
-                        `<option value="${s}">${s}</option>`
-                    ).join('');
-                }
-
-                if (tbody) {
-                    // Find advisors based on our updated faculties list or staffDirectory
-                    const allFaculties = [...(window.staffDirectory || []), ...faculties];
-                    // filter unique by name/val
-                    const uniqueFacs = [];
-                    const seen = new Set();
-                    for (let f of allFaculties) {
-                        const val = f.employeeId || f.name || f.displayName || f.username || f.firstName;
-                        if (val && !seen.has(val)) {
-                            seen.add(val);
-                            uniqueFacs.push(f);
-                        }
+                    const [teachersResponse, sectionsResponse] = await Promise.all([
+                        fetchFn('/api/teachers'),
+                        fetchFn('/api/sections')
+                    ]);
+                    if (!teachersResponse.ok || !sectionsResponse.ok) {
+                        throw new Error('Unable to load faculty or class data from the server.');
                     }
 
-                    const advisors = uniqueFacs.filter(s => s.classAdvisorFor && s.classAdvisorFor.trim() !== '');
+                    const faculties = await teachersResponse.json();
+                    const sectionRecords = await sectionsResponse.json();
+                    if (!Array.isArray(faculties) || !Array.isArray(sectionRecords)) {
+                        throw new Error('The server returned invalid faculty or class data.');
+                    }
+                    window.classAdvisorFacultyData = faculties;
 
-                    if (advisors.length === 0) {
-                        tbody.innerHTML = '<tr><td colSpan="3" class="text-center text-muted">No class advisors assigned yet.</td></tr>';
-                    } else {
-                        tbody.innerHTML = advisors.map(a => {
-                            const val = a.employeeId || a.name || a.displayName || a.username || a.firstName;
-                            const disp = a.displayName || a.name || (a.firstName ? a.firstName + ' ' + (a.lastName || '') : val);
-                            return `
+                    if (selFac) {
+                        const facOptions = faculties.filter(f => f.id != null).map(f => {
+                            const val = f.id;
+                            const disp = f.displayName || f.name || (f.firstName ? f.firstName + ' ' + (f.lastName || '') : val);
+                            const dept = f.department ? (f.department.name || f.department) : (f.dept || '-');
+                            return `<option value="${val}">${disp} (${dept})</option>`;
+                        }).join('');
+                        selFac.innerHTML = '<option value="">-- Choose Faculty --</option>' + facOptions;
+                    }
+
+                    let sections = typeof activeSections !== 'undefined' && Array.isArray(activeSections)
+                        ? activeSections.map(section => String(section.name || '').trim()).filter(Boolean)
+                        : [];
+                    if (sections.length === 0) {
+                        sections = sectionRecords.map(section => String(section.sectionName || section.name || '').trim()).filter(Boolean);
+                    }
+
+                    sections = [...new Set(sections)].sort();
+
+                    if (selClass) {
+                        selClass.innerHTML = '<option value="">-- Choose Class --</option>' + sections.map(s =>
+                            `<option value="${s}">${s}</option>`
+                        ).join('');
+                    }
+
+                    if (tbody) {
+                        const advisors = faculties.filter(f => f.classAdvisorFor && f.classAdvisorFor.trim() !== '');
+                        if (advisors.length === 0) {
+                            tbody.innerHTML = '<tr><td colSpan="3" class="text-center text-muted">No class advisors assigned yet.</td></tr>';
+                        } else {
+                            tbody.innerHTML = advisors.map(a => {
+                                const disp = a.displayName || a.name || [a.firstName, a.lastName].filter(Boolean).join(' ') || a.employeeId || 'Faculty';
+                                return `
                 <tr>
                     <td>${disp}</td>
                     <td><span class="badge bg-success">${a.classAdvisorFor}</span></td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-outline-danger" onclick="window.removeClassAdvisor('${val}')" title="Remove Advisor">
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.removeClassAdvisor(${a.id})" title="Remove Advisor">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </td>
                 </tr>
-            `}).join('');
+                                `}).join('');
+                        }
                     }
+                } catch (error) {
+                    console.error('Error loading class advisors:', error);
+                    if (selFac) selFac.innerHTML = '<option value="">-- Faculty could not be loaded --</option>';
+                    if (selClass) selClass.innerHTML = '<option value="">-- Classes could not be loaded --</option>';
+                    if (tbody) tbody.innerHTML = '<tr><td colSpan="3" class="text-center text-danger">Could not load class advisors. Please try again.</td></tr>';
                 }
             };
 
-            window.assignClassAdvisor = function () {
-                const facName = document.getElementById('advisorSelectFaculty').value;
-                const className = document.getElementById('advisorSelectClass').value;
+            function _getValidAdminToken() {
+                const raw = (localStorage.getItem('jwt_token') || '').trim();
+                if (!raw || raw === 'null' || raw === 'undefined') {
+                    return { ok: false, reason: 'This session cannot save changes. Sign out and sign in again with the administrator account while the backend is available.' };
+                }
+                try {
+                    const parts = raw.split('.');
+                    if (parts.length === 3) {
+                        const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+                        const payload = JSON.parse(atob(b64));
+                        if (payload && payload.exp && Date.now() >= payload.exp * 1000) {
+                            return { ok: false, reason: 'Your admin login session expired. Please sign out and sign in again as Admin.' };
+                        }
+                        if (payload && payload.role && String(payload.role).toUpperCase() !== 'ROLE_ADMIN') {
+                            return { ok: false, reason: `Signed-in session has role ${payload.role} instead of ROLE_ADMIN. Please sign out and sign in with the Admin account.` };
+                        }
+                    }
+                } catch (_) { /* ignore decode issues and let backend validate */ }
+                return { ok: true, token: raw };
+            }
 
-                if (!facName || !className) {
+            window.assignClassAdvisor = async function () {
+                const selFac = document.getElementById('advisorSelectFaculty');
+                const selClass = document.getElementById('advisorSelectClass');
+                const facultyId = selFac?.value;
+                const className = selClass?.value;
+
+                if (!facultyId || !className) {
                     alert('Please select both faculty and class.');
                     return;
                 }
 
-                const existing = window.staffDirectory.find(s => s.classAdvisorFor === className);
-                if (existing && existing.name !== facName) {
-                    if (!confirm(`Class ${className} is already assigned to ${existing.displayName || existing.name}. Reassign?`)) {
-                        return;
-                    }
-                    existing.classAdvisorFor = '';
+                const faculty = (window.classAdvisorFacultyData || []).find(item => String(item.id) === String(facultyId));
+                if (!faculty) {
+                    showToast('Assignment failed', 'Select a faculty member from the server list and try again.', 'error');
+                    return;
+                }
+                const authCheck = _getValidAdminToken();
+                if (!authCheck.ok) {
+                    showToast('Admin sign-in required', authCheck.reason, 'error');
+                    return;
                 }
 
-                let fac = window.staffDirectory.find(s => s.name === facName);
-                if (!fac) {
-                    const selFac = document.getElementById('advisorSelectFaculty');
-                    const text = selFac.options[selFac.selectedIndex].text;
-                    let dept = 'Unknown';
-                    if (text.includes('(') && text.includes(')')) {
-                        dept = text.split('(')[1].split(')')[0];
-                    }
-                    fac = { name: facName, displayName: facName, dept: dept, status: 'Available' };
-                    window.staffDirectory.push(fac);
+                const existing = (window.classAdvisorFacultyData || []).find(item =>
+                    item.classAdvisorFor && item.classAdvisorFor.toLowerCase() === className.toLowerCase()
+                    && String(item.id) !== String(facultyId));
+                if (existing && !confirm(`Class ${className} is already assigned to ${existing.displayName || existing.name}. Reassign?`)) {
+                    return;
                 }
 
-                fac.classAdvisorFor = className;
-                window.saveStaffDirectory();
-                window.renderManageClassAdvisors();
-                showToast('Assigned', `${fac.displayName || fac.name} is now the Class Advisor for ${className}.`);
+                try {
+                    const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
+                    const response = await fetchFn(`/api/teachers/${encodeURIComponent(facultyId)}/class-advisor`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + authCheck.token
+                        },
+                        body: JSON.stringify({ sectionName: className })
+                    });
+                    if (!response.ok) {
+                        const detail = await response.text().catch(() => '');
+                        if (response.status === 401 || response.status === 403) {
+                            throw new Error(detail || 'Admin access was denied. Sign out and sign in again with an authenticated administrator account.');
+                        }
+                        throw new Error(detail || `Request failed (${response.status}).`);
+                    }
 
-                if (window.renderCredentialsList && document.getElementById('viewCredentialsModal').classList.contains('show')) {
-                    window.renderCredentialsList();
+                    await window.renderManageClassAdvisors();
+                    showToast('Assigned', `${faculty.displayName || faculty.name} is now the Class Advisor for ${className}.`);
+
+                    const credentialsModal = document.getElementById('viewCredentialsModal');
+                    if (window.renderCredentialsList && credentialsModal?.classList.contains('show')) {
+                        window.renderCredentialsList();
+                    }
+                } catch (error) {
+                    console.error('Error assigning class advisor:', error);
+                    showToast('Assignment failed', error.message || 'Could not save this class advisor assignment.', 'error');
                 }
             };
 
-            window.removeClassAdvisor = function (facName) {
+            window.removeClassAdvisor = async function (facultyId) {
                 if (!confirm('Are you sure you want to remove this Class Advisor?')) return;
-                const fac = window.staffDirectory.find(s => s.name === facName);
-                if (fac) {
-                    fac.classAdvisorFor = '';
-                    window.saveStaffDirectory();
-                    window.renderManageClassAdvisors();
-                    showToast('Removed', `Class Advisor role removed for ${fac.displayName || fac.name}.`);
+                const faculty = (window.classAdvisorFacultyData || []).find(item => String(item.id) === String(facultyId));
+                try {
+                    const authCheck = _getValidAdminToken();
+                    if (!authCheck.ok) {
+                        throw new Error(authCheck.reason);
+                    }
+                    const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
+                    const response = await fetchFn(`/api/teachers/${encodeURIComponent(facultyId)}/class-advisor`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': 'Bearer ' + authCheck.token
+                        }
+                    });
+                    if (!response.ok) {
+                        const detail = await response.text().catch(() => '');
+                        if (response.status === 401 || response.status === 403) {
+                            throw new Error(detail || 'Admin access was denied. Sign out and sign in again with an authenticated administrator account.');
+                        }
+                        throw new Error(detail || `Request failed (${response.status}).`);
+                    }
 
-                    // Refresh credentials list if it's open
-                    if (window.renderCredentialsList && document.getElementById('viewCredentialsModal').classList.contains('show')) {
+                    await window.renderManageClassAdvisors();
+                    showToast('Removed', `Class Advisor role removed for ${faculty?.displayName || faculty?.name || 'faculty member'}.`);
+
+                    const credentialsModal = document.getElementById('viewCredentialsModal');
+                    if (window.renderCredentialsList && credentialsModal?.classList.contains('show')) {
                         window.renderCredentialsList();
                     }
+                } catch (error) {
+                    console.error('Error removing class advisor:', error);
+                    showToast('Removal failed', error.message || 'Could not remove this class advisor.', 'error');
                 }
             };
 
@@ -9373,7 +9785,7 @@ async function initSubstitutionModal() {
                 showToast('Academic Year Updated', `Academic year set to ${ayText}.`);
             };
 
-            function _readExcelRows(file) {
+            function _readExcelTable(file) {
                 return new Promise((resolve, reject) => {
                     if (typeof XLSX === 'undefined') {
                         reject(new Error('Excel parser library (XLSX) is not loaded.'));
@@ -9383,8 +9795,22 @@ async function initSubstitutionModal() {
                     reader.onload = (ev) => {
                         try {
                             const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-                            const sheet = wb.Sheets[wb.SheetNames[0]];
-                            resolve(XLSX.utils.sheet_to_json(sheet, { defval: '' }));
+                            const sheetName = wb.SheetNames[0];
+                            if (!sheetName) { resolve({ rows: [], matrix: [] }); return; }
+                            const sheet = wb.Sheets[sheetName];
+                            const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+                            const rows = rawRows.map(obj => {
+                                const cleaned = {};
+                                Object.entries(obj || {}).forEach(([k, v]) => {
+                                    const cleanKey = String(k || '').replace(/^\uFEFF/, '').trim();
+                                    cleaned[cleanKey] = String(v ?? '').trim();
+                                });
+                                return cleaned;
+                            }).filter(obj => Object.values(obj).some(v => v !== ''));
+                            const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false })
+                                .map(r => (Array.isArray(r) ? r.map(c => String(c ?? '').replace(/^\uFEFF/, '').trim()) : []))
+                                .filter(r => r.some(c => c !== ''));
+                            resolve({ rows, matrix });
                         } catch (err) {
                             reject(err);
                         }
@@ -9394,12 +9820,45 @@ async function initSubstitutionModal() {
                 });
             }
 
+            async function _readExcelRows(file) {
+                const { rows } = await _readExcelTable(file);
+                return rows;
+            }
+
+            function _normColKey(k) {
+                return String(k || '').replace(/[\uFEFF*_:\s-]+/g, '').toLowerCase();
+            }
+
             function _pickCol(row, keys) {
                 const entries = Object.entries(row || {});
                 for (const key of keys) {
-                    const found = entries.find(([k]) => k.trim().toLowerCase() === key.toLowerCase());
-                    if (found && String(found[1]).trim() !== '') return String(found[1]).trim();
+                    const target = _normColKey(key);
+                    const found = entries.find(([k]) => _normColKey(k) === target);
+                    if (found && String(found[1] ?? '').trim() !== '') return String(found[1]).trim();
                 }
+                return '';
+            }
+
+            function _splitFullName(rawFirst, rawLast) {
+                const first = String(rawFirst || '').trim();
+                const last = String(rawLast || '').trim();
+                if (last) return { firstName: first, lastName: last };
+                const parts = first.split(/\s+/).filter(Boolean);
+                if (parts.length >= 2) {
+                    return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length - 1] };
+                }
+                return { firstName: first, lastName: '.' };
+            }
+
+            function _normalizeExcelDay(rawDay) {
+                const k = String(rawDay || '').trim().toLowerCase();
+                if (!k) return '';
+                if (k.startsWith('mon')) return 'Monday';
+                if (k.startsWith('tue')) return 'Tuesday';
+                if (k.startsWith('wed')) return 'Wednesday';
+                if (k.startsWith('thu')) return 'Thursday';
+                if (k.startsWith('fri')) return 'Friday';
+                if (k.startsWith('sat')) return 'Saturday';
                 return '';
             }
 
@@ -9410,36 +9869,74 @@ async function initSubstitutionModal() {
                     const rows = await _readExcelRows(file);
                     if (!rows.length) { alert('The selected file contains no student rows.'); return; }
                     let added = 0, failed = 0;
-                    for (const r of rows) {
-                        const regNo = _pickCol(r, ['Register Number', 'Reg No', 'Roll No', 'registerNumber']);
-                        const firstName = _pickCol(r, ['First Name', 'firstName', 'Name']);
-                        const lastName = _pickCol(r, ['Last Name', 'lastName']) || '.';
-                        if (!regNo || !firstName) { failed++; continue; }
+                    const reasons = [];
+                    for (let idx = 0; idx < rows.length; idx++) {
+                        const r = rows[idx];
+                        const regNo = _pickCol(r, ['Register Number', 'Reg No', 'Roll No', 'Register No', 'RegNum', 'registerNumber']);
+                        const rawName = _pickCol(r, ['First Name', 'firstName', 'Student Name', 'Full Name', 'Name']);
+                        const rawLast = _pickCol(r, ['Last Name', 'lastName']);
+                        const { firstName, lastName } = _splitFullName(rawName, rawLast);
+                        if (!regNo || !firstName) {
+                            failed++;
+                            reasons.push(`Row ${idx + 2}: missing Register Number or Name`);
+                            continue;
+                        }
 
-                        const dept = _pickCol(r, ['Department', 'Dept', 'department']) || 'CSE';
-                        const course = _pickCol(r, ['Course', 'Class', 'course']) || 'BTECH-' + dept;
-                        const sec = _pickCol(r, ['Section', 'section']) || 'II ' + dept + ' A';
+                        const dept = _pickCol(r, ['Department', 'Dept', 'Branch', 'department']) || 'CSE';
+                        const course = _pickCol(r, ['Course', 'Class', 'Program', 'Degree', 'course']) || ('BTECH-' + dept.toUpperCase());
+                        const rawSec = _pickCol(r, ['Section', 'Sec', 'Class Section', 'section']) || 'A';
                         const sem = parseInt(_pickCol(r, ['Semester', 'Sem', 'semester']) || '3', 10) || 3;
-                        const email = _pickCol(r, ['Personal Email', 'Email', 'email']) || `${regNo.toLowerCase()}@example.com`;
-                        const collegeEmail = _pickCol(r, ['College Email', 'collegeEmail']) || `${regNo.toLowerCase()}@sece.ac.in`;
+                        const canonicalSec = typeof buildCanonicalStudentSection === 'function'
+                            ? buildCanonicalStudentSection(course, dept, rawSec, sem)
+                            : rawSec;
+
+                        const safeRegSlug = regNo.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                        const email = _pickCol(r, ['Personal Email', 'Email', 'Mail', 'email']) || `${safeRegSlug}@example.com`;
+                        const collegeEmail = _pickCol(r, ['College Email', 'Official Email', 'College Mail ID', 'collegeEmail']) || `${safeRegSlug}@sece.ac.in`;
 
                         const payload = {
-                            firstName, lastName, registerNumber: regNo,
-                            email, collegeEmail,
-                            phone: _pickCol(r, ['Mobile Number', 'Mobile', 'Phone', 'phone']) || '9999999999',
-                            parentPhone1: _pickCol(r, ['Parent 1 Mobile', 'Parent Phone 1', 'parentPhone1']) || '9999999999',
-                            parentPhone2: _pickCol(r, ['Parent 2 Mobile', 'Parent Phone 2', 'parentPhone2']) || null,
-                            residentType: _pickCol(r, ['Resident Type', 'residentType']) || 'Day Scholar',
+                            firstName,
+                            lastName,
+                            registerNumber: regNo,
+                            email,
+                            collegeEmail,
+                            phone: _pickCol(r, ['Mobile Number', 'Mobile', 'Phone', 'Phone No', 'phone']) || '9999999999',
+                            parentPhone1: _pickCol(r, ['Parent 1 Mobile', 'Parent Phone 1', 'Parent Mobile 1', 'Parent Phone', 'parentPhone1']) || '9999999999',
+                            parentPhone2: _pickCol(r, ['Parent 2 Mobile', 'Parent Phone 2', 'Parent Mobile 2', 'parentPhone2']) || null,
+                            residentType: _pickCol(r, ['Resident Type', 'Hostel/Day Scholar', 'residentType']) || 'Day Scholar',
+                            hostelBlock: _pickCol(r, ['Hostel Block', 'hostelBlock']) || null,
+                            roomNumber: _pickCol(r, ['Room Number', 'Room No', 'roomNumber']) || null,
                             semester: sem,
-                            department: { name: dept },
+                            department: { name: dept, code: dept.toUpperCase() },
                             course: { name: course },
-                            section: { sectionName: sec }
+                            section: { sectionName: canonicalSec }
                         };
                         const res = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(payload) });
-                        if (res.ok) added++; else failed++;
+                        if (res && res.ok) {
+                            added++;
+                        } else {
+                            failed++;
+                            let msg = res ? `HTTP ${res.status}` : 'Network error';
+                            try {
+                                const errObj = res ? await res.json() : null;
+                                if (errObj && (errObj.message || errObj.error)) msg = errObj.message || errObj.error;
+                            } catch (e) { }
+                            reasons.push(`Row ${idx + 2} (${regNo}): ${msg}`);
+                        }
                     }
-                    if (typeof loadRecentStudents === 'function') loadRecentStudents();
-                    showToast('Student Import Complete', `Imported ${added} student(s)${failed ? `, ${failed} skipped` : ''}.`);
+
+                    if (typeof loadRecentStudents === 'function') await loadRecentStudents();
+                    if (typeof window.renderStudentsRoster === 'function') await window.renderStudentsRoster();
+                    if (typeof window.renderCredentialsList === 'function') window.renderCredentialsList();
+                    if (typeof populateSectionSelects === 'function') await populateSectionSelects();
+                    if (typeof window.loadAdvisorStudentSectionDetails === 'function') window.loadAdvisorStudentSectionDetails();
+
+                    const summary = `Imported ${added} student(s)${failed ? `, ${failed} skipped` : ''}.`;
+                    showToast('Student Import Complete', summary, added > 0 ? 'success' : 'warning');
+                    if (failed && reasons.length) {
+                        console.warn('Student Excel import skipped rows:', reasons);
+                        if (added === 0) alert(`${summary}\n\n${reasons.slice(0, 5).join('\n')}`);
+                    }
                 } catch (err) {
                     alert('Error importing students: ' + err.message);
                 } finally {
@@ -9450,35 +9947,70 @@ async function initSubstitutionModal() {
             window.importFacultyExcel = async function (event) {
                 const file = event.target.files?.[0];
                 if (!file) return;
+                const alertEl = document.getElementById('manageFacultyAlert');
                 try {
                     const rows = await _readExcelRows(file);
                     if (!rows.length) { alert('The selected file contains no faculty rows.'); return; }
                     let added = 0, failed = 0;
-                    for (const r of rows) {
-                        const firstName = _pickCol(r, ['First Name', 'firstName', 'Name']);
-                        const lastName = _pickCol(r, ['Last Name', 'lastName']) || '.';
-                        if (!firstName) { failed++; continue; }
+                    const reasons = [];
+                    for (let idx = 0; idx < rows.length; idx++) {
+                        const r = rows[idx];
+                        const rawName = _pickCol(r, ['First Name', 'firstName', 'Faculty Name', 'Full Name', 'Name']);
+                        const rawLast = _pickCol(r, ['Last Name', 'lastName']);
+                        const { firstName, lastName } = _splitFullName(rawName, rawLast);
+                        if (!firstName) {
+                            failed++;
+                            reasons.push(`Row ${idx + 2}: missing Faculty Name`);
+                            continue;
+                        }
 
-                        const dept = _pickCol(r, ['Department', 'Dept', 'department']) || 'CSE';
-                        const personalEmail = _pickCol(r, ['Personal Email', 'Email', 'personalEmail']) || `${firstName.toLowerCase()}@example.com`;
-                        const collegeEmail = _pickCol(r, ['College Email', 'collegeEmail']) || `${firstName.toLowerCase()}@sece.ac.in`;
+                        const dept = _pickCol(r, ['Department', 'Dept', 'Branch', 'department']) || 'CSE';
+                        const safeSlug = firstName.toLowerCase().replace(/[^a-z0-9]/g, '') || ('fac' + idx);
+                        const personalEmail = _pickCol(r, ['Personal Email', 'Email', 'Mail', 'personalEmail']) || `${safeSlug}@example.com`;
+                        const collegeEmail = _pickCol(r, ['College Email', 'Official Email', 'College Mail ID', 'collegeEmail']) || `${safeSlug}@sece.ac.in`;
+                        const employeeId = _pickCol(r, ['Employee ID', 'Faculty ID', 'Emp ID', 'ID', 'employeeId']) || ('EMP' + Date.now().toString().slice(-5) + idx);
 
                         const payload = {
-                            employeeId: _pickCol(r, ['Employee ID', 'Faculty ID', 'employeeId']) || ('EMP' + Date.now().toString().slice(-6) + added),
-                            firstName, lastName,
-                            personalEmail, collegeEmail,
-                            phone1: _pickCol(r, ['Mobile Number 1', 'Mobile 1', 'Phone', 'phone1']) || '9999999999',
+                            employeeId,
+                            firstName,
+                            lastName,
+                            personalEmail,
+                            collegeEmail,
+                            phone1: _pickCol(r, ['Mobile Number 1', 'Mobile 1', 'Mobile Number', 'Phone', 'phone1']) || '9999999999',
                             phone2: _pickCol(r, ['Mobile Number 2', 'Mobile 2', 'phone2']) || '',
-                            subjectHandling: _pickCol(r, ['Subject Handling', 'Subject', 'subjectHandling']) || 'General',
-                            department: { code: dept }
+                            subjectHandling: _pickCol(r, ['Subject Handling', 'Subject', 'Subjects', 'subjectHandling']) || 'General',
+                            department: { code: dept.toUpperCase(), name: dept }
                         };
                         const res = await apiFetch('/api/teachers', { method: 'POST', body: JSON.stringify(payload) });
-                        if (res.ok) added++; else failed++;
+                        if (res && res.ok) {
+                            added++;
+                        } else {
+                            failed++;
+                            let msg = res ? `HTTP ${res.status}` : 'Network error';
+                            try {
+                                const errObj = res ? await res.json() : null;
+                                if (errObj && (errObj.message || errObj.error)) msg = errObj.message || errObj.error;
+                            } catch (e) { }
+                            reasons.push(`Row ${idx + 2} (${firstName}): ${msg}`);
+                        }
                     }
+
                     if (window.renderAdminFacultyDetails) window.renderAdminFacultyDetails();
-                    if (window.loadAdminFullFaculty) window.loadAdminFullFaculty();
+                    if (window.loadAdminFullFaculty) await window.loadAdminFullFaculty();
                     if (window.renderCredentialsList) window.renderCredentialsList();
-                    showToast('Faculty Import Complete', `Imported ${added} faculty member(s)${failed ? `, ${failed} skipped` : ''}.`);
+                    if (window.renderStaffAvailability) window.renderStaffAvailability();
+                    if (window.renderManageClassAdvisors) window.renderManageClassAdvisors();
+                    if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
+
+                    const summary = `Imported ${added} faculty member(s)${failed ? `, ${failed} skipped` : ''}.`;
+                    if (alertEl) {
+                        alertEl.innerHTML = `<div class="alert ${added > 0 ? 'alert-success' : 'alert-warning'} py-2 px-3 small mb-2">${escapeHtml(summary)}</div>`;
+                    }
+                    showToast('Faculty Import Complete', summary, added > 0 ? 'success' : 'warning');
+                    if (failed && reasons.length) {
+                        console.warn('Faculty Excel import skipped rows:', reasons);
+                        if (added === 0) alert(`${summary}\n\n${reasons.slice(0, 5).join('\n')}`);
+                    }
                 } catch (err) {
                     alert('Error importing faculty: ' + err.message);
                 } finally {
@@ -9490,24 +10022,177 @@ async function initSubstitutionModal() {
                 const file = event.target.files?.[0];
                 if (!file) return;
                 try {
-                    const rows = await _readExcelRows(file);
-                    if (!rows.length) { alert('The selected Excel file has no rows.'); return; }
-                    rows.forEach(r => {
-                        const rawDay = _pickCol(r, ['Day', 'Day Order', 'day']);
-                        if (!rawDay) return;
-                        const day = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase();
-                        for (let p = 1; p <= 7; p++) {
-                            const val = _pickCol(r, [`Period ${p}`, `P${p}`, `${p}`]);
-                            const input = document.getElementById(`myTt_${day}_P${p}`);
-                            if (input && val) input.value = val;
+                    const { rows, matrix } = await _readExcelTable(file);
+                    if (!matrix.length) { alert('The selected Excel file has no rows.'); return; }
+
+                    if (typeof window.renderMyTimetable === 'function' && !document.getElementById('myTt_Monday_P1')) {
+                        window.renderMyTimetable();
+                    }
+
+                    loadFacultyTtColumns();
+                    const activeCols = facultyTtColumns.filter(c => !c.isBreak || c.key === 'ACT');
+                    let populatedCells = 0;
+
+                    if (rows.length > 0 && _pickCol(rows[0], ['Day', 'Day Order', 'Weekday', 'day'])) {
+                        rows.forEach(r => {
+                            const day = _normalizeExcelDay(_pickCol(r, ['Day', 'Day Order', 'Weekday', 'day']));
+                            if (!day) return;
+                            activeCols.forEach(col => {
+                                const candidates = col.key === 'ACT'
+                                    ? ['Activity', 'ACT', col.label]
+                                    : [`Period ${col.key.replace(/^P/, '')}`, col.key, col.label, col.key.replace(/^P/, '')];
+                                const val = _pickCol(r, candidates);
+                                const input = document.getElementById(`myTt_${day}_${col.key}`);
+                                if (input) {
+                                    const cleanVal = /^(free|break|tea break|lunch break|-)$/i.test(val) ? '' : val;
+                                    input.value = cleanVal;
+                                    if (cleanVal) populatedCells++;
+                                }
+                            });
+                        });
+                    } else {
+                        const startIdx = (matrix[0] && /day/i.test(matrix[0][0] || '')) ? 1 : 0;
+                        const headerRow = startIdx === 1 ? matrix[0] : [];
+                        for (let r = startIdx; r < matrix.length; r++) {
+                            const row = matrix[r];
+                            const day = _normalizeExcelDay(row[0]);
+                            if (!day) continue;
+                            for (let c = 1; c < row.length; c++) {
+                                const hdr = String(headerRow[c] || '').toLowerCase();
+                                if (/tea|lunch|break/.test(hdr)) continue;
+                                let key = '';
+                                if (/act/i.test(hdr)) {
+                                    key = 'ACT';
+                                } else {
+                                    const pm = hdr.match(/([1-7])/);
+                                    key = pm ? `P${pm[1]}` : (c <= 7 ? `P${c}` : '');
+                                }
+                                if (!key) continue;
+                                const input = document.getElementById(`myTt_${day}_${key}`);
+                                if (input) {
+                                    const val = String(row[c] || '').trim();
+                                    const cleanVal = /^(free|break|tea break|lunch break|-)$/i.test(val) ? '' : val;
+                                    input.value = cleanVal;
+                                    if (cleanVal) populatedCells++;
+                                }
+                            }
                         }
-                    });
-                    if (typeof window.saveMyTimetable === 'function') window.saveMyTimetable();
-                    showToast('Timetable Imported', 'Personal timetable imported from Excel.');
+                    }
+
+                    if (populatedCells === 0) {
+                        alert('No matching Day/Period cells found in the file. Ensure Column A has Day (Monday..Saturday) and columns include Period 1..7 (or P1..P7).');
+                        return;
+                    }
+
+                    if (typeof window.saveMyTimetable === 'function') await window.saveMyTimetable();
+                    showToast('Timetable Imported', `Imported ${populatedCells} slot(s) from Excel & saved.`);
                 } catch (err) {
                     alert('Error importing personal timetable: ' + err.message);
                 } finally {
                     event.target.value = '';
+                }
+            };
+
+            window.importFacultyTimetablePdfOrImage = async function (event) {
+                const file = event?.target?.files?.[0];
+                if (!file) return;
+
+                const statusEl = document.getElementById('facultyAiExtractStatus');
+                const previewWrap = document.getElementById('facultyAiPreviewWrap');
+                const previewImg = document.getElementById('facultyAiPreviewImg');
+
+                if (statusEl) {
+                    statusEl.className = 'small mt-2 text-info';
+                    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Extracting timetable & image from uploaded file...';
+                }
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const token = (localStorage.getItem('jwt_token') || '').trim();
+                    const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+                    const res = await fetch('/api/timetable/upload-image', {
+                        method: 'POST',
+                        headers,
+                        body: formData
+                    });
+                    const payload = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        throw new Error(payload.error || 'Failed to extract uploaded file.');
+                    }
+
+                    const previewSrc = payload.previewImage || (file.type && file.type.startsWith('image/') ? URL.createObjectURL(file) : '');
+                    if (previewSrc && previewImg && previewWrap) {
+                        previewImg.src = previewSrc;
+                        previewImg.classList.remove('d-none');
+                        previewWrap.classList.remove('d-none');
+                    }
+
+                    let ttData = payload.data || null;
+                    let modeNote = payload.extractionMode === 'PDF_TEXT'
+                        ? 'Extracted from PDF text table.'
+                        : (payload.extractionMode === 'GEMINI_AI' ? 'Extracted via AI vision.' : '');
+
+                    if (!ttData && payload.needsClientOcr && previewSrc) {
+                        if (statusEl) {
+                            statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running OCR on extracted image to detect periods...';
+                        }
+                        try {
+                            ttData = await _extractGridViaClientOcr(previewSrc);
+                            modeNote = ttData
+                                ? 'Image extracted and OCR-parsed.'
+                                : 'Image extracted. Please verify or fill any missing periods below.';
+                        } catch (ocrErr) {
+                            console.warn('Faculty OCR warning:', ocrErr);
+                            modeNote = 'Image extracted. Enter or adjust periods below before saving.';
+                        }
+                    }
+
+                    if (typeof window.renderMyTimetable === 'function') {
+                        window.renderMyTimetable();
+                    }
+
+                    loadFacultyTtColumns();
+                    const periodKeys = facultyTtColumns
+                        .filter(col => !col.isBreak && col.key !== 'ACT')
+                        .map(col => col.key);
+
+                    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    let totalEntries = 0;
+
+                    if (ttData) {
+                        days.forEach(day => {
+                            const periods = Array.isArray(ttData[day]) ? ttData[day] : [];
+                            for (let p = 0; p < 7; p++) {
+                                const colKey = periodKeys[p] || (`P${p + 1}`);
+                                const input = document.getElementById(`myTt_${day}_${colKey}`);
+                                if (!input) continue;
+
+                                const item = periods[p];
+                                if (item && item.sub && item.sub.toUpperCase() !== 'FREE' && item.sub.toUpperCase() !== 'BREAK') {
+                                    const val = [item.sub, item.faculty, item.venue].filter(Boolean).join(', ');
+                                    input.value = val;
+                                    if (val) totalEntries++;
+                                } else {
+                                    input.value = '';
+                                }
+                            }
+                        });
+                    }
+
+                    if (statusEl) {
+                        statusEl.className = 'small mt-2 text-success fw-semibold';
+                        statusEl.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${modeNote || 'Scan completed!'} Detected ${totalEntries} period(s). Review cells below and click <strong>Save Timetable</strong>.`;
+                    }
+                    showToast('Scan Completed', `Extracted ${totalEntries} timetable cell(s). Review and click Save Timetable.`);
+                } catch (err) {
+                    console.error('Faculty PDF/Image scan error:', err);
+                    if (statusEl) {
+                        statusEl.className = 'small mt-2 text-danger';
+                        statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i>${err.message || 'Scan failed.'}`;
+                    }
+                    showToast('Scan Failed', err.message || 'Could not scan timetable PDF/image.', 'error');
                 }
             };
 
@@ -10612,6 +11297,80 @@ async function initSubstitutionModal() {
                 window.updateCaSelectedCount();
             };
 
+            window.selectSem8CompletedStudents = function () {
+                const alertBox = document.getElementById('caSemChangeAlert');
+                const chks = Array.from(document.querySelectorAll('.ca-student-chk'));
+                let matched = 0;
+                chks.forEach(chk => {
+                    const isSem8 = chk.dataset.sem8Completed === 'true' || Number(chk.dataset.sem) === 8;
+                    chk.checked = isSem8;
+                    if (isSem8) matched++;
+                });
+                window.updateCaSelectedCount();
+                if (alertBox) {
+                    if (matched > 0) {
+                        alertBox.className = 'alert alert-info small py-2 mt-2 mb-0';
+                        alertBox.innerText = `Selected ${matched} student(s) on Semester 8 / Sem 8 Completed. Click "Delete Selected (DB & Website Access)" to permanently remove them.`;
+                    } else {
+                        alertBox.className = 'alert alert-warning small py-2 mt-2 mb-0';
+                        alertBox.innerText = 'No students in this class are on Semester 8 yet. Select students and choose "Semester 8 (Completed / Passed Out)" or check rows manually.';
+                    }
+                }
+            };
+
+            window.deleteSelectedClassAdvisorStudents = async function () {
+                const section = window._caCurrentSection;
+                const faculty = window._caCurrentFaculty;
+                const alertBox = document.getElementById('caSemChangeAlert');
+                const checkedEls = Array.from(document.querySelectorAll('.ca-student-chk:checked'));
+                const selectedIds = checkedEls.map(c => Number(c.value)).filter(Boolean);
+
+                if (selectedIds.length === 0) {
+                    if (alertBox) {
+                        alertBox.className = 'alert alert-warning small py-2 mt-2 mb-0';
+                        alertBox.innerText = 'Please select at least one student (or click "Select Sem 8 Completed") before deleting.';
+                    }
+                    return;
+                }
+
+                const previewNames = checkedEls.slice(0, 5)
+                    .map(c => `${c.dataset.roll || ''} ${c.dataset.name || ''}`.trim())
+                    .filter(Boolean)
+                    .join(', ');
+                const extraCount = checkedEls.length > 5 ? ` (+${checkedEls.length - 5} more)` : '';
+                const confirmed = confirm(
+                    `Permanently delete ${selectedIds.length} selected student(s) (${previewNames}${extraCount}) from BOTH the database and website login access?\n\nThis action cannot be undone.`
+                );
+                if (!confirmed) return;
+
+                try {
+                    const res = await apiFetch('/api/students/bulk-delete', {
+                        method: 'POST',
+                        body: JSON.stringify({ studentIds: selectedIds })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || 'Failed to delete selected students.');
+
+                    showToast('Students Removed', data.message || `Deleted ${data.deletedCount || selectedIds.length} student(s) from database and website access.`);
+                    if (section && faculty) {
+                        await window.renderClassAdvisorStudents(section, faculty);
+                        const postAlert = document.getElementById('caSemChangeAlert');
+                        if (postAlert) {
+                            postAlert.className = 'alert alert-success small py-2 mt-2 mb-0';
+                            postAlert.innerText = data.message || `Deleted ${data.deletedCount || selectedIds.length} selected student(s) from database and website login access.`;
+                        }
+                    }
+                    if (typeof window.renderStudentsRoster === 'function') await window.renderStudentsRoster();
+                    if (typeof loadRecentStudents === 'function') await loadRecentStudents();
+                    if (typeof window.renderCredentialsList === 'function') window.renderCredentialsList();
+                } catch (err) {
+                    if (alertBox) {
+                        alertBox.className = 'alert alert-danger small py-2 mt-2 mb-0';
+                        alertBox.innerText = 'Error: ' + err.message;
+                    }
+                }
+            };
+
             window.updateCaSelectedCount = function () {
                 const chks = Array.from(document.querySelectorAll('.ca-student-chk'));
                 const selected = chks.filter(c => c.checked).length;
@@ -10637,24 +11396,28 @@ async function initSubstitutionModal() {
                     return;
                 }
 
-                const newSemester = Number(document.getElementById('caTargetSemSelect')?.value || 4);
-                const note = String(document.getElementById('caSemChangeNote')?.value || '').trim();
+                const rawSemVal = String(document.getElementById('caTargetSemSelect')?.value || '4');
+                const completedSem8 = rawSemVal === '8-completed';
+                const newSemester = completedSem8 ? 8 : (Number(rawSemVal) || 4);
+                let note = String(document.getElementById('caSemChangeNote')?.value || '').trim();
+                if (completedSem8 && !note) note = 'Sem 8 Completed';
 
                 try {
                     const res = await apiFetch('/api/students/bulk-semester', {
                         method: 'POST',
-                        body: JSON.stringify({ studentIds: selectedIds, newSemester, note })
+                        body: JSON.stringify({ studentIds: selectedIds, newSemester, completedSem8, note })
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(data.error || 'Failed to update semester.');
 
-                    showToast('Semester Changes Marked', `Updated ${data.updatedCount || selectedIds.length} student(s) to Semester ${newSemester}.`);
+                    const msgLabel = completedSem8 ? 'Semester 8 (Completed)' : `Semester ${newSemester}`;
+                    showToast('Semester Changes Marked', `Updated ${data.updatedCount || selectedIds.length} student(s) to ${msgLabel}.`);
                     if (section && faculty) {
                         await window.renderClassAdvisorStudents(section, faculty);
                         const postAlert = document.getElementById('caSemChangeAlert');
                         if (postAlert) {
                             postAlert.className = 'alert alert-success small py-2 mt-2 mb-0';
-                            postAlert.innerText = `Marked Semester ${newSemester} for ${data.updatedCount || selectedIds.length} selected student(s).`;
+                            postAlert.innerText = `Marked ${msgLabel} for ${data.updatedCount || selectedIds.length} selected student(s).`;
                         }
                     }
                 } catch (err) {

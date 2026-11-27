@@ -16,7 +16,7 @@ The **Smart Classroom & Timetable Scheduler** provides an intuitive dashboard to
 
 ## 🚀 Technology Stack
 - **Frontend**: React (Vite), HTML5, CSS3, JavaScript, Bootstrap 5 (Responsive Dashboard)
-- **Backend**: Java 21, Spring Boot 3.2.5, Spring Web, Spring Data JPA, Spring Security, Maven
+- **Backend**: Java 25, Spring Boot 3.5.16, Spring Web, Spring Data JPA, Spring Security, Maven
 - **Database**: H2 In-Memory Database (Default for development)
 - **Architecture**: Decoupled Architecture (Vite Dev Server on 5173 proxying to Spring Boot on 8080)
 
@@ -37,8 +37,8 @@ The **Smart Classroom & Timetable Scheduler** provides an intuitive dashboard to
 ## 🛠️ Setup & Execution Instructions
 
 ### Prerequisites
-- **Java 21** (`java -version`)
-- **Maven 3.8+**
+- **Java 25** (`java -version`)
+- **Maven 3.9+** (or use the included Maven Wrapper)
 - **Node.js & npm** (for the Vite frontend)
 
 ### 1. Run the Backend (Spring Boot)

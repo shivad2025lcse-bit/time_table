@@ -2371,7 +2371,7 @@ export default function DashboardLayout() {
                         <div className="modal-body text-center">
                             <p className="text-muted small mb-3">Scan this QR Code to directly open the login page on your mobile device:</p>
                             <div className="bg-white p-2 d-inline-block rounded mb-3 shadow" id="qrCodeContainer">
-                                <img src="" id="loginQrCodeImage" alt="Login QR Code" style={{ width: "160px", height: "160px", objectFit: "contain" }} />
+                                <img id="loginQrCodeImage" alt="Login QR Code" style={{ width: "160px", height: "160px", objectFit: "contain" }} />
                             </div>
                             
                             <div className="input-group input-group-sm mb-4 mx-auto" style={{maxWidth: "300px"}}>
@@ -2480,5 +2480,4 @@ export default function DashboardLayout() {
         </>
     );
 }
-
 

@@ -738,4 +738,339 @@ class TemporaryTimetableAndEmailTests {
                         .content("{\"username\":\"test_stu1_zz\",\"password\":\"changedpw1\"}"))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void adminCanAssignReassignAndRemoveClassAdvisorPersistently() throws Exception {
+        String adminJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(adminUser.getUsername()), "ROLE_ADMIN");
+        String facultyJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(fac1User.getUsername()), "ROLE_FACULTY");
+        String assignment = "{\"sectionName\":\"II ZZC A\"}";
+
+        mockMvc.perform(put("/api/teachers/" + fac1.getId() + "/class-advisor")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignment))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.classAdvisorFor").value("II ZZC A"));
+        assertThat(teacherRepo.findById(fac1.getId()).orElseThrow().getClassAdvisorFor()).isEqualTo("II ZZC A");
+
+        mockMvc.perform(put("/api/teachers/" + fac2.getId() + "/class-advisor")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignment))
+                .andExpect(status().isOk());
+        assertThat(teacherRepo.findById(fac1.getId()).orElseThrow().getClassAdvisorFor()).isEmpty();
+        assertThat(teacherRepo.findById(fac2.getId()).orElseThrow().getClassAdvisorFor()).isEqualTo("II ZZC A");
+
+        mockMvc.perform(delete("/api/teachers/" + fac2.getId() + "/class-advisor")
+                        .header("Authorization", "Bearer " + adminJwt))
+                .andExpect(status().isNoContent());
+        assertThat(teacherRepo.findById(fac2.getId()).orElseThrow().getClassAdvisorFor()).isEmpty();
+
+        mockMvc.perform(put("/api/teachers/" + fac1.getId() + "/class-advisor")
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignment))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void facultyAndAdminCanControlQuizVisibilityPerClassAndGlobally() throws Exception {
+        String adminJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(adminUser.getUsername()), "ROLE_ADMIN");
+        String facultyJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(fac1User.getUsername()), "ROLE_FACULTY");
+        String studentJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(stu1User.getUsername()), "ROLE_STUDENT");
+
+        // Student cannot toggle section or global quiz visibility
+        mockMvc.perform(put("/api/quizzes/visibility/section/" + secA.getId())
+                        .header("Authorization", "Bearer " + studentJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isForbidden());
+
+        // Faculty cannot toggle admin global/all-class quiz visibility
+        mockMvc.perform(put("/api/quizzes/visibility/all")
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isForbidden());
+
+        // Faculty hides quiz for secA -> student in secA sees visible=false and gets 403 on quizzes endpoint
+        mockMvc.perform(put("/api/quizzes/visibility/section/" + secA.getId())
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.effectiveQuizVisible").value(false));
+
+        mockMvc.perform(get("/api/quizzes/visibility/student")
+                        .header("Authorization", "Bearer " + studentJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visible").value(false));
+
+        mockMvc.perform(get("/api/quizzes/section/" + secA.getId())
+                        .header("Authorization", "Bearer " + studentJwt))
+                .andExpect(status().isForbidden());
+
+        // secB remains enabled for its students
+        String stu2Jwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(stu2User.getUsername()), "ROLE_STUDENT");
+        mockMvc.perform(get("/api/quizzes/visibility/student")
+                        .header("Authorization", "Bearer " + stu2Jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visible").value(true));
+
+        // Faculty re-enables secA -> student in secA sees visible=true and 200
+        mockMvc.perform(put("/api/quizzes/visibility/section/" + secA.getId())
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.effectiveQuizVisible").value(true));
+
+        mockMvc.perform(get("/api/quizzes/section/" + secA.getId())
+                        .header("Authorization", "Bearer " + studentJwt))
+                .andExpect(status().isOk());
+
+        // Admin disables overall quiz access for all classes -> even secA/secB students become hidden (403)
+        mockMvc.perform(put("/api/quizzes/visibility/global")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.globalQuizEnabled").value(false));
+
+        mockMvc.perform(get("/api/quizzes/visibility/student")
+                        .header("Authorization", "Bearer " + studentJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visible").value(false));
+        mockMvc.perform(get("/api/quizzes/visibility/student")
+                        .header("Authorization", "Bearer " + stu2Jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visible").value(false));
+
+        // Admin re-enables all classes
+        mockMvc.perform(put("/api/quizzes/visibility/all")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.globalQuizEnabled").value(true));
+
+        mockMvc.perform(get("/api/quizzes/visibility/student")
+                        .header("Authorization", "Bearer " + studentJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visible").value(true));
+    }
+
+    @Test
+    void testTimetableExcelAndCsvImportPersistsCorrectly() throws Exception {
+        String adminJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(adminUser.getUsername()), "ROLE_ADMIN");
+        String stuJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(stu1User.getUsername()), "ROLE_STUDENT");
+
+        // Build real .xlsx workbook including Tea Break, Lunch Break, Activity, numeric cell, and abbreviated day
+        byte[] xlsxBytes;
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = wb.createSheet("Timetable");
+            org.apache.poi.ss.usermodel.Row hdr = sheet.createRow(0);
+            hdr.createCell(0).setCellValue("Day");
+            hdr.createCell(1).setCellValue("Period 1");
+            hdr.createCell(2).setCellValue("Tea Break");
+            hdr.createCell(3).setCellValue("Period 2");
+            hdr.createCell(4).setCellValue("Lunch Break");
+            hdr.createCell(5).setCellValue("Activity");
+            hdr.createCell(6).setCellValue("Period 3");
+
+            org.apache.poi.ss.usermodel.Row r1 = sheet.createRow(1);
+            r1.createCell(0).setCellValue("MON");
+            r1.createCell(1).setCellValue("CS301 (Mr. Kumar - CR101)");
+            r1.createCell(2).setCellValue("TEA BREAK");
+            r1.createCell(3).setCellValue(102); // Numeric cell should not throw IllegalStateException
+            r1.createCell(4).setCellValue("LUNCH BREAK");
+            r1.createCell(5).setCellValue("Club");
+            r1.createCell(6).setCellValue("FREE");
+
+            wb.write(baos);
+            xlsxBytes = baos.toByteArray();
+        }
+
+        org.springframework.mock.web.MockMultipartFile xlsxFile = new org.springframework.mock.web.MockMultipartFile(
+                "file", "timetable.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                xlsxBytes);
+
+        // Student role must be rejected
+        mockMvc.perform(multipart("/api/timetable/import-excel")
+                        .file(xlsxFile)
+                        .param("section", secA.getSectionName())
+                        .header("Authorization", "Bearer " + stuJwt))
+                .andExpect(status().isForbidden());
+
+        // Admin import .xlsx succeeds and writes exact periods to DB
+        mockMvc.perform(multipart("/api/timetable/import-excel")
+                        .file(xlsxFile)
+                        .param("section", secA.getSectionName())
+                        .param("semester", "3")
+                        .header("Authorization", "Bearer " + adminJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entriesSaved").value(2))
+                .andExpect(jsonPath("$.sectionName").value(secA.getSectionName()))
+                .andExpect(jsonPath("$.grid.Monday.P1").value("CS301, Mr. Kumar, CR101"))
+                .andExpect(jsonPath("$.grid.Monday.P2").value("102"));
+
+        List<TimetableEntry> dbAfterXlsx = timetableRepo.findBySectionId(secA.getId());
+        assertThat(dbAfterXlsx).hasSize(2);
+
+        // Admin import .csv (with UTF-8 BOM & quoted cell) for semester 4 succeeds cleanly
+        String csvContent = "\uFEFFDay,Period 1,Tea Break,Period 2\nTuesday,\"CS401, Ms. Priya, CR101\",TEA BREAK,FREE\n";
+        org.springframework.mock.web.MockMultipartFile csvFile = new org.springframework.mock.web.MockMultipartFile(
+                "file", "timetable.csv",
+                "text/csv",
+                csvContent.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/api/timetable/import-excel")
+                        .file(csvFile)
+                        .param("section", secA.getSectionName())
+                        .param("semester", "4")
+                        .header("Authorization", "Bearer " + adminJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entriesSaved").value(1))
+                .andExpect(jsonPath("$.semester").value(4))
+                .andExpect(jsonPath("$.grid.Tuesday.P1").value("CS401, Ms. Priya, CR101"));
+
+        // Verify custom subject & custom venue persistence endpoints work cleanly
+        mockMvc.perform(post("/api/operations/custom-subjects")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"shortName\":\"AI301\",\"subjectCode\":\"23CS399\",\"title\":\"AI Systems\",\"faculty\":\"Dr. Rao\",\"category\":\"cat-theory\",\"venue\":\"SF 04\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.subjectCode").value("23CS399"));
+
+        mockMvc.perform(post("/api/operations/custom-venues")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Seminar Hall 2\",\"venueType\":\"Auditorium\",\"block\":\"Main\",\"capacity\":\"120\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Seminar Hall 2"));
+    }
+
+    @Test
+    void testBulkSem8CompletionAndPermanentStudentDelete() throws Exception {
+        String facultyJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(fac1User.getUsername()), "ROLE_FACULTY");
+        String stuJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(stu1User.getUsername()), "ROLE_STUDENT");
+
+        // Attach dependent EmailSubscription to confirm FK-safe deletion of Student + User
+        EmailSubscription sub = new EmailSubscription();
+        sub.setUser(stu1User);
+        sub.setEmail("stu1_sem8_cleanup@test.edu");
+        sub.setVerified(true);
+        sub.setNotificationsEnabled(true);
+        subscriptionRepo.save(sub);
+
+        Student targetStudent = studentRepo.findByUserId(stu1User.getId()).orElseThrow();
+        Long targetStudentId = targetStudent.getId();
+        String targetUsername = stu1User.getUsername();
+
+        // Mark student as Semester 8 Completed
+        mockMvc.perform(post("/api/students/bulk-semester")
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentIds\":[" + targetStudentId + "],\"newSemester\":8,\"completedSem8\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedCount").value(1))
+                .andExpect(jsonPath("$.newSemester").value(8))
+                .andExpect(jsonPath("$.completedSem8").value(true));
+
+        Student promoted = studentRepo.findById(targetStudentId).orElseThrow();
+        assertThat(promoted.getSemester()).isEqualTo(8);
+        assertThat(promoted.getSemesterChangeNote()).contains("Sem 8 Completed");
+
+        // Student role must NOT be allowed to bulk-delete
+        mockMvc.perform(post("/api/students/bulk-delete")
+                        .header("Authorization", "Bearer " + stuJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentIds\":[" + targetStudentId + "]}"))
+                .andExpect(status().isForbidden());
+
+        // Faculty deletes selected Sem 8 completed student -> removed from DB & User website access revoked
+        mockMvc.perform(post("/api/students/bulk-delete")
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentIds\":[" + targetStudentId + "]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedCount").value(1));
+
+        assertThat(studentRepo.findById(targetStudentId)).isEmpty();
+        assertThat(userRepo.findByUsername(targetUsername)).isEmpty();
+        assertThat(subscriptionRepo.findByUserId(stu1User.getId())).isEmpty();
+
+        // Old student JWT must no longer authenticate website APIs
+        mockMvc.perform(get("/api/quizzes/visibility/student")
+                        .header("Authorization", "Bearer " + stuJwt))
+                .andExpect(status().isForbidden());
+
+        // Deleted student login must fail
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"" + targetUsername + "\",\"password\":\"Pass@123\",\"loginType\":\"STUDENT\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void testAiQuizGenerationNonRepeatingAndDifficultyStratified() throws Exception {
+        String facultyJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(fac1User.getUsername()), "ROLE_FACULTY");
+        String stuJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(stu1User.getUsername()), "ROLE_STUDENT");
+
+        // Student cannot call Faculty AI generator
+        mockMvc.perform(post("/api/quizzes/generate")
+                        .header("Authorization", "Bearer " + stuJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topic\":\"Data Structures\",\"difficulty\":\"Easy\",\"count\":3}"))
+                .andExpect(status().isForbidden());
+
+        // 1. Easy level -> 5 marks each, 4 unique questions
+        String easyRes = mockMvc.perform(post("/api/quizzes/generate")
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topic\":\"Data Structures\",\"difficulty\":\"Easy\",\"type\":\"MCQ\",\"count\":4,\"provider\":\"BUILT_IN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.difficultyApplied").value("Easy"))
+                .andExpect(jsonPath("$.questions.length()").value(4))
+                .andExpect(jsonPath("$.questions[0].marks").value(5))
+                .andReturn().getResponse().getContentAsString();
+
+        // 2. Hard level -> 15 marks each, completely distinct stems from Easy!
+        String hardRes = mockMvc.perform(post("/api/quizzes/generate")
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topic\":\"Data Structures\",\"difficulty\":\"Hard\",\"type\":\"MCQ\",\"count\":4,\"provider\":\"BUILT_IN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.difficultyApplied").value("Hard"))
+                .andExpect(jsonPath("$.questions.length()").value(4))
+                .andExpect(jsonPath("$.questions[0].marks").value(15))
+                .andReturn().getResponse().getContentAsString();
+
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var easyTree = mapper.readTree(easyRes).path("questions");
+        var hardTree = mapper.readTree(hardRes).path("questions");
+        Set<String> easyTexts = new HashSet<>();
+        for (var q : easyTree) easyTexts.add(q.path("questionText").asText());
+        assertThat(easyTexts).hasSize(4);
+
+        Set<String> hardTexts = new HashSet<>();
+        for (var q : hardTree) hardTexts.add(q.path("questionText").asText());
+        assertThat(hardTexts).hasSize(4);
+        assertThat(hardTexts).doesNotContainAnyElementsOf(easyTexts);
+
+        // 3. Re-generating same topic & difficulty does NOT repeat previous batch stems
+        String easyRes2 = mockMvc.perform(post("/api/quizzes/generate")
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topic\":\"Data Structures\",\"difficulty\":\"Easy\",\"type\":\"MCQ\",\"count\":4,\"provider\":\"BUILT_IN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.questions.length()").value(4))
+                .andReturn().getResponse().getContentAsString();
+        Set<String> easyTexts2 = new HashSet<>();
+        for (var q : mapper.readTree(easyRes2).path("questions")) easyTexts2.add(q.path("questionText").asText());
+        assertThat(easyTexts2).hasSize(4);
+        assertThat(easyTexts2).doesNotContainAnyElementsOf(easyTexts);
+    }
 }

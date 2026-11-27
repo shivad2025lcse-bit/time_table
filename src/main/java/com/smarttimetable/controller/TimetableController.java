@@ -265,16 +265,20 @@ public class TimetableController {
         return ResponseEntity.noContent().build();
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @PostMapping("/import-excel")
-    public ResponseEntity<?> importExcel(@RequestParam("file") MultipartFile file, @RequestParam("section") String sectionName) {
+    public ResponseEntity<?> importExcel(@RequestParam("file") MultipartFile file,
+                                         @RequestParam("section") String sectionName,
+                                         @RequestParam(value = "semester", required = false) Integer semester) {
         try {
-            java.util.Map<String, Object> result = excelImportService.importTimetableExcel(file, sectionName);
+            java.util.Map<String, Object> result = excelImportService.importTimetableExcel(file, sectionName, semester);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", "Excel import failed: " + e.getMessage()));
         }
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @PostMapping("/save-manual")
     public ResponseEntity<?> saveManualTimetable(@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> request) {
         try {

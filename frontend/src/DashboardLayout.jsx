@@ -11,6 +11,131 @@ export default function DashboardLayout() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 992);
 
     useEffect(() => {
+        window.openLoginForm = window.openLoginForm || ((role) => {
+            const normalizedRole = String(role || "STUDENT").toUpperCase();
+            const configs = {
+                STUDENT: { title: "Student Login", hint: "Student username is your Register Number.", icon: "fa-user-graduate", example: "25cs303" },
+                FACULTY: { title: "Faculty Login", hint: "Enter the username provided by the Administrator.", icon: "fa-chalkboard-user", example: "fkeerj012345" },
+                ADMIN: { title: "Admin Login", hint: "Enter the Administrator username and password.", icon: "fa-user-shield", example: "shiva25012007" }
+            };
+            const config = configs[normalizedRole] || configs.STUDENT;
+            window._selectedLoginRole = normalizedRole;
+
+            const roleInput = document.getElementById("selectedLoginRole");
+            if (roleInput) roleInput.value = normalizedRole;
+            const roleBadge = document.getElementById("loginRoleBadge");
+            if (roleBadge) roleBadge.innerText = normalizedRole;
+            const title = document.getElementById("loginTitle");
+            if (title) title.innerText = config.title;
+            const hint = document.getElementById("loginHint");
+            if (hint) hint.innerText = config.hint;
+            const username = document.getElementById("loginUsername");
+            if (username) {
+                username.placeholder = config.example;
+                username.focus();
+            }
+            const icon = document.getElementById("loginIcon");
+            if (icon) icon.innerHTML = `<i class="fa-solid ${config.icon}"></i>`;
+
+            document.getElementById("roleSelection")?.classList.add("login-hidden");
+            document.getElementById("loginFormPanel")?.classList.remove("login-hidden");
+        });
+
+        window.backToRoleSelection = window.backToRoleSelection || (() => {
+            window._selectedLoginRole = null;
+            document.getElementById("loginFormPanel")?.classList.add("login-hidden");
+            document.getElementById("roleSelection")?.classList.remove("login-hidden");
+            document.getElementById("roleLoginForm")?.reset();
+        });
+
+        window.toggleLoginPassword = window.toggleLoginPassword || (() => {
+            const input = document.getElementById("loginPassword");
+            const icon = document.getElementById("loginPasswordEye");
+            if (!input) return;
+            input.type = input.type === "password" ? "text" : "password";
+            if (icon) icon.className = input.type === "password" ? "fa-solid fa-eye" : "fa-solid fa-eye-slash";
+        });
+
+        window.handleRoleLogin = window.handleRoleLogin || (async (event) => {
+            event.preventEvent?.();
+            event.preventDefault();
+
+            const role = (window._selectedLoginRole || document.getElementById("selectedLoginRole")?.value || "STUDENT").toUpperCase();
+            const username = document.getElementById("loginUsername")?.value.trim();
+            const password = document.getElementById("loginPassword")?.value;
+            const loginButton = document.getElementById("roleLoginBtn");
+            const banner = document.getElementById("loginErrorBanner");
+
+            if (!username || !password) {
+                if (banner) {
+                    banner.textContent = "Please enter your username and password.";
+                    banner.classList.remove("d-none");
+                }
+                return;
+            }
+
+            if (loginButton) {
+                loginButton.disabled = true;
+                loginButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Logging in...';
+            }
+            if (banner) {
+                banner.textContent = "";
+                banner.classList.add("d-none");
+            }
+
+            const candidates = [password];
+
+            let result = null;
+            let lastStatus = 0;
+            for (const candidate of [...new Set(candidates)]) {
+                try {
+                    const response = await fetch("/api/auth/login", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ username, password: candidate })
+                    });
+                    lastStatus = response.status;
+                    if (response.ok) {
+                        result = await response.json();
+                        break;
+                    }
+                } catch (error) {
+                    console.warn("Login request failed", error);
+                }
+            }
+
+            if (loginButton) {
+                loginButton.disabled = false;
+                loginButton.innerHTML = '<i class="fa-solid fa-right-to-bracket me-1"></i> Login';
+            }
+
+            if (!result) {
+                const message = lastStatus === 0
+                    ? "Cannot reach the login server. Please wait a moment and try again."
+                    : "Invalid username or password.";
+                if (banner) {
+                    banner.textContent = message;
+                    banner.classList.remove("d-none");
+                }
+                return;
+            }
+
+            const actualRole = String(result.role || "").replace("ROLE_", "").toUpperCase();
+            if (actualRole && actualRole !== role) {
+                if (banner) {
+                    banner.textContent = `This account has ${actualRole} access. Please use the ${actualRole} login card.`;
+                    banner.classList.remove("d-none");
+                }
+                return;
+            }
+
+            localStorage.setItem("jwt_token", result.token);
+            localStorage.setItem("user_info", JSON.stringify(result));
+            localStorage.setItem("sece_logged_in_user", result.username || username);
+            localStorage.setItem("sece_logged_in_role", role);
+            window.location.assign(role === "ADMIN" ? "/admin" : role === "FACULTY" ? "/faculty" : "/student");
+        });
+
         // Guard against double-injection: React 19 StrictMode double-fires
         // effects in dev, and every route ("/login", "/admin", "/faculty",
         // "/student") mounts this same component, so without this flag these
@@ -21,7 +146,7 @@ export default function DashboardLayout() {
             return;
         }
         window.__seceLegacyScriptsLoaded = true;
-        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js?v=57", "/js/charts.js", "/js/reports.js", "/js/quiz.js?v=3", "/js/temp_timetable.js?v=1"];
+        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js?v=58", "/js/charts.js", "/js/reports.js", "/js/quiz.js?v=4", "/js/temp_timetable.js?v=1"];
         scripts.forEach(src => {
             const script = document.createElement("script");
             script.src = src + '?v=' + new Date().getTime();
@@ -33,11 +158,29 @@ export default function DashboardLayout() {
     useEffect(() => {
         // When the React route changes, wait for DOM update and then trigger legacy rendering scripts
         const timer = setTimeout(() => {
+            const routeRole = isAdmin ? "ADMIN" : isFaculty ? "FACULTY" : isStudent ? "STUDENT" : null;
+            if (routeRole) {
+                window.currentUserRole = routeRole;
+                const bannerText = document.getElementById("roleBannerText");
+                if (bannerText) {
+                    if (routeRole === "ADMIN") {
+                        bannerText.innerHTML = "Logged in as <strong>ADMIN</strong>. Full permission enabled: Edit periods and manage subjects/classes/venues.";
+                    } else if (routeRole === "FACULTY") {
+                        bannerText.innerHTML = "Logged in as <strong>FACULTY</strong>. You have period editing privileges and Class Advisor access where assigned.";
+                    } else {
+                        bannerText.innerHTML = "Logged in as <strong>STUDENT</strong>. View mode active. Timetable and notification access enabled.";
+                    }
+                }
+            }
+
             if (window.renderStaffAvailability) window.renderStaffAvailability();
             if (window.renderEnrolledStudentsRoster) window.renderEnrolledStudentsRoster();
             if (window.renderFacultyPersonalTT) window.renderFacultyPersonalTT();
 
             // Re-apply login session so timetable and roles load correctly
+            if (typeof window.applyTheme === 'function') {
+                window.applyTheme(localStorage.getItem('sece_theme') || 'dark');
+            }
             if (location.pathname !== '/login' && location.pathname !== '/') {
                 if (typeof window.restoreLoginSession === 'function') {
                     window.restoreLoginSession();
@@ -113,7 +256,12 @@ export default function DashboardLayout() {
                             <p id="loginHint" className="small text-muted mb-0">Username = role letter + first 4 letters of first name + last-name initial + 012345</p>
                         </div>
 
-                        <form id="roleLoginForm" onSubmit={(event) => window.handleRoleLogin && window.handleRoleLogin(event)} >
+                        <form id="roleLoginForm" onSubmit={(event) => {
+                            event.preventDefault();
+                            if (typeof window.handleRoleLogin === "function") {
+                                window.handleRoleLogin(event);
+                            }
+                        }}>
                             <input type="hidden" id="selectedLoginRole" defaultValue="STUDENT" />
 
                             <div className="mb-3">
@@ -226,6 +374,16 @@ export default function DashboardLayout() {
                                         </li>
                                     </ul>
                                 </div>
+                                <button
+                                    id="themeToggleBtn"
+                                    className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1 ms-1"
+                                    type="button"
+                                    title="Switch Light / Dark Theme"
+                                    onClick={() => window.toggleTheme?.()}
+                                >
+                                    <i id="themeIcon" className="fa-solid fa-sun"></i>
+                                    <span id="themeToggleLabel" className="d-none d-md-block">Light</span>
+                                </button>
                                 <button className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 ms-1 ms-md-2" type="button" onClick={() => window.logoutUser?.()}>
                                     <i className="fa-solid fa-right-from-bracket"></i> <span className="d-none d-md-block">Logout</span>
                                 </button>
@@ -275,13 +433,16 @@ export default function DashboardLayout() {
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#emailVerificationModal" onClick={() => { window.openEmailVerificationModal?.(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-envelope-circle-check fa-fw me-3 text-info"></i> Email Alerts (OTP)
                                     </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminQuizAccessModal" onClick={() => { window.openAdminQuizAccessModal?.(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-toggle-on fa-fw me-3 text-warning"></i> Quiz Access Control
+                                    </button>
                                 </>
                             )}
 
                             {isFaculty && (
                                 <>
-                                    <button className="sidebar-nav-link" onClick={() => { window.openAddStudentDirectly(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
-                                        <i className="fa-solid fa-user-plus fa-fw me-3 text-success"></i> Add New Student
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageStudentsModal" onClick={() => { window.openManageStudentsModal?.(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-users fa-fw me-3" style={{ color: '#a855f7' }}></i> Add Students
                                     </button>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageAnnouncementsModal" onClick={() => { window.renderManageAnnouncementsList && window.renderManageAnnouncementsList(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-bullhorn fa-fw me-3 text-success"></i> Announcements
@@ -292,7 +453,7 @@ export default function DashboardLayout() {
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#substitutionModal" onClick={() => { window.initSubstitutionModal && window.initSubstitutionModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-people-arrows fa-fw me-3 text-info"></i> Availability / Sub
                                     </button>
-                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageSectionsModal" onClick={() => { window.renderSectionsList && window.renderSectionsList(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#viewSectionsModal" onClick={() => { window.renderSectionsList && window.renderSectionsList(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-school fa-fw me-3 text-success"></i> Classes
                                     </button>
                                     <button className="sidebar-nav-link" onClick={() => { window.openFacultyQuizModal && window.openFacultyQuizModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
@@ -303,6 +464,9 @@ export default function DashboardLayout() {
                                     </button>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#myTimetableModal" onClick={() => { window.renderMyTimetable && window.renderMyTimetable(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-regular fa-calendar fa-fw me-3 text-primary"></i> Timetable
+                                    </button>
+                                    <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminUploadAssignTtModal" onClick={() => { window.openUploadAssignTtModal && window.openUploadAssignTtModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                        <i className="fa-solid fa-file-arrow-up fa-fw me-3 text-info"></i> Upload &amp; Assign Class TT
                                     </button>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#adminViewEditTimetableModal" onClick={() => { window.initAdminViewEditTimetableModal && window.initAdminViewEditTimetableModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-users-rectangle fa-fw me-3 text-primary"></i> View Timetable
@@ -327,10 +491,10 @@ export default function DashboardLayout() {
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#studentDayNotificationModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
                                         <i className="fa-solid fa-bell fa-fw me-3 text-warning"></i> Period Notifications
                                     </button>
-                                    <button className="sidebar-nav-link" onClick={() => { window.openStudentQuizHistoryModal && window.openStudentQuizHistoryModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                    <button id="studentQuizHistoryNavBtn" className="sidebar-nav-link" onClick={() => { window.openStudentQuizHistoryModal && window.openStudentQuizHistoryModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-clock-rotate-left fa-fw me-3 text-info"></i> Quiz History
                                     </button>
-                                    <button className="sidebar-nav-link" onClick={() => { window.openStudentQuizModal && window.openStudentQuizModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
+                                    <button id="studentTakeQuizNavBtn" className="sidebar-nav-link" onClick={() => { window.openStudentQuizModal && window.openStudentQuizModal(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-pen-to-square fa-fw me-3 text-danger"></i> Take Quiz
                                     </button>
                                     <button className="sidebar-nav-link" onClick={() => { window.showTtPopup && window.showTtPopup(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
@@ -951,14 +1115,25 @@ export default function DashboardLayout() {
                                                     <div className="mb-3">
                                                         <label className="form-label small text-white fw-semibold">Username</label>
                                                         <input type="text" id="fpIdentifier" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. sarjuk23" pattern="[a-z0-9]+"
-                                                            onInput={(e) => e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')} required />
+                                                            onInput={(e) => { e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''); window.invalidateRecoveryVerification?.(); }} required />
                                                         <div id="fpUsernameHint" className="form-text text-muted">Student username = "s" + first 4 letters of first name + last name initial + a number. Example: sarjuk23. Lowercase only.</div>
                                                     </div>
-                                                    <div className="mb-3">
+                                                    <div className="mb-3" id="fpMobileGroup">
                                                         <label className="form-label small text-white fw-semibold"><i className="fa-solid fa-mobile-screen-button text-success me-1"></i> Registered Mobile Number</label>
-                                                        <input type="tel" id="fpMobile" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="+91 9876543210" required />
+                                                        <input type="tel" id="fpMobile" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="9876543210" autoComplete="tel"
+                                                            onInput={() => window.invalidateRecoveryVerification?.()} required />
                                                         <div id="fpMobileHint" className="form-text text-muted">Required for Student/Faculty recovery. Admin recovery does not use a mobile number.</div>
                                                     </div>
+                                                    <div className="mb-3 d-none" id="fpAdminEmailGroup">
+                                                        <label className="form-label small text-white fw-semibold">Administrator Email</label>
+                                                        <input type="email" id="fpAdminEmail" className="form-control form-control-sm bg-dark text-white border-secondary" autoComplete="email"
+                                                            onInput={() => window.invalidateRecoveryVerification?.()} />
+                                                    </div>
+                                                    <button type="button" id="fpVerifyButton" className="btn btn-sm btn-outline-info w-100 mb-3"
+                                                        onClick={() => window.verifyRecoveryMobile?.()}>
+                                                        Verify mobile number
+                                                    </button>
+                                                    <div id="fpRecoveryStatus" className="small mb-3" role="status" aria-live="polite"></div>
                                                     <div className="mb-3">
                                                         <label className="form-label small text-white fw-semibold">Enter New Password</label>
                                                         <div className="input-group input-group-sm">
@@ -968,7 +1143,7 @@ export default function DashboardLayout() {
                                                                 onClick={(event) => window.togglePasswordVisibility?.('fpNewPassword', event.currentTarget)}><i className="fa-solid fa-eye"></i></button>
                                                         </div>
                                                     </div>
-                                                    <div className="mb-3" id="fpMobileGroup">
+                                                    <div className="mb-3">
                                                         <label className="form-label small text-white fw-semibold">Re-enter New Password</label>
                                                         <div className="input-group input-group-sm">
                                                             <input type="password" id="fpConfirmPassword" className="form-control bg-dark text-white border-secondary" placeholder="Re-enter new password" pattern="[a-z0-9]+"
@@ -1113,16 +1288,6 @@ export default function DashboardLayout() {
                                                                     <th>Name</th>
                                                                     <th>Department & Sec</th>
                                                                     <th>Email</th>
-                                                    <div className="mb-3 d-none" id="fpAdminEmailGroup">
-                                                        <label className="form-label small text-white fw-semibold">Administrator Email</label>
-                                                        <input type="email" id="fpAdminEmail" className="form-control form-control-sm bg-dark text-white border-secondary" autoComplete="email"
-                                                            onInput={() => window.invalidateRecoveryVerification?.()} />
-                                                    </div>
-                                                    <button type="button" id="fpVerifyButton" className="btn btn-sm btn-outline-info w-100 mb-3"
-                                                        onClick={() => window.verifyRecoveryMobile?.()}>
-                                                        Verify mobile number
-                                                    </button>
-                                                    <div id="fpRecoveryStatus" className="small mb-3" role="status" aria-live="polite"></div>
                                                                     <th>Phone (SMS)</th>
                                                                     <th className="text-center">Action</th>
                                                                 </tr>
@@ -1198,23 +1363,64 @@ export default function DashboardLayout() {
                                 </div>
 
                                 <div className="modal fade" id="viewSectionsModal" tabIndex="-1">
-                                    <div className="modal-dialog modal-lg modal-dialog-centered">
+                                    <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
                                         <div className="modal-content bg-dark text-white border-secondary">
                                             <div className="modal-header border-secondary">
-                                                <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-folder-tree me-2"></i> View Sections</h5>
+                                                <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-folder-tree me-2"></i> Enrolled Sections, Classes, Departments &amp; Venues</h5>
                                                 <div>
                                                     <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                                 </div>
                                             </div>
-                                            <div className="modal-body">
-                                                <div className="row g-3">
-                                                    <div className="col-12">
-                                                        <div className="card card-body bg-secondary border-0">
-                                                            <ul className="list-group list-group-flush rounded bg-dark" id="sectionsListOnly">
-                                                            </ul>
-                                                        </div>
-                                                    </div>
+                                            <div className="modal-body p-3">
+                                                <div className="alert alert-info py-2 small mb-3">
+                                                    <i className="fa-solid fa-eye me-2"></i>Read-only directory of Sections, Classes, Departments, and Venues enrolled by the Administrator.
                                                 </div>
+
+                                                <h6 className="fw-bold text-warning mb-2"><i className="fa-solid fa-building-columns me-2"></i>Enrolled Departments</h6>
+                                                <div id="viewEnrolledDeptsBadges" className="d-flex flex-wrap gap-2 mb-3">
+                                                    <span className="text-muted small">Loading departments...</span>
+                                                </div>
+
+                                                <h6 className="fw-bold text-info mb-2"><i className="fa-solid fa-school me-2"></i>Enrolled Sections &amp; Classes</h6>
+                                                <div className="table-responsive mb-3">
+                                                    <table className="table table-dark table-striped table-hover align-middle small mb-0">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>#</th>
+                                                                <th>Section</th>
+                                                                <th>Class</th>
+                                                                <th>Department</th>
+                                                                <th>Venue / Classroom</th>
+                                                                <th>Year / Sem</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="viewEnrolledSectionsTableBody">
+                                                            <tr><td colSpan={6} className="text-center text-muted py-3">Loading sections...</td></tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                <h6 className="fw-bold text-success mb-2"><i className="fa-solid fa-map-location-dot me-2"></i>Enrolled Venues (Classrooms &amp; Labs)</h6>
+                                                <div className="table-responsive">
+                                                    <table className="table table-dark table-striped table-hover align-middle small mb-0">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>#</th>
+                                                                <th>Venue</th>
+                                                                <th>Building</th>
+                                                                <th>Type</th>
+                                                                <th>Capacity</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="viewEnrolledVenuesBody">
+                                                            <tr><td colSpan={5} className="text-center text-muted py-3">Loading venues...</td></tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <ul className="list-group list-group-flush rounded bg-dark d-none" id="sectionsListOnly"></ul>
+                                            </div>
+                                            <div className="modal-footer border-secondary">
+                                                <button type="button" className="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1724,7 +1930,7 @@ export default function DashboardLayout() {
                                 <div className="toast-container">
                                     <div id="seceToast" className="toast sece-toast" role="alert">
                                         <div className="toast-header bg-transparent  border-0">
-                                            <i className="fa-solid fa-circle-check text-success me-2"></i>
+                                            <i id="toastIcon" className="fa-solid fa-circle-check text-success me-2"></i>
                                             <strong className="me-auto" id="toastTitle">Notification Sent</strong>
                                             <small className="text-muted" id="toastTime">Just now</small>
                                             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="toast"></button>
@@ -2333,18 +2539,44 @@ export default function DashboardLayout() {
                                         <div className="modal-content bg-dark text-white border-secondary">
                                             <div className="modal-header border-secondary d-flex align-items-center justify-content-between">
                                                 <h5 className="modal-title text-info fw-bold"><i className="fa-solid fa-calendar-user me-2"></i> Feed Your Timetable</h5>
-                                                <div>
+                                                <div className="d-flex flex-wrap align-items-center gap-2">
                                                     <input type="file" id="importExcelInputFaculty" accept=".xlsx, .xls, .csv" style={{ display: "none" }} onChange={(e) => window.importFacultyTimetableExcel && window.importFacultyTimetableExcel(e)} />
-                                                    <button type="button" className="btn btn-sm btn-outline-primary me-2" onClick={() => window.addFacultyPeriodCol && window.addFacultyPeriodCol()}>
+                                                    <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => window.addFacultyPeriodCol && window.addFacultyPeriodCol()}>
                                                         <i className="fa-solid fa-plus me-1"></i> Add Period
                                                     </button>
-                                                    <button type="button" className="btn btn-sm btn-outline-success me-3" onClick={() => document.getElementById('importExcelInputFaculty').click()}>
+                                                    <button type="button" className="btn btn-sm btn-outline-success me-2" onClick={() => document.getElementById('importExcelInputFaculty')?.click()}>
                                                         <i className="fa-solid fa-file-excel me-1"></i> Import Excel
                                                     </button>
                                                     <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                                 </div>
                                             </div>
                                             <div className="modal-body p-3">
+                                                <div id="facultyAiUploadCard" className="p-3 rounded border border-info bg-secondary bg-opacity-10 mb-3">
+                                                    <label className="form-label fw-bold text-info mb-2">
+                                                        <i className="fa-solid fa-cloud-arrow-up me-2"></i>Step 1: Upload Timetable PDF or Image
+                                                    </label>
+                                                    <div className="d-flex flex-wrap align-items-center gap-2">
+                                                        <input
+                                                            type="file"
+                                                            id="importPdfImageInputFaculty"
+                                                            accept=".pdf,.png,.jpg,.jpeg,.webp"
+                                                            className="form-control form-control-sm bg-dark text-white border-secondary"
+                                                            style={{ maxWidth: "420px" }}
+                                                            onChange={(e) => window.importFacultyTimetablePdfOrImage && window.importFacultyTimetablePdfOrImage(e)}
+                                                        />
+                                                        <span className="small text-muted">Supports `.pdf`, `.png`, `.jpg`, `.jpeg`, `.webp`</span>
+                                                    </div>
+                                                    <div id="facultyAiExtractStatus" className="small mt-2 d-none"></div>
+                                                </div>
+                                                <div id="facultyAiPreviewWrap" className="mb-3 d-none">
+                                                    <div className="d-flex justify-content-between align-items-center mb-1">
+                                                        <span className="small fw-bold text-info"><i className="fa-solid fa-image me-1"></i> Extracted Image Preview</span>
+                                                        <button type="button" className="btn btn-xs btn-outline-secondary py-0 px-2" onClick={() => document.getElementById('facultyAiPreviewImg')?.classList.toggle('d-none')}>Toggle Image</button>
+                                                    </div>
+                                                    <div className="text-center p-2 rounded border border-secondary bg-black bg-opacity-50">
+                                                        <img id="facultyAiPreviewImg" alt="Extracted timetable preview" style={{ maxHeight: "240px", maxWidth: "100%", objectFit: "contain" }} />
+                                                    </div>
+                                                </div>
                                                 <form id="myTimetableForm" onSubmit={(e) => { e.preventDefault(); if (window.saveMyTimetable) window.saveMyTimetable(); }}>
                                                     <p className="small text-muted mb-2">Enter Subject / Class / Venue. Format: <code>Subject, Class, Venue</code> or just type it in. Leave blank for FREE.</p>
                                                     <div className="table-responsive">
@@ -2515,7 +2747,7 @@ export default function DashboardLayout() {
                                             <div className="modal-body text-center">
                                                 <p className="text-muted small mb-3">Scan this QR Code to directly open the login page on your mobile device:</p>
                                                 <div className="bg-white p-2 d-inline-block rounded mb-3 shadow" id="qrCodeContainer">
-                                                    <img src="" id="loginQrCodeImage" alt="Login QR Code" style={{ width: "160px", height: "160px", objectFit: "contain" }} />
+                                                    <img id="loginQrCodeImage" alt="Login QR Code" style={{ width: "160px", height: "160px", objectFit: "contain" }} />
                                                 </div>
 
                                                 <div className="input-group input-group-sm mb-4 mx-auto" style={{ maxWidth: "300px" }}>
@@ -3062,6 +3294,110 @@ export default function DashboardLayout() {
                                             </div>
                                         </div>
 
+                                        {/* ===== Admin: Overall & Per-Class Quiz Access Control Modal ===== */}
+                                        <div className="modal fade" id="adminQuizAccessModal" tabIndex="-1">
+                                            <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                                                <div className="modal-content bg-dark text-white border-secondary">
+                                                    <div className="modal-header border-secondary">
+                                                        <h5 className="modal-title fw-bold text-warning">
+                                                            <i className="fa-solid fa-toggle-on me-2"></i> Quiz Access Control (Admin Overall &amp; Class Visibility)
+                                                        </h5>
+                                                        <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div className="modal-body p-4">
+                                                        <div id="adminQuizAccessAlert" className="alert d-none small py-2 mb-3"></div>
+
+                                                        <div className="p-3 rounded border border-warning bg-secondary bg-opacity-10 mb-3">
+                                                            <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                                                                <div>
+                                                                    <h6 className="fw-bold text-warning mb-1">
+                                                                        <i className="fa-solid fa-globe me-2"></i>Overall Quiz Access (All Classes)
+                                                                    </h6>
+                                                                    <div className="small text-muted">
+                                                                        Control Quiz visibility across all classes simultaneously, or override individual class settings.
+                                                                    </div>
+                                                                </div>
+                                                                <div className="d-flex flex-wrap align-items-center gap-2">
+                                                                    <span id="adminGlobalQuizBadge" className="badge bg-success px-3 py-2">Loading...</span>
+                                                                    <div className="form-check form-switch m-0 px-2 py-1 rounded border border-secondary bg-dark d-flex align-items-center gap-2">
+                                                                        <input className="form-check-input m-0" type="checkbox" role="switch" id="adminGlobalQuizSwitch" onChange={(e) => window.toggleGlobalQuizAccess?.(e.target.checked)} />
+                                                                        <label className="form-check-label small fw-semibold text-white m-0" htmlFor="adminGlobalQuizSwitch" style={{ cursor: "pointer" }}>
+                                                                            Global Lock
+                                                                        </label>
+                                                                    </div>
+                                                                    <button type="button" className="btn btn-sm btn-success fw-semibold" onClick={() => window.setAllClassesQuizAccess?.(true)}>
+                                                                        <i className="fa-solid fa-eye me-1"></i> Enable All Classes
+                                                                    </button>
+                                                                    <button type="button" className="btn btn-sm btn-danger fw-semibold" onClick={() => window.setAllClassesQuizAccess?.(false)}>
+                                                                        <i className="fa-solid fa-eye-slash me-1"></i> Disable All Classes
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="p-3 rounded border border-info bg-dark mb-3">
+                                                            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                                                <h6 className="fw-bold text-info mb-0">
+                                                                    <i className="fa-solid fa-filter me-2"></i>Enable / Disable Quiz for a Particular Class
+                                                                </h6>
+                                                                <span id="aqvStatusBadge" className="badge bg-secondary">Select Class</span>
+                                                            </div>
+                                                            <div className="row g-2 align-items-end">
+                                                                <div className="col-md-2">
+                                                                    <label className="form-label small text-muted mb-1">Department</label>
+                                                                    <select id="aqvDeptSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onAdminQuizFilterChange?.()}></select>
+                                                                </div>
+                                                                <div className="col-md-2">
+                                                                    <label className="form-label small text-muted mb-1">Year</label>
+                                                                    <select id="aqvYearSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onAdminQuizFilterChange?.()}>
+                                                                        <option value="I">I Year</option>
+                                                                        <option value="II">II Year</option>
+                                                                        <option value="III">III Year</option>
+                                                                        <option value="IV">IV Year</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div className="col-md-3">
+                                                                    <label className="form-label small text-muted mb-1">Class</label>
+                                                                    <select id="aqvClassSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onAdminQuizFilterChange?.()}></select>
+                                                                </div>
+                                                                <div className="col-md-2">
+                                                                    <label className="form-label small text-muted mb-1">Section</label>
+                                                                    <select id="aqvSectionSelect" className="form-select form-select-sm bg-dark text-white border-secondary" onChange={() => window.onAdminQuizSectionChange?.()}></select>
+                                                                </div>
+                                                                <div className="col-md-3 d-flex gap-2">
+                                                                    <button type="button" className="btn btn-sm btn-success flex-fill fw-semibold" onClick={() => window.setSelectedAdminClassQuizAccess?.(true)}>
+                                                                        <i className="fa-solid fa-eye me-1"></i> Enable
+                                                                    </button>
+                                                                    <button type="button" className="btn btn-sm btn-danger flex-fill fw-semibold" onClick={() => window.setSelectedAdminClassQuizAccess?.(false)}>
+                                                                        <i className="fa-solid fa-eye-slash me-1"></i> Disable
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="table-responsive">
+                                                            <table className="table table-dark table-striped table-hover align-middle small mb-0">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>Dept</th>
+                                                                        <th>Year</th>
+                                                                        <th>Class</th>
+                                                                        <th>Section</th>
+                                                                        <th>Class Quiz Setting</th>
+                                                                        <th>Effective Student View</th>
+                                                                        <th className="text-center">Action</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody id="adminQuizAccessTableBody">
+                                                                    <tr><td colSpan={7} className="text-center text-muted py-3">Loading classes...</td></tr>
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         {/* ===== Shared: View Temporary Change Details Modal ===== */}
                                         <div className="modal fade" id="tempChangeDetailModal" tabIndex="-1" style={{ zIndex: 1085 }}>
                                             <div className="modal-dialog modal-dialog-centered">
@@ -3126,5 +3462,3 @@ export default function DashboardLayout() {
                                     </>
                                     );
 }
-
-
