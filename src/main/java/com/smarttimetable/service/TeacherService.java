@@ -80,21 +80,22 @@ public class TeacherService {
             
             String baseUser = firstPart + lastPart + "012345";
             String username = "f" + baseUser;
+            String initialPassword = "password123";
             
-            com.smarttimetable.entity.User user = userRepository.findByUsername(username).orElse(null);
+            com.smarttimetable.entity.User user = userRepository.findByUsernameIgnoreCase(username).orElse(null);
             
             if (user == null) {
                 user = new com.smarttimetable.entity.User(
                     username, 
-                    passwordEncoder.encode(baseUser), 
-                    baseUser,
+                    passwordEncoder.encode(initialPassword), 
+                    initialPassword,
                     com.smarttimetable.entity.Role.ROLE_FACULTY, 
                     teacher.getCollegeEmail(), 
                     true
                 );
             } else {
-                user.setPassword(passwordEncoder.encode(baseUser));
-                user.setRawPassword(baseUser);
+                user.setPassword(passwordEncoder.encode(initialPassword));
+                user.setRawPassword(initialPassword);
                 user.setEmail(teacher.getCollegeEmail());
                 user.setRole(com.smarttimetable.entity.Role.ROLE_FACULTY);
                 user.setActive(true);

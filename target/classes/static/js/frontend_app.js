@@ -7,7 +7,7 @@ const AUTH_CONFIG = {
     ADMIN: { prefix: 'a', title: 'Admin Login', example: 'shiva25012007', icon: 'fa-user-shield', color: 'danger' }
 };
 const ADMIN_USERNAME = 'shiva25012007';
-const ADMIN_INITIAL_PASSWORD = 'shiv2501';
+const ADMIN_INITIAL_PASSWORD = 'password123';
 
 function normalizeNamePart(name) {
     return String(name || '').toLowerCase().replace(/[^a-z]/g, '');
@@ -39,6 +39,7 @@ function getClassAdvisorPassword(username) {
 function buildGeneratedPassword(role, username) {
     const clean = String(username || '').toLowerCase();
     if (role === 'ADMIN') return ADMIN_INITIAL_PASSWORD;
+    if (role === 'ADMIN' || role === 'FACULTY') return ADMIN_INITIAL_PASSWORD;
     if (role === 'STUDENT') return ''; // Handled by getStudentPassword
     return clean.startsWith(AUTH_CONFIG[role].prefix) ? clean.slice(1) : clean;
 }
@@ -100,14 +101,27 @@ function usernameRuleText(role) {
 
 function openLoginForm(role) {
     const config = AUTH_CONFIG[role];
-    document.getElementById('selectedLoginRole').value = role;
+    window._selectedLoginRole = role;
+    const roleInput = document.getElementById('selectedLoginRole');
+    if (roleInput) roleInput.value = role;
     document.getElementById('loginRoleBadge').innerText = role;
     document.getElementById('loginTitle').innerText = config.title;
     document.getElementById('loginHint').innerText = usernameRuleText(role);
-    document.getElementById('usernameRule').innerText = role === 'FACULTY' ? '' : (role === 'STUDENT' ? 'Example: 25CS316 (Case-insensitive)' : `Example: ${config.example}`);
-    document.getElementById('loginUsername').placeholder = role === 'FACULTY' ? 'Your Username' : config.example;
+    document.getElementById('usernameRule').innerText = role === 'FACULTY' ? 'Example: fkeerj012345 or smithp012345' : (role === 'STUDENT' ? 'Example: 25cs303 or studenta' : `Example: ${config.example}`);
+    const pwHintEl = document.getElementById('loginPasswordHint');
+    if (pwHintEl) {
+        if (role === 'FACULTY') pwHintEl.innerHTML = 'Initial password for faculty accounts is <code>password123</code>.';
+        else if (role === 'ADMIN') pwHintEl.innerHTML = 'Initial password for Admin (<code>shiva25012007</code>) is <code>password123</code>.';
+        else pwHintEl.innerHTML = 'For enrolled students: UPPERCASE First Name + last 4 mobile digits (or <code>password123</code> for test accounts).';
+    }
+    document.getElementById('loginUsername').placeholder = role === 'FACULTY' ? 'e.g. fkeerj012345 or smithp012345' : config.example;
     document.getElementById('loginIcon').innerHTML =
         `<i class="fa-solid ${config.icon}"></i>`;
+
+    const errBanner = document.getElementById('loginErrorBanner');
+    if (errBanner) { errBanner.classList.add('d-none'); errBanner.textContent = ''; }
+    const form = document.getElementById('roleLoginForm');
+    if (form) form.reset();
 
     document.getElementById('roleSelection').classList.add('login-hidden');
     document.getElementById('loginFormPanel').classList.remove('login-hidden');
@@ -115,9 +129,30 @@ function openLoginForm(role) {
 }
 
 function backToRoleSelection() {
+    window._selectedLoginRole = null;
+    const errBanner = document.getElementById('loginErrorBanner');
+    if (errBanner) { errBanner.classList.add('d-none'); errBanner.textContent = ''; }
     document.getElementById('loginFormPanel').classList.add('login-hidden');
     document.getElementById('roleSelection').classList.remove('login-hidden');
     document.getElementById('roleLoginForm').reset();
+}
+
+function setLoginErrorBanner(msg) {
+    const errBanner = document.getElementById('loginErrorBanner');
+    if (errBanner) {
+        if (msg) {
+            errBanner.textContent = msg;
+            errBanner.classList.remove('d-none');
+        } else {
+            errBanner.textContent = '';
+            errBanner.classList.add('d-none');
+        }
+    }
+}
+
+function showRepaintedLoginAlert(msg) {
+    setLoginErrorBanner(msg);
+    requestAnimationFrame(() => setTimeout(() => alert(msg), 25));
 }
 
 function toggleLoginPassword() {
@@ -129,33 +164,46 @@ function toggleLoginPassword() {
 
 async function handleRoleLogin(e) {
     e.preventDefault();
-    const role = document.getElementById('selectedLoginRole').value;
-    const username = document.getElementById('loginUsername').value.trim().toLowerCase();
+    const badgeRole = (document.getElementById('loginRoleBadge')?.innerText || '').trim().toUpperCase();
+    const inputRole = (document.getElementById('selectedLoginRole')?.value || '').trim().toUpperCase();
+    const role = (window._selectedLoginRole || (badgeRole && AUTH_CONFIG[badgeRole] ? badgeRole : inputRole) || 'STUDENT').toUpperCase();
+    const usernameInputRaw = document.getElementById('loginUsername').value.trim();
+    const username = usernameInputRaw.toLowerCase();
     const password = document.getElementById('loginPassword').value;
     const loginBtn = document.getElementById('roleLoginBtn');
 
-    if (!username || !password) {
+    if (!usernameInputRaw || !password) {
         alert('Please enter your username and password.');
+        showRepaintedLoginAlert('Please enter your username and password.');
         return;
     }
 
+    setLoginErrorBanner('');
     // Show loading state
     if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Logging in...'; }
 
-    // Step 1: Try backend API authentication first (works for all backend users)
+    // Step 1: Try backend API authentication first (preserve exact case so both 25cs315 and 25CS315 work)
+    let backendResponded = false;
     try {
         const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username: usernameInputRaw, password })
         });
+        backendResponded = true;
 
         if (res.ok) {
             const data = await res.json();
-            // Backend login success -” store token and user info
+            const actualRole = (data.role || '').replace('ROLE_', '');
+            if (actualRole && actualRole !== role) {
+                if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket me-1"></i> Login'; }
+                alert(`This account has ${actualRole} access. Please use the ${actualRole} login card.`);
+                return;
+            }
+            // Backend login success - store token and user info
             localStorage.setItem('jwt_token', data.token);
             localStorage.setItem('user_info', JSON.stringify(data));
-            localStorage.setItem('sece_logged_in_user', username);
+            localStorage.setItem('sece_logged_in_user', (data.username || username).toLowerCase());
             localStorage.setItem('sece_logged_in_role', role);
             currentUserRole = role;
 
@@ -165,7 +213,10 @@ async function handleRoleLogin(e) {
                     const stuRes = await fetch('/api/students', { headers: { 'Authorization': 'Bearer ' + data.token } });
                     if (stuRes.ok) {
                         const students = await stuRes.json();
-                        const me = students.find(s => s.user && s.user.username === username);
+                        const me = students.find(s =>
+                            (s.user && String(s.user.username || '').toLowerCase() === username) ||
+                            String(s.registerNumber || '').toLowerCase() === username
+                        );
                         if (me && me.section) {
                             const secName = me.section.sectionName || me.section.name || '';
                             if (secName) {
@@ -174,7 +225,7 @@ async function handleRoleLogin(e) {
                             }
                         }
                     }
-                } catch(err) { console.warn('Could not fetch student section', err); }
+                } catch (err) { console.warn('Could not fetch student section', err); }
                 window.location.href = '/student';
             } else if (role === 'ADMIN') {
                 window.location.href = '/admin';
@@ -183,10 +234,33 @@ async function handleRoleLogin(e) {
             }
             return;
         }
-        // Backend returned 401/403 -” fall through to local validation below
+        // Handle server/proxy errors distinctly from invalid credentials
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket me-1"></i> Login'; }
+        if (res.status >= 500) {
+            setTimeout(() => alert('Backend server is starting up or temporarily unavailable (HTTP ' + res.status + '). Please wait a few seconds and try again.'), 0);
+            showRepaintedLoginAlert('Backend server is starting up or temporarily unavailable (HTTP ' + res.status + '). Please wait a few seconds and try again.');
+        } else {
+            let errText = 'Invalid username or password.';
+            try {
+                const errJson = await res.json();
+                if (errJson && errJson.message) errText = errJson.message;
+                else if (errJson && errJson.error) errText = errJson.error;
+            } catch (_) { }
+            setTimeout(() => alert(errText), 0);
+            const roleHint = role === 'FACULTY'
+                ? ' Check Caps Lock or click the eye icon to clear browser autofill (initial faculty password is password123).'
+                : (role === 'STUDENT'
+                    ? ' Check Caps Lock or click the eye icon (enrolled student default is UPPERCASE First Name + last 4 mobile digits; test accounts use password123).'
+                    : '');
+            setLoginErrorBanner(errText + roleHint);
+            requestAnimationFrame(() => setTimeout(() => alert(errText), 25));
+        }
+        return;
     } catch (networkErr) {
         console.warn('Backend unreachable, falling back to local auth', networkErr);
     }
+
+    if (backendResponded) return;
 
     // Step 2: Fallback to local validation (for hardcoded admin / offline mode)
     if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket me-2"></i>Login'; }
@@ -227,6 +301,13 @@ function logoutUser() {
     localStorage.removeItem('sece_logged_in_role');
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_info');
+    localStorage.removeItem('sece_last_viewed_section');
+    localStorage.removeItem('sece_last_viewed_dept');
+    currentSection = '';
+    currentDept = '';
+    window.currentSection = '';
+    window.currentTimetableEntries = [];
+    window.currentTimetableEntriesLoaded = false;
     currentUserRole = null;
     window.location.href = '/login';
 }
@@ -279,7 +360,8 @@ function updateForgotPasswordHint() {
 }
 
 function openForgotPasswordForLogin() {
-    const role = document.getElementById('selectedLoginRole').value || 'STUDENT';
+    const badgeRole = (document.getElementById('loginRoleBadge')?.innerText || '').trim().toUpperCase();
+    const role = window._selectedLoginRole || (badgeRole && AUTH_CONFIG[badgeRole] ? badgeRole : document.getElementById('selectedLoginRole')?.value) || 'STUDENT';
     document.getElementById('fpUserType').value = role;
     updateForgotPasswordHint();
     const modal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
@@ -472,26 +554,33 @@ const DEFAULT_TIMETABLE_DATA = {};
 
 function loadSavedTimetable() {
     const merged = JSON.parse(JSON.stringify(DEFAULT_TIMETABLE_DATA));
-    
-    // 1. Inject custom built timetables
-    activeSections.forEach(sec => {
-        const builtSaved = localStorage.getItem(`sece_tt_built_${sec.name}`);
+
+    // 1. Inject custom built timetables (for activeSections and currentSection)
+    const builtSectionNames = new Set(activeSections.map(s => s.name));
+    if (typeof currentSection !== 'undefined' && currentSection) builtSectionNames.add(currentSection);
+    builtSectionNames.forEach(secName => {
+        const builtSaved = localStorage.getItem(`sece_tt_built_${secName}`);
         if (builtSaved) {
             try {
                 const built = JSON.parse(builtSaved);
                 if (built && built.grid) {
-                    merged[sec.name] = {};
+                    merged[secName] = {};
                     Object.keys(built.grid).forEach(day => {
-                        merged[sec.name][day] = [];
-                        for(let i=1; i<=7; i++) {
-                             const pData = built.grid[day][`P${i}`] || '';
-                             const parts = pData.split(',').map(s => s.trim());
-                             merged[sec.name][day].push({
-                                 sub: parts[0] || '',
-                                 faculty: parts[1] || '',
-                                 venue: parts[2] || '',
-                                 cat: 'cat-theory'
-                             });
+                        merged[secName][day] = [];
+                        for (let i = 1; i <= 7; i++) {
+                            const pData = built.grid[day][`P${i}`] || '';
+                            const parts = pData.split(',').map(s => s.trim());
+                            const subTxt = parts[0] || 'FREE';
+                            const lowSub = subTxt.toLowerCase();
+                            let cat = 'cat-theory';
+                            if (lowSub.includes('lab') || lowSub.includes('practical') || lowSub.includes('project')) cat = 'cat-lab';
+                            else if (lowSub === 'alt') cat = 'cat-alt';
+                            merged[secName][day].push({
+                                sub: subTxt,
+                                faculty: parts[1] || '',
+                                venue: parts[2] || '',
+                                cat: cat
+                            });
                         }
                     });
                 }
@@ -579,7 +668,10 @@ function loadSections() {
         return Array.isArray(saved) ? saved : JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
     } catch (_) { return JSON.parse(JSON.stringify(DEFAULT_SECTIONS)); }
 }
-function saveSections() { localStorage.setItem(SECTIONS_STORAGE_KEY, JSON.stringify(activeSections)); }
+function saveSections() {
+    localStorage.setItem(SECTIONS_STORAGE_KEY, JSON.stringify(activeSections));
+    if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
+}
 let activeSections = loadSections();
 
 // Active timetable data = default schedule + any saved edits from Admin/Faculty
@@ -621,14 +713,14 @@ setTimeout(() => {
     if (substModalEl) {
         substModalEl.addEventListener('show.bs.modal', initSubstitutionModal);
     }
-    
+
     const defaultsModalEl = document.getElementById('timetableDefaultsModal');
     if (defaultsModalEl) {
         defaultsModalEl.addEventListener('show.bs.modal', () => {
             const batchStart = localStorage.getItem('sece_global_custom_batch');
             const semText = localStorage.getItem('sece_global_custom_sem');
             const ay = localStorage.getItem('sece_global_custom_ay');
-            
+
             if (batchStart) {
                 const yearMatch = batchStart.match(/^(\d{4})/);
                 if (yearMatch) {
@@ -702,6 +794,7 @@ function loadStaffDirectory() {
 
 function saveStaffDirectory() {
     localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(staffDirectory));
+    if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
 }
 
 function loadSubstitutions() {
@@ -751,29 +844,102 @@ function toggleSubstitutionUI() {
     if (btn) btn.style.display = canManageSubstitutions() ? 'inline-flex' : 'none';
 }
 
+function normalizeSectionCompare(secStr) {
+    return String(secStr || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+function normalizeStaffCompare(nameStr) {
+    return String(nameStr || '').replace(/^(dr|mr|mrs|ms|prof)\.?\s+/i, '').replace(/,.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function resolveLoggedInFacultyRecord() {
+    let userInfo = null;
+    try { userInfo = JSON.parse(localStorage.getItem('user_info') || 'null'); } catch (_) { }
+    const uname = String((userInfo && userInfo.username) || localStorage.getItem('sece_logged_in_user') || '').trim().toLowerCase();
+    const uFullName = String((userInfo && userInfo.name) || '').trim();
+    if (Array.isArray(staffDirectory) && staffDirectory.length > 0) {
+        const byUser = staffDirectory.find(s =>
+            (s.userUsername && String(s.userUsername).trim().toLowerCase() === uname) ||
+            (s.employeeId && String(s.employeeId).trim().toLowerCase() === uname) ||
+            (typeof buildGeneratedUsername === 'function' && buildGeneratedUsername('FACULTY', s.name) === uname)
+        );
+        if (byUser) return byUser;
+        if (uFullName) {
+            const normTarget = normalizeStaffCompare(uFullName);
+            const byName = staffDirectory.find(s => {
+                const n1 = normalizeStaffCompare(s.name);
+                const n2 = normalizeStaffCompare(s.displayName);
+                return (n1 && (n1 === normTarget || n1.includes(normTarget) || normTarget.includes(n1))) ||
+                       (n2 && (n2 === normTarget || n2.includes(normTarget) || normTarget.includes(n2)));
+            });
+            if (byName) return byName;
+        }
+    }
+    return uFullName ? { name: uFullName, displayName: uFullName, userUsername: uname, dept: '' } : null;
+}
+
+function isMatchingFaculty(candidateName, staffRec) {
+    if (!candidateName || !staffRec) return false;
+    const cNorm = normalizeStaffCompare(candidateName);
+    const s1 = normalizeStaffCompare(staffRec.name);
+    const s2 = normalizeStaffCompare(staffRec.displayName);
+    if (!cNorm) return false;
+    return (s1 && (cNorm === s1 || cNorm.includes(s1) || s1.includes(cNorm))) ||
+           (s2 && (cNorm === s2 || cNorm.includes(s2) || s2.includes(cNorm)));
+}
+
+async function notifyClassStudentsViaEmail(eventType, details) {
+    if (!details || !details.sectionName) return null;
+    try {
+        const res = await apiFetch('/api/operations/notify-class-leave-or-sub', {
+            method: 'POST',
+            body: JSON.stringify({
+                eventType,
+                sectionName: details.sectionName,
+                date: details.date || todayDateStr(),
+                day: details.day || getTodayDayName(),
+                periodNumber: details.periodNumber || 1,
+                subject: details.subject || '',
+                venue: details.venue || '',
+                originalFaculty: details.originalFaculty || '',
+                substituteFaculty: details.substituteFaculty || '',
+                reason: details.reason || ''
+            })
+        });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (err) {
+        console.warn('Email dispatch error:', err);
+        return null;
+    }
+}
+
 function renderStaffAvailability() {
     const tbody = document.getElementById('staffAvailabilityBody');
     const studentTbody = document.getElementById('studentFacultyAvailabilityBody');
     if (!tbody && !studentTbody) return;
-    
+
     try {
-        const canManage = canManageSubstitutions();
+        const isFacultyOnly = currentUserRole === 'FACULTY';
+        const myRec = isFacultyOnly ? resolveLoggedInFacultyRecord() : null;
         const dateStr = todayDateStr();
-        
+
         if (tbody) tbody.innerHTML = '';
         if (studentTbody) studentTbody.innerHTML = '';
-        
+
         if (!staffDirectory || staffDirectory.length === 0) {
             if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="text-danger">DEBUG: staffDirectory is empty or undefined!</td></tr>';
             if (studentTbody) studentTbody.innerHTML = '<tr><td colspan="3" class="text-danger">DEBUG: staffDirectory is empty or undefined!</td></tr>';
             return;
         }
-        
+
         staffDirectory.forEach((staff, idx) => {
             const dayKey = 'sece_staff_availability_' + dateStr;
             const daily = JSON.parse(localStorage.getItem(dayKey) || '{}');
             const isAvailable = daily[staff.name] !== false;
             const onLeave = isStaffOnLeaveToday(staff.name);
+            const isSelfRow = isFacultyOnly && myRec && isMatchingFaculty(staff.name, myRec);
+            const canToggleRow = currentUserRole === 'ADMIN' || isSelfRow;
 
             let statusBadge;
             if (isAvailable) {
@@ -787,18 +953,18 @@ function renderStaffAvailability() {
             if (tbody) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${staff.displayName || staff.name}</td>
+                    <td>${staff.displayName || staff.name}${isSelfRow ? ' <span class="badge bg-info text-dark ms-1">You</span>' : ''}</td>
                     <td>${staff.dept}</td>
                     <td>${statusBadge}</td>
                     <td class="text-center">
-                        ${canManage ? `<button class="btn btn-sm ${isAvailable ? 'btn-outline-danger' : 'btn-outline-success'} py-0" onclick="toggleStaffAvailability(${idx})">
+                        ${canToggleRow ? `<button class="btn btn-sm ${isAvailable ? 'btn-outline-danger' : 'btn-outline-success'} py-0" onclick="toggleStaffAvailability(${idx})">
                             ${isAvailable ? 'Mark Unavailable' : 'Mark Available'}
                         </button>` : '<span class="text-muted small">View only</span>'}
                     </td>
                 `;
                 tbody.appendChild(tr);
             }
-            
+
             if (studentTbody) {
                 const tr2 = document.createElement('tr');
                 tr2.innerHTML = `
@@ -820,24 +986,64 @@ async function toggleStaffAvailability(idx) {
         alert('Access denied. Only Faculty and Admin can update staff availability.');
         return;
     }
-    const name = staffDirectory[idx].name;
+    const staffObj = staffDirectory[idx];
+    if (!staffObj) return;
+    if (currentUserRole === 'FACULTY') {
+        const myRec = resolveLoggedInFacultyRecord();
+        if (!myRec || !isMatchingFaculty(staffObj.name, myRec)) {
+            alert('You can only submit or cancel leave for your own account.');
+            return;
+        }
+    }
+    const name = staffObj.name;
     const isLeave = isStaffOnLeaveToday(name);
     if (isLeave) {
         await cancelStaffLeave(name);
     } else {
-        await markStaffOnLeave(name, "Admin marked as unavailable");
+        await markStaffOnLeave(name, currentUserRole === 'FACULTY' ? 'Faculty on leave' : 'Admin marked as unavailable');
     }
 }
 
-// Fill the "Period to Cover" dropdown with today's periods for the currently viewed section
+function parseSectionMeta(secStr) {
+    const clean = String(secStr || '').trim().replace(/\s+/g, ' ');
+    const parts = clean.split(' ').filter(Boolean);
+    if (parts.length >= 3) {
+        return { year: parts[0], dept: parts.slice(1, -1).join(' '), section: parts[parts.length - 1] };
+    }
+    return { year: '', dept: clean, section: clean };
+}
+
+// Fill the "Period to Cover" dropdown with today's periods (for FACULTY: strictly their own periods across classes)
 function populateSubPeriodOptions() {
     const select = document.getElementById('subPeriodSelect');
     if (!select) return;
     const todayName = getTodayDayName();
     document.getElementById('substTodayLabel').innerText = `${todayName}, ${todayDateStr()}`;
-    document.getElementById('substSectionLabel').innerText = currentSection;
-
     select.innerHTML = '';
+
+    if (currentUserRole === 'FACULTY') {
+        const myRec = resolveLoggedInFacultyRecord();
+        const myName = myRec ? myRec.name : '';
+        document.getElementById('substSectionLabel').innerText = myName || 'Your Schedule';
+        const myPeriods = myName ? findTodaysPeriodsForStaff(myName) : [];
+        window._facultyTodaySubPeriods = myPeriods;
+
+        if (todayName === 'Sunday' || myPeriods.length === 0) {
+            select.innerHTML = '<option value="">No periods assigned to you today</option>';
+            document.getElementById('subOriginalFaculty').value = myName;
+            return;
+        }
+        myPeriods.forEach((p, idx) => {
+            const opt = document.createElement('option');
+            opt.value = String(idx);
+            opt.text = `Period ${p.pIdx + 1} - ${p.section} - ${p.subject || 'Period'}${p.venue ? ' (' + p.venue + ')' : ''}`;
+            select.appendChild(opt);
+        });
+        onSubPeriodChange();
+        return;
+    }
+
+    document.getElementById('substSectionLabel').innerText = currentSection;
     const dayData = (timetableData[currentSection] || timetableData['II CSE C'])[todayName] || [];
 
     if (todayName === 'Sunday' || dayData.length === 0) {
@@ -850,7 +1056,7 @@ function populateSubPeriodOptions() {
         const opt = document.createElement('option');
         opt.value = idx;
         const subName = p.sub && p.sub.trim() !== '' && p.sub !== '-' ? p.sub.trim() : `FREE (Period ${idx + 1})`;
-        opt.text = subName;
+        opt.text = `Period ${idx + 1} - ${subName}`;
         select.appendChild(opt);
     });
     onSubPeriodChange();
@@ -858,17 +1064,40 @@ function populateSubPeriodOptions() {
 
 function onSubPeriodChange() {
     const select = document.getElementById('subPeriodSelect');
-    const pIdx = parseInt(select.value);
-    if (isNaN(pIdx)) return;
+    const idxVal = parseInt(select.value);
+    if (isNaN(idxVal)) return;
+
+    if (currentUserRole === 'FACULTY') {
+        const myRec = resolveLoggedInFacultyRecord();
+        const myPeriods = window._facultyTodaySubPeriods || [];
+        const p = myPeriods[idxVal];
+        document.getElementById('subOriginalFaculty').value = myRec ? myRec.name : '';
+        if (p) {
+            const meta = parseSectionMeta(p.section);
+            if (document.getElementById('subDepartment')) document.getElementById('subDepartment').value = meta.dept;
+            if (document.getElementById('subYear')) document.getElementById('subYear').value = meta.year;
+            if (document.getElementById('subSection')) document.getElementById('subSection').value = meta.section;
+            if (document.getElementById('subVenue')) document.getElementById('subVenue').value = p.venue || '';
+        }
+        return;
+    }
+
     const todayName = getTodayDayName();
     const dayData = (timetableData[currentSection] || timetableData['II CSE C'])[todayName] || [];
-    document.getElementById('subOriginalFaculty').value = dayData[pIdx] ? dayData[pIdx].faculty : '';
+    const slot = dayData[idxVal];
+    document.getElementById('subOriginalFaculty').value = slot ? slot.faculty : '';
+    const meta = parseSectionMeta(currentSection);
+    if (document.getElementById('subDepartment')) document.getElementById('subDepartment').value = meta.dept;
+    if (document.getElementById('subYear')) document.getElementById('subYear').value = meta.year;
+    if (document.getElementById('subSection')) document.getElementById('subSection').value = meta.section;
+    if (document.getElementById('subVenue')) document.getElementById('subVenue').value = slot ? (slot.venue || '') : '';
 }
 
 function populateSubstituteFacultyOptions() {
     const select = document.getElementById('subSubstituteFaculty');
     if (!select) return;
-    const available = staffDirectory.filter(s => s.status === 'Available');
+    const myRec = currentUserRole === 'FACULTY' ? resolveLoggedInFacultyRecord() : null;
+    const available = staffDirectory.filter(s => s.status === 'Available' && (!myRec || !isMatchingFaculty(s.name, myRec)));
     select.innerHTML = available.length
         ? available.map(s => `<option value="${s.name}">${s.name} (${s.dept})</option>`).join('')
         : '<option value="">No staff currently marked Available</option>';
@@ -882,11 +1111,11 @@ async function handleArrangeSubstitution(e) {
     }
     const todayName = getTodayDayName();
     if (todayName === 'Sunday') {
-        alert('No classes scheduled on Sunday - nothing to substitute.');
+        alert('No classes scheduled on Sunday - nothing to substitute.');
         return;
     }
-    const pIdx = parseInt(document.getElementById('subPeriodSelect').value);
-    if (isNaN(pIdx)) {
+    const selVal = parseInt(document.getElementById('subPeriodSelect').value);
+    if (isNaN(selVal)) {
         alert('Please select a valid period.');
         return;
     }
@@ -896,12 +1125,42 @@ async function handleArrangeSubstitution(e) {
         return;
     }
     const reason = document.getElementById('subReason').value;
-    const originalFaculty = document.getElementById('subOriginalFaculty').value;
 
-    const key = substitutionKey(todayDateStr(), currentSection, todayName, pIdx);
+    let targetSection = currentSection;
+    let pIdx = selVal;
+    let originalFaculty = document.getElementById('subOriginalFaculty').value;
+    let subjectName = '';
+    let venueName = document.getElementById('subVenue')?.value || '';
+
+    if (currentUserRole === 'FACULTY') {
+        const myRec = resolveLoggedInFacultyRecord();
+        const myPeriods = window._facultyTodaySubPeriods || [];
+        const p = myPeriods[selVal];
+        if (!p || !myRec) {
+            alert('You can only arrange substitution for your own scheduled periods.');
+            return;
+        }
+        targetSection = p.section;
+        pIdx = p.pIdx;
+        originalFaculty = myRec.name;
+        subjectName = p.subject || '';
+        venueName = venueName || p.venue || '';
+        if (!isMatchingFaculty(originalFaculty, myRec)) {
+            alert('You can only arrange substitution for your own period.');
+            return;
+        }
+    } else {
+        const dayData2 = (timetableData[targetSection] || {})[todayName] || [];
+        const periodEntry = dayData2[pIdx] || {};
+        subjectName = periodEntry.sub || '';
+        venueName = venueName || periodEntry.venue || '';
+    }
+
+    const subNotifDate = todayDateStr();
+    const key = substitutionKey(subNotifDate, targetSection, todayName, pIdx);
     substitutions[key] = {
-        date: todayDateStr(),
-        section: currentSection,
+        date: subNotifDate,
+        section: targetSection,
         day: todayName,
         pIdx: pIdx,
         originalFaculty: originalFaculty,
@@ -912,21 +1171,28 @@ async function handleArrangeSubstitution(e) {
     };
     saveSubstitutions();
 
-    // Save substitution notification to backend API so all users can see it
-    const todayName2 = todayName;
-    const subNotifDate = todayDateStr();
-    const dayData2 = (timetableData[currentSection] || {})[todayName2] || [];
-    const periodEntry = dayData2[pIdx] || {};
     await savePeriodNotificationToAPI({
         date: subNotifDate,
-        day: todayName2,
+        day: todayName,
         period: pIdx + 1,
-        section: currentSection,
+        section: targetSection,
         originalFaculty: originalFaculty,
         staff: substituteFaculty,
-        subject: periodEntry.sub || reason || 'Substitution',
+        subject: subjectName || reason || 'Substitution',
         reason: reason || 'Substitution arranged',
         source: 'substitution'
+    });
+
+    const mailRes = await notifyClassStudentsViaEmail('SUBSTITUTION', {
+        sectionName: targetSection,
+        date: subNotifDate,
+        day: todayName,
+        periodNumber: pIdx + 1,
+        subject: subjectName || 'Scheduled Class',
+        venue: venueName,
+        originalFaculty,
+        substituteFaculty,
+        reason: reason || 'Substitution arranged'
     });
 
     renderTimetableGrid();
@@ -935,7 +1201,10 @@ async function handleArrangeSubstitution(e) {
     populateSubPeriodOptions();
     populateSubstituteFacultyOptions();
 
-    showToast('Substitute Assigned!', `${substituteFaculty} will cover Period ${pIdx + 1} today in place of ${originalFaculty}. Reverts automatically tomorrow.`);
+    const mailNote = mailRes && mailRes.totalRecipients > 0
+        ? ` Emailed ${mailRes.totalRecipients} verified student(s) in ${targetSection}.`
+        : ` Website Period Notification posted for ${targetSection} students.`;
+    showToast('Substitute Assigned!', `${substituteFaculty} will cover Period ${pIdx + 1} (${targetSection}) today in place of ${originalFaculty}.${mailNote}`);
 }
 
 function renderTodaysSubstitutions() {
@@ -943,28 +1212,29 @@ function renderTodaysSubstitutions() {
     if (!list) return;
     const todayName = getTodayDayName();
     const dateStr = todayDateStr();
-    let filterSection = currentSection;
-    if (currentUserRole === 'STUDENT') {
-        if (typeof currentStudentRecord === 'function') {
-            const rec = currentStudentRecord();
-            if (rec && rec.sec) filterSection = rec.sec;
+    const myRec = currentUserRole === 'FACULTY' ? resolveLoggedInFacultyRecord() : null;
+
+    const relevant = Object.entries(substitutions).filter(([key, s]) => {
+        if (s.date !== dateStr || s.day !== todayName) return false;
+        if (currentUserRole === 'FACULTY' && myRec) {
+            return isMatchingFaculty(s.originalFaculty, myRec) || normalizeSectionCompare(s.section) === normalizeSectionCompare(currentSection);
         }
-    }
-    const relevant = Object.entries(substitutions).filter(([key, s]) =>
-        s.date === dateStr && s.section === filterSection && s.day === todayName
-    );
+        return normalizeSectionCompare(s.section) === normalizeSectionCompare(currentSection);
+    });
 
     if (relevant.length === 0) {
-        list.innerHTML = '<li class="list-group-item bg-dark text-muted small">No substitutions arranged for today in this section.</li>';
+        list.innerHTML = '<li class="list-group-item bg-dark text-muted small">No substitutions arranged for today.</li>';
         return;
     }
 
-    list.innerHTML = relevant.map(([key, s]) => `
+    list.innerHTML = relevant.map(([key, s]) => {
+        const canCancelThis = currentUserRole === 'ADMIN' || (currentUserRole === 'FACULTY' && myRec && isMatchingFaculty(s.originalFaculty, myRec));
+        return `
         <li class="list-group-item bg-dark text-white d-flex justify-content-between align-items-center small">
-            <span>Period ${s.pIdx + 1}: <strong class='text-danger'>${s.originalFaculty} is Absent</strong>. <strong class='text-success'>${s.substituteFaculty}</strong> is substituted.${s.reason ? ' - ' + s.reason : ''}</span>
-            ${canManageSubstitutions() ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="cancelSubstitution('${key}')">Cancel</button>` : ''}
-        </li>
-    `).join('');
+            <span><strong>${s.section}</strong> &bull; Period ${s.pIdx + 1}: <strong class='text-danger'>${s.originalFaculty} is Absent</strong>. <strong class='text-success'>${s.substituteFaculty}</strong> is substituted.${s.reason ? ' - ' + s.reason : ''}</span>
+            ${canCancelThis ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="cancelSubstitution('${key}')">Cancel</button>` : ''}
+        </li>`;
+    }).join('');
 }
 
 async function cancelSubstitution(key) {
@@ -973,6 +1243,13 @@ async function cancelSubstitution(key) {
         return;
     }
     const cancelledSub = substitutions[key];
+    if (currentUserRole === 'FACULTY' && cancelledSub) {
+        const myRec = resolveLoggedInFacultyRecord();
+        if (!myRec || !isMatchingFaculty(cancelledSub.originalFaculty, myRec)) {
+            alert('You can only cancel substitutions for your own periods.');
+            return;
+        }
+    }
     delete substitutions[key];
     saveSubstitutions();
     // If this substitution came from an accepted coverage request, reopen it
@@ -1030,16 +1307,17 @@ function findTodaysPeriodsForStaff(staffName) {
     const todayName = getTodayDayName();
     const results = [];
     const seen = new Set(); // Avoid duplicates
+    const targetRec = { name: staffName, displayName: staffName };
 
-    // Primary: search the real backend-loaded timetable entries
+    // 1. Primary: search the real backend-loaded timetable entries
     if (window.currentTimetableEntries && window.currentTimetableEntries.length > 0) {
         window.currentTimetableEntries.forEach(entry => {
-            if (!entry.teacherName || !entry.teacherName.includes(staffName)) return;
+            if (!entry.teacherName || !isMatchingFaculty(entry.teacherName, targetRec)) return;
             const entryDay = entry.day;
             if (entryDay !== todayName) return;
             const pIdx = (entry.slotNumber || 1) - 1;
             const section = entry.sectionName || currentSection || entry.section || '';
-            const key = `${section}_${pIdx}`;
+            const key = `${normalizeSectionCompare(section)}_${pIdx}`;
             if (seen.has(key)) return;
             seen.add(key);
             results.push({
@@ -1052,23 +1330,59 @@ function findTodaysPeriodsForStaff(staffName) {
         });
     }
 
-    // Fallback / supplement: search local static timetableData
+    // 2. Search loaded section timetableData grids
     Object.keys(timetableData).forEach(section => {
         const dayData = timetableData[section] && timetableData[section][todayName];
         if (!dayData) return;
         dayData.forEach((p, pIdx) => {
-            if (p && p.faculty && p.faculty.includes(staffName)) {
-                const key = `${section}_${pIdx}`;
+            if (p && p.faculty && isMatchingFaculty(p.faculty, targetRec)) {
+                const key = `${normalizeSectionCompare(section)}_${pIdx}`;
                 if (seen.has(key)) return;
                 seen.add(key);
                 results.push({ section, day: todayName, pIdx, subject: p.sub, venue: p.venue });
             }
         });
     });
-    return results;
+
+    // 3. Also include periods assigned in the logged-in faculty's own Personal Timetable
+    const myRec = resolveLoggedInFacultyRecord();
+    if (myRec && isMatchingFaculty(staffName, myRec)) {
+        try {
+            const saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}');
+            const dayCells = saved[todayName] || {};
+            const colToPIdx = { P1: 0, P2: 1, P3: 2, P4: 3, P5: 4, P6: 5, P7: 6 };
+            Object.entries(colToPIdx).forEach(([colKey, pIdx]) => {
+                const raw = String(dayCells[colKey] || '').trim();
+                if (!raw || /^free$/i.test(raw)) return;
+                const parts = raw.split(',').map(x => x.trim()).filter(Boolean);
+                let subj = '', secName = '', ven = '';
+                if (parts.length >= 3) {
+                    subj = parts[0]; secName = parts[1]; ven = parts[2];
+                } else if (parts.length === 2) {
+                    if (/^(I|II|III|IV)\s+/i.test(parts[0])) { secName = parts[0]; ven = parts[1]; }
+                    else { subj = parts[0]; secName = parts[1]; }
+                } else {
+                    secName = parts[0];
+                }
+                if (secName) {
+                    const key = `${normalizeSectionCompare(secName)}_${pIdx}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        results.push({ section: secName, day: todayName, pIdx, subject: subj || 'Scheduled Period', venue: ven });
+                    }
+                }
+            });
+        } catch (_) { }
+    }
+
+    return results.sort((a, b) => a.pIdx - b.pIdx);
 }
 
 function getMyStaffIdentity() {
+    if (currentUserRole === 'FACULTY') {
+        const rec = resolveLoggedInFacultyRecord();
+        if (rec && rec.name) return rec.name;
+    }
     const username = localStorage.getItem('sece_logged_in_user');
     if (!username) return null;
     return localStorage.getItem('sece_staff_identity_' + username.toLowerCase()) || null;
@@ -1083,12 +1397,28 @@ function setMyStaffIdentity(name) {
 function populateStaffIdentityDropdown() {
     const select = document.getElementById('myStaffIdentitySelect');
     if (!select) return;
+    if (currentUserRole === 'FACULTY') {
+        const myRec = resolveLoggedInFacultyRecord();
+        if (myRec && myRec.name) {
+            select.innerHTML = `<option value="${myRec.name}" selected>${myRec.name}${myRec.dept ? ' (' + myRec.dept + ')' : ''}</option>`;
+            select.value = myRec.name;
+            select.disabled = true;
+            setMyStaffIdentity(myRec.name);
+            return;
+        }
+    }
+    select.disabled = false;
     const saved = getMyStaffIdentity();
     select.innerHTML = '<option value="">-- Select your name --</option>' +
         staffDirectory.map(s => `<option value="${s.name}" ${s.name === saved ? 'selected' : ''}>${s.name} (${s.dept})</option>`).join('');
 }
 
 function onStaffIdentityChange() {
+    if (currentUserRole === 'FACULTY') {
+        populateStaffIdentityDropdown();
+        updateLeaveButtonState();
+        return;
+    }
     const select = document.getElementById('myStaffIdentitySelect');
     if (select.value) setMyStaffIdentity(select.value);
     updateLeaveButtonState();
@@ -1122,18 +1452,31 @@ async function markStaffOnLeave(name, reason) {
     });
     saveCoverageRequests();
 
-    // Save leave notifications to backend API (shared across all users)
-    await Promise.all(periods.map(p => savePeriodNotificationToAPI({
-        date: dateStr,
-        day: p.day,
-        period: p.pIdx + 1,
-        section: p.section,
-        originalFaculty: name,
-        staff: '- (Coverage Needed)',
-        subject: reason + ' - Period open for substitution.',
-        reason: reason + ' - Period open for substitution.',
-        source: 'leave'
-    })));
+    // Save leave notifications to backend API + email ONLY students of each affected class/section
+    await Promise.all(periods.map(async p => {
+        await savePeriodNotificationToAPI({
+            date: dateStr,
+            day: p.day,
+            period: p.pIdx + 1,
+            section: p.section,
+            originalFaculty: name,
+            staff: '-  (Coverage Needed)',
+            subject: reason + ' -  Period open for substitution.',
+            reason: reason + ' -  Period open for substitution.',
+            source: 'leave'
+        });
+        await notifyClassStudentsViaEmail('ABSENT', {
+            sectionName: p.section,
+            date: dateStr,
+            day: p.day,
+            periodNumber: p.pIdx + 1,
+            subject: p.subject || 'Scheduled Period',
+            venue: p.venue || '',
+            originalFaculty: name,
+            substituteFaculty: '',
+            reason: reason || 'Faculty on leave'
+        });
+    }));
 
     renderStaffAvailability();
     populateSubstituteFacultyOptions();
@@ -1142,7 +1485,7 @@ async function markStaffOnLeave(name, reason) {
 
     showToast('Marked as On Leave',
         periods.length
-            ? `${name} is on leave today. ${periods.length} period(s) flagged for coverage - other staff have been notified.`
+            ? `${name} is on leave today. ${periods.length} period(s) flagged - affected class students notified via website and email.`
             : `${name} is marked on leave today (no periods scheduled).`
     );
 }
@@ -1201,9 +1544,11 @@ window.markMyselfOnLeave = async function () {
         alert('Only Faculty and Admin can mark themselves on leave.');
         return;
     }
-    const name = document.getElementById('myStaffIdentitySelect').value;
+    const name = currentUserRole === 'FACULTY'
+        ? (resolveLoggedInFacultyRecord()?.name || '')
+        : (document.getElementById('myStaffIdentitySelect')?.value || '');
     if (!name) {
-        alert('Please select which staff member you are first.');
+        alert('Could not resolve your staff profile. Please ensure your faculty record exists.');
         return;
     }
     setMyStaffIdentity(name);
@@ -1217,9 +1562,11 @@ window.cancelMyLeave = async function () {
         alert('Only Faculty and Admin can cancel their leave.');
         return;
     }
-    const name = getMyStaffIdentity() || document.getElementById('myStaffIdentitySelect')?.value;
+    const name = currentUserRole === 'FACULTY'
+        ? (resolveLoggedInFacultyRecord()?.name || '')
+        : (getMyStaffIdentity() || document.getElementById('myStaffIdentitySelect')?.value);
     if (!name) {
-        alert('No staff identity found. Please select your name first.');
+        alert('No staff identity found.');
         return;
     }
     await cancelStaffLeave(name);
@@ -1276,7 +1623,7 @@ function requestToCover(key) {
     showToast('Request Sent', `Your request to cover ${req.subject} (Period ${req.pIdx + 1}, ${req.section}) was sent to ${req.absentStaff}. Waiting for their confirmation.`);
 }
 
-function respondToCoverageRequest(key, accept) {
+async function respondToCoverageRequest(key, accept) {
     const req = coverageRequests[key];
     if (!req) return;
     const myName = getMyStaffIdentity();
@@ -1300,23 +1647,31 @@ function respondToCoverageRequest(key, accept) {
         };
         saveSubstitutions();
 
-        // Add substitution to period notifications so it displays in the Day/Period Notifications modal
-        const notifArr = purgeExpiredPeriodNotifications();
-        notifArr.push({
+        // Persist substitution notification to backend API + notify that class's students via email
+        await savePeriodNotificationToAPI({
             date: req.date,
             day: req.day,
             period: parseInt(req.pIdx) + 1,
             section: req.section,
             originalFaculty: req.absentStaff,
             staff: req.requestedBy,
+            subject: req.subject || 'Substitution accepted',
+            reason: req.reason || 'Substitution accepted',
+            source: 'substitution'
+        });
+        notifyClassStudentsViaEmail('SUBSTITUTION', {
+            sectionName: req.section,
+            date: req.date,
+            day: req.day,
+            periodNumber: parseInt(req.pIdx) + 1,
             subject: req.subject,
             venue: req.venue,
-            reason: `Substitution accepted`,
-            source: 'auto'
+            originalFaculty: req.absentStaff,
+            substituteFaculty: req.requestedBy,
+            reason: req.reason || 'Substitution accepted'
         });
-        savePeriodNotifications(notifArr);
 
-        showToast('Coverage Accepted', `${req.requestedBy} will cover ${req.subject} (Period ${req.pIdx + 1}) today.`);
+        showToast('Coverage Accepted', `${req.requestedBy} will cover ${req.subject} (Period ${req.pIdx + 1}, ${req.section}) today. Class students notified.`);
     } else {
         req.status = 'OPEN';
         req.requestedBy = null;
@@ -1420,7 +1775,10 @@ window.addEventListener('storage', (e) => {
     }
 });
 
-function initSubstitutionModal() {
+async function initSubstitutionModal() {
+    if (currentUserRole === 'FACULTY' && typeof window.syncFacultyPersonalTtFromBackend === 'function') {
+        try { await window.syncFacultyPersonalTtFromBackend(); } catch (_) { }
+    }
     renderStaffAvailability();
     populateSubstituteFacultyOptions();
     populateSubPeriodOptions();
@@ -1488,7 +1846,7 @@ function renderAdminLeaveNotifications() {
                     const dObj = new Date(n.date);
                     if (!isNaN(dObj.getTime())) dayName = daysArr[dObj.getDay()];
                 }
-                
+
                 if (sec && dayName && timetableData[sec] && timetableData[sec][dayName] && timetableData[sec][dayName][pIdx]) {
                     fac = timetableData[sec][dayName][pIdx].faculty;
                 }
@@ -1513,13 +1871,38 @@ function renderAdminLeaveNotifications() {
         });
     }
 
+    const adminChangeNotifs = (typeof getFacultyAdminTtNotifications === 'function')
+        ? getFacultyAdminTtNotifications()
+        : [];
+
+    let adminChangeHtml = '';
+    if (currentUserRole === 'FACULTY' && adminChangeNotifs.length > 0) {
+        adminChangeHtml = `<div class="mb-3">
+            <h6 class="text-warning fw-bold mb-2"><i class="fa-solid fa-calendar-check me-2"></i>Timetable Changes by Admin</h6>
+            <ul class="list-group list-group-flush mb-2">
+                ${adminChangeNotifs.map(n => `
+                    <li class="list-group-item bg-dark text-white border-warning d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <span class="badge bg-warning text-dark me-2">${n.day || 'Schedule'}</span>
+                            <small class="text-muted">${n.date || ''}</small>
+                            <div class="small mt-1">${n.reason || n.section || 'Your timetable was updated by Admin.'}</div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" onclick="window.dismissFacultyAdminTtNotif?.('${n._id || ''}')" title="Dismiss">
+                            <i class="fa-solid fa-check"></i>
+                        </button>
+                    </li>
+                `).join('')}
+            </ul>
+        </div>`;
+    }
+
     const staffNames = Object.keys(todaysLeaves);
     if (staffNames.length === 0) {
-        list.innerHTML = '<div class="alert alert-success small py-2 mb-0"><i class="fa-solid fa-check-circle me-1"></i> No faculty members are reported absent today.</div>';
+        list.innerHTML = adminChangeHtml + '<div class="alert alert-success small py-2 mb-0"><i class="fa-solid fa-check-circle me-1"></i> No faculty members are reported absent today.</div>';
         return;
     }
 
-    let html = '<ul class="list-group list-group-flush">';
+    let html = adminChangeHtml + '<ul class="list-group list-group-flush">';
     staffNames.forEach(staff => {
         // deduplicate identical periods for the same staff
         const uniquePeriods = [];
@@ -1529,7 +1912,7 @@ function renderAdminLeaveNotifications() {
             }
         });
 
-        const periodsDetails = uniquePeriods.sort((a,b) => parseInt(a.pIdx) - parseInt(b.pIdx)).map(r => {
+        const periodsDetails = uniquePeriods.sort((a, b) => parseInt(a.pIdx) - parseInt(b.pIdx)).map(r => {
             let detail = `Period ${parseInt(r.pIdx) + 1} (${r.section})`;
             if (r.status === 'ACCEPTED' && r.requestedBy) {
                 detail += ` - <span class="text-success fw-bold">Substituted by ${r.requestedBy}</span>`;
@@ -1556,7 +1939,7 @@ function renderTimetableGrid() {
     tbody.innerHTML = '';
 
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    
+
     // --- Custom Manual Override for Student Timetable ---
     let secString = typeof currentSection !== 'undefined' ? currentSection.replace(/_/g, ' ') : '';
     if (!secString) {
@@ -1564,14 +1947,15 @@ function renderTimetableGrid() {
         let match = thText.match(/\(([^)]+)\)/);
         if (match) secString = match[1].split('-')[0].trim();
     }
-    
-    if (secString) {
+
+    const roleForGrid = typeof getEffectiveRole === 'function' ? getEffectiveRole() : currentUserRole;
+    if (secString && roleForGrid !== 'STUDENT') {
         try {
             const manualData = JSON.parse(localStorage.getItem('class_tt_' + secString));
             const manualCols = JSON.parse(localStorage.getItem('mc_tt_cols_' + secString));
             if (manualData && manualCols) {
                 // We have a manual override grid! Let's render it directly and return.
-                
+
                 // Update headers if any
                 const thead = tbody.parentElement.querySelector('thead tr');
                 if (thead && manualCols.length > 0) {
@@ -1586,7 +1970,7 @@ function renderTimetableGrid() {
                     });
                     thead.innerHTML = thHtml;
                 }
-                
+
                 let html = '';
                 days.forEach(day => {
                     html += `<tr><td class="fw-bold">${day}</td>`;
@@ -1611,18 +1995,14 @@ function renderTimetableGrid() {
                 tbody.innerHTML = html;
                 return; // SKIP the rest of the function!
             }
-        } catch(e) {
+        } catch (e) {
             console.error(e);
         }
     }
     // --- End Custom Manual Override ---
 
-    let data = {};
+    let data = null;
     if (window.currentTimetableEntries && window.currentTimetableEntries.length > 0) {
-        days.forEach(day => {
-            data[day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
-        });
-        
         let filteredEntries = window.currentTimetableEntries;
         if (typeof currentSection !== 'undefined' && currentSection) {
             let q1 = currentSection.toUpperCase();
@@ -1630,30 +2010,52 @@ function renderTimetableGrid() {
             filteredEntries = filteredEntries.filter(e => {
                 if (!e.sectionName) return false;
                 let sName = e.sectionName.toUpperCase();
-                return sName.includes(q1) || sName.includes(q2) || sName === q1 || sName === q2;
+                return sName === q1 || sName === q2 || sName.includes(q1) || sName.includes(q2);
             });
         }
-        
-        filteredEntries.forEach(entry => {
-            let day = entry.day;
-            let pIdx = entry.slotNumber - 1;
-            if (pIdx >= 0 && pIdx < 7 && data[day]) {
-                data[day][pIdx] = {
-                    sub: entry.subjectName || entry.subjectCode,
-                    code: entry.subjectCode,
-                    faculty: entry.teacherName,
-                    venue: entry.roomNumber || entry.labName || 'TBA',
-                    cat: entry.subjectType === 'LAB' || entry.subjectType === 'PROJECT' ? 'cat-lab' : 'cat-theory'
-                };
-            }
-        });
-    } else {
-        data = timetableData[currentSection];
-        if (!data) {
+        if (filteredEntries.length > 0) {
             data = {};
             days.forEach(day => {
                 data[day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
             });
+            filteredEntries.forEach(entry => {
+                let day = entry.day;
+                let pIdx = (entry.slotNumber || 1) - 1;
+                if (pIdx >= 0 && pIdx < 7 && data[day]) {
+                    const sName = entry.subjectName || entry.subjectCode || 'FREE';
+                    const low = sName.toLowerCase();
+                    let cat = (entry.subjectType === 'LAB' || entry.subjectType === 'PROJECT' || low.includes('lab') || low.includes('practical') || low.includes('project')) ? 'cat-lab' : (low === 'alt' ? 'cat-alt' : 'cat-theory');
+                    data[day][pIdx] = {
+                        sub: sName,
+                        code: entry.subjectCode || '',
+                        faculty: entry.teacherName || '-',
+                        venue: entry.roomNumber || entry.labName || 'TBA',
+                        cat: cat
+                    };
+                }
+            });
+        }
+    }
+    if (!data) {
+        if (roleForGrid === 'STUDENT' && window.currentTimetableEntriesLoaded) {
+            // Authoritative DB returned no entries for this student's current semester — do not show old-semester or other-class cached timetables
+            const semBadge = window.currentStudentSemester ? `Semester ${window.currentStudentSemester}` : 'your current semester';
+            const warnTr = document.createElement('tr');
+            warnTr.innerHTML = `<td colspan="10" class="text-center py-3 bg-dark border border-warning text-warning small fw-semibold"><i class="fa-solid fa-clock me-2"></i>No timetable has been assigned yet for <strong>${semBadge}</strong>. Your previous semester timetable is hidden until Admin assigns your new semester timetable.</td>`;
+            tbody.appendChild(warnTr);
+            data = {};
+            days.forEach(day => {
+                data[day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
+            });
+        } else {
+            timetableData = loadSavedTimetable();
+            data = timetableData[currentSection];
+            if (!data) {
+                data = {};
+                days.forEach(day => {
+                    data[day] = Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
+                });
+            }
         }
     }
 
@@ -1667,7 +2069,10 @@ function renderTimetableGrid() {
         dayTd.innerHTML = `${day}`;
         tr.appendChild(dayTd);
 
-        const periods = data[day] || Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
+        let periods = data[day] || Array(7).fill({ sub: 'FREE', code: '-', faculty: '-', venue: '-', cat: 'cat-theory' });
+        if (typeof window.applyEffectiveOverridesToGridDay === 'function') {
+            periods = window.applyEffectiveOverridesToGridDay(day, periods);
+        }
 
         // Period 1
         tr.appendChild(createCell(day, 0, periods[0]));
@@ -1699,13 +2104,13 @@ function renderTimetableGrid() {
 
         // Period 5
         tr.appendChild(createCell(day, 4, periods[4]));
-        
+
         // Activity Hour (Empty/Placeholder to fix column shift)
         const actTd = document.createElement('td');
         actTd.className = 'align-middle cat-theory';
         actTd.innerHTML = '<div class="text-secondary" style="font-size:0.7rem">-</div>';
         tr.appendChild(actTd);
-        
+
         // Period 6
         tr.appendChild(createCell(day, 5, periods[5]));
         // Period 7
@@ -1728,7 +2133,7 @@ function updateStudentDashboardPeriod() {
     const studentAlert = document.getElementById('studentUpcomingClassAlert');
     const studentTitle = document.getElementById('studentUpcomingClassTitle');
     const studentText = document.getElementById('studentUpcomingClassText');
-    
+
     if (!studentAlert || !studentTitle || !studentText) return;
 
     if (!window.currentTimetableEntries || window.currentTimetableEntries.length === 0) {
@@ -1753,7 +2158,7 @@ function updateStudentDashboardPeriod() {
     ];
 
     const todaysEntries = window.currentTimetableEntries.filter(e => e.day === todayStr);
-    
+
     let activeEntry = null;
     let matchingSlot = null;
     let isOngoing = false;
@@ -1788,7 +2193,7 @@ function updateStudentDashboardPeriod() {
     if (activeEntry && matchingSlot) {
         studentAlert.classList.remove('d-none');
         studentAlert.classList.add('d-flex');
-        
+
         studentTitle.innerText = isOngoing ? "Currently Ongoing Period" : "Next Upcoming Class";
         if (isOngoing) {
             studentAlert.style.borderLeft = "4px solid #198754";
@@ -1803,7 +2208,7 @@ function updateStudentDashboardPeriod() {
         const subName = activeEntry.subjectName || 'Unknown Subject';
         const teacher = activeEntry.teacherName || 'Unknown Faculty';
         const room = activeEntry.classroomNumber || activeEntry.laboratoryName || 'Unknown Venue';
-        
+
         studentText.innerHTML = `<strong>${subName}</strong> &bull; ${matchingSlot.label}<br/><span class="text-muted small">Faculty: ${teacher} | Venue: ${room}</span>`;
     } else {
         studentAlert.classList.remove('d-none');
@@ -1812,7 +2217,7 @@ function updateStudentDashboardPeriod() {
         studentAlert.style.borderLeft = "4px solid #6c757d";
         studentAlert.className = "alert alert-secondary mb-3 align-items-center shadow-sm d-flex";
         studentAlert.querySelector('i').className = "fa-solid fa-mug-hot fa-2x me-3 text-secondary";
-        
+
         if (todaysEntries.length === 0) {
             studentText.innerHTML = `You have no classes scheduled for today (${todayStr}). Enjoy your day!`;
         } else {
@@ -1822,9 +2227,50 @@ function updateStudentDashboardPeriod() {
 }
 
 // Call on load and every minute
-setInterval(updateStudentDashboardPeriod, 60000);
-window.addEventListener('load', () => setTimeout(updateStudentDashboardPeriod, 1000));
+if (window.__studentDashboardPeriodInterval) clearInterval(window.__studentDashboardPeriodInterval);
+window.__studentDashboardPeriodInterval = setInterval(updateStudentDashboardPeriod, 60000);
+if (document.readyState === 'complete') {
+    setTimeout(updateStudentDashboardPeriod, 1000);
+} else {
+    window.addEventListener('load', () => setTimeout(updateStudentDashboardPeriod, 1000));
+}
 
+
+// Backend Timetable Loader (populates Student / Faculty / Admin grids from database)
+window.loadTimetableData = async function () {
+    try {
+        const token = localStorage.getItem('jwt_token');
+        if (!token) return [];
+        const res = await apiFetch('/api/timetable');
+        if (!res || !res.ok) return [];
+        const entries = await res.json();
+        window.currentTimetableEntries = Array.isArray(entries) ? entries : [];
+        window.currentTimetableEntriesLoaded = true;
+
+        if (typeof getEffectiveRole === 'function' && getEffectiveRole() === 'STUDENT') {
+            if (window.currentTimetableEntries.length > 0) {
+                const firstSec = window.currentTimetableEntries[0].sectionName;
+                if (firstSec) {
+                    currentSection = firstSec;
+                    window.currentSection = firstSec;
+                    localStorage.setItem('sece_last_viewed_section', firstSec);
+                    window.updateBannerHeaders?.(firstSec);
+                    const ttTitleHeader = document.getElementById('ttTitleHeader');
+                    if (ttTitleHeader) ttTitleHeader.innerText = firstSec;
+                }
+            }
+        }
+        if (typeof window.refreshStudentEffectiveTempUpdates === 'function') {
+            window.refreshStudentEffectiveTempUpdates().then(() => {
+                if (typeof renderTimetableGrid === 'function') renderTimetableGrid();
+            });
+        }
+        return window.currentTimetableEntries;
+    } catch (err) {
+        console.warn('Could not load backend timetable entries:', err);
+        return [];
+    }
+};
 
 // Helper to Create Period Cell
 function createCell(day, pIdx, pData) {
@@ -1847,6 +2293,7 @@ function createCell(day, pIdx, pData) {
             <span class="slot-badge">${pData.sub}</span>
             <span class="slot-subtext">${pData.faculty}</span>
             <span class="slot-venue">${pData.venue}</span>
+            ${typeof window.renderTempBadgeForCell === 'function' ? window.renderTempBadgeForCell(pData) : ''}
             ${isEditable ? '<button class="btn btn-outline-warning btn-sm mt-2 py-0 px-2" style="font-size: 0.75rem; border-radius: 4px;" onclick="openEditPeriodModal(\'' + day + '\', ' + pIdx + ', ' + JSON.stringify(pData).replace(/"/g, '&quot;') + ')"><i class="fa-solid fa-pen-to-square me-1"></i>Edit</button>' : ''}
         `;
     }
@@ -1878,9 +2325,50 @@ function renderCourseRefTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    courseReferenceList.forEach(item => {
+    // Derive live course rows from DB entries or saved grid for currentSection when available
+    const dynamicMap = new Map();
+    const secFilter = (typeof currentSection !== 'undefined' && currentSection) ? currentSection.replace('_', ' ').toUpperCase() : '';
+    if (window.currentTimetableEntries && window.currentTimetableEntries.length > 0) {
+        window.currentTimetableEntries.forEach(e => {
+            if (secFilter && e.sectionName && e.sectionName.toUpperCase() !== secFilter && !e.sectionName.toUpperCase().includes(secFilter)) return;
+            const sub = e.subjectName || e.subjectCode || '';
+            if (!sub || sub.toUpperCase() === 'FREE') return;
+            const fac = e.teacherName || '-';
+            const venue = e.roomNumber || e.labName || '-';
+            const cat = (e.subjectType === 'LAB' || sub.toLowerCase().includes('lab') || sub.toLowerCase().includes('practical')) ? 'PC (Lab)' : 'PC';
+            const key = `${sub.toLowerCase()}|${venue.toLowerCase()}`;
+            if (!dynamicMap.has(key)) {
+                dynamicMap.set(key, { short: sub, code: e.subjectCode && e.subjectCode !== sub ? `${e.subjectCode} ${sub}` : sub, faculty: fac, venue, cat, credits: '-', hrs: 1 });
+            } else {
+                dynamicMap.get(key).hrs += 1;
+            }
+        });
+    } else if (currentSection && timetableData[currentSection]) {
+        Object.values(timetableData[currentSection]).forEach(dayList => {
+            if (!Array.isArray(dayList)) return;
+            dayList.forEach(c => {
+                if (!c || !c.sub || c.sub.toUpperCase() === 'FREE') return;
+                const key = `${c.sub.toLowerCase()}|${(c.venue || '').toLowerCase()}`;
+                if (!dynamicMap.has(key)) {
+                    dynamicMap.set(key, { short: c.sub, code: c.code || c.sub, faculty: c.faculty || '-', venue: c.venue || '-', cat: c.cat === 'cat-lab' ? 'PC (Lab)' : 'PC', credits: '-', hrs: 1 });
+                } else {
+                    dynamicMap.get(key).hrs += 1;
+                }
+            });
+        });
+    }
+
+    const roleNow = typeof getEffectiveRole === 'function' ? getEffectiveRole() : currentUserRole;
+    const rows = dynamicMap.size > 0
+        ? Array.from(dynamicMap.values())
+        : ((roleNow === 'STUDENT' && window.currentTimetableEntriesLoaded) ? [] : courseReferenceList);
+    if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No courses assigned for this class yet.</td></tr>';
+        return;
+    }
+    rows.forEach(item => {
         const tr = document.createElement('tr');
-        if (item.short === 'ALT') tr.className = 'table-warning text-dark font-semibold';
+        if (String(item.short).toUpperCase() === 'ALT') tr.className = 'table-warning text-dark font-semibold';
 
         tr.innerHTML = `
             <td><strong class="text-info">${item.short}</strong></td>
@@ -2049,8 +2537,8 @@ function switchRole(role, silent = false) {
         if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.add('d-none');
         if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
     } else { // STUDENT
-        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.add('d-none');
-        if (referenceTableArea) referenceTableArea.classList.add('d-none');
+        if (ttPopupOverlayWrapper) ttPopupOverlayWrapper.classList.remove('d-none');
+        if (referenceTableArea) referenceTableArea.classList.remove('d-none');
         if (studentFacultyAvailabilityArea) studentFacultyAvailabilityArea.classList.remove('d-none');
         if (adminTTPlaceholder) adminTTPlaceholder.classList.add('d-none');
     }
@@ -2155,12 +2643,12 @@ function switchRole(role, silent = false) {
             ttTitleHeader.style.borderColor = 'var(--bs-secondary)';
             ttTitleEditIcon.classList.remove('d-none');
 
-            ttTitleHeader.addEventListener('blur', function () {
+            ttTitleHeader.onblur = function () {
                 localStorage.setItem('sece_custom_tt_title_' + currentSection, this.innerText);
                 showToast('Title Saved', 'Custom timetable title saved successfully.');
-            });
+            };
 
-            ttTitleEditIcon.addEventListener('click', function () {
+            ttTitleEditIcon.onclick = function () {
                 ttTitleHeader.focus();
                 // Select all text
                 const range = document.createRange();
@@ -2168,7 +2656,7 @@ function switchRole(role, silent = false) {
                 const sel = window.getSelection();
                 sel.removeAllRanges();
                 sel.addRange(range);
-            });
+            };
         } else {
             ttTitleHeader.contentEditable = false;
             ttTitleHeader.style.borderColor = 'transparent';
@@ -2209,9 +2697,9 @@ function switchRole(role, silent = false) {
         if (semEditIcon) semEditIcon.classList.add('d-none');
         if (ayEditIcon) {
             ayEditIcon.classList.remove('d-none');
-            ayEditIcon.addEventListener('click', () => {
+            ayEditIcon.onclick = () => {
                 if (window.openEditAyModal) window.openEditAyModal();
-            });
+            };
         }
     } else {
         if (batchEditIcon) batchEditIcon.classList.add('d-none');
@@ -2224,14 +2712,31 @@ function switchRole(role, silent = false) {
 
     // Standard dashboard updates
     if (role === 'STUDENT') {
-        renderTimetableGrid();
-        renderStudentsRoster();
+        if (typeof window.loadTimetableData === 'function') {
+            window.loadTimetableData().then(() => {
+                renderTimetableGrid();
+                renderCourseRefTable();
+                renderStudentsRoster();
+            });
+        } else {
+            renderTimetableGrid();
+            renderStudentsRoster();
+        }
         if (typeof window.fetchStudentDynamicDashboard === 'function') {
             window.fetchStudentDynamicDashboard();
             if (window.dynamicDashboardInterval) clearInterval(window.dynamicDashboardInterval);
             window.dynamicDashboardInterval = setInterval(window.fetchStudentDynamicDashboard, 30000);
         }
+        if (typeof window.loadStudentClassDocuments === 'function') {
+            window.loadStudentClassDocuments();
+        }
     } else {
+        if (typeof window.loadTimetableData === 'function') {
+            window.loadTimetableData().then(() => {
+                if (typeof onFilterChange === 'function') onFilterChange();
+                else { renderTimetableGrid(); renderCourseRefTable(); }
+            });
+        }
         if (typeof onFilterChange === 'function') {
             onFilterChange();
         } else {
@@ -2243,6 +2748,19 @@ function switchRole(role, silent = false) {
     renderNotificationStatus();
     toggleSubstitutionUI();
     if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+    if (role === 'FACULTY') {
+        if (typeof window.syncFacultyPersonalTtFromBackend === 'function') {
+            window.syncFacultyPersonalTtFromBackend().then(() => {
+                if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+            });
+        }
+        if (typeof fetchPeriodNotificationsFromAPI === 'function') {
+            fetchPeriodNotificationsFromAPI().then(() => {
+                if (typeof window.renderFacultyAdminTtBanner === 'function') window.renderFacultyAdminTtBanner();
+                if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
+            });
+        }
+    }
 
     const resetBtn = document.getElementById('resetTimetableBtn');
     if (resetBtn) resetBtn.classList.toggle('d-none', role !== 'ADMIN');
@@ -2435,8 +2953,12 @@ function quickAssignWednesdayALT() {
 
 // Filter Change Handler
 function onFilterChange() {
-    currentDept = document.getElementById('deptSelect').value;
-    currentSection = document.getElementById('sectionSelect').value;
+    const deptEl = document.getElementById('deptSelect');
+    const secEl = document.getElementById('sectionSelect');
+    if (!deptEl || !secEl) return;
+
+    currentDept = deptEl.value;
+    currentSection = secEl.value;
     localStorage.setItem('sece_last_viewed_dept', currentDept);
     localStorage.setItem('sece_last_viewed_section', currentSection);
 
@@ -2478,9 +3000,9 @@ function currentStudentRecord() {
     try {
         userInfo = JSON.parse(localStorage.getItem('user_info'));
         if (userInfo && userInfo.username) username = userInfo.username;
-    } catch (e) {}
+    } catch (e) { }
     if (!username) return null;
-    
+
     if (username === '25cs316') {
         return {
             id: 99999,
@@ -2495,9 +3017,9 @@ function currentStudentRecord() {
         };
     }
     const student = (typeof studentsRoster !== 'undefined' ? studentsRoster : []).find(s => (s.username || String(s.roll || '').toLowerCase()) === username.toLowerCase());
-    
+
     if (student) return student;
-    
+
     // Fallback for API authenticated students not in mock roster
     if (userInfo && userInfo.role === 'ROLE_STUDENT') {
         return {
@@ -2634,6 +3156,21 @@ function toggleAddStudentForm() {
     card.classList.toggle('d-none');
 }
 
+function buildCanonicalStudentSection(courseId, deptId, secId, semester) {
+    const toRomanYr = v => ({ '1': 'I', '2': 'II', '3': 'III', '4': 'IV', 'I': 'I', 'II': 'II', 'III': 'III', 'IV': 'IV' }[String(v || '').trim().toUpperCase()] || '');
+    const semNum = parseInt(semester, 10) || 3;
+    const yrFromSem = toRomanYr(Math.ceil(semNum / 2)) || 'II';
+    const rawSec = String(secId || '').trim().replace(/\s+/g, ' ');
+    const fullSecMatch = rawSec.match(/^(I|II|III|IV|[1-4])\s+([A-Za-z&.-]+)\s+([A-Za-z0-9]+)$/i);
+    if (fullSecMatch) {
+        return `${toRomanYr(fullSecMatch[1]) || yrFromSem} ${fullSecMatch[2].toUpperCase()} ${fullSecMatch[3].toUpperCase()}`;
+    }
+    const yrPart = toRomanYr(courseId) || yrFromSem;
+    const deptClean = String(deptId || 'CSE').trim().toUpperCase();
+    const secLetter = (rawSec.split(/\s+/).pop() || 'A').toUpperCase();
+    return `${yrPart} ${deptClean} ${secLetter}`;
+}
+
 function handleAddStudent(e) {
     e.preventDefault();
     if (!ensureStudentManagementAccess()) return;
@@ -2687,7 +3224,7 @@ function handleAddStudent(e) {
         'ECE': 'BTECH-ECE'
     };
     const actualCourseId = deptCourseMap[deptId] || 'BTECH-' + deptId;
-    const fullSectionName = courseId + ' ' + deptId + ' ' + secId;
+    const fullSectionName = buildCanonicalStudentSection(courseId, deptId, secId, semester);
 
     const payload = {
         registerNumber: regNo,
@@ -2756,13 +3293,13 @@ function populateSectionSelects() {
         const uniqueDepts = [...new Set(activeSections.map(s => s.dept))]
             .filter(d => d && d !== 'Select Department...' && d.trim() !== '')
             .sort();
-        
+
         let deptHTML = '<option value="">Select Dept...</option>';
         uniqueDepts.forEach(d => {
             deptHTML += `<option value="${d}">${d}</option>`;
         });
         deptSelect.innerHTML = deptHTML;
-        
+
         if (typeof currentDept !== 'undefined' && currentDept) {
             const exists = uniqueDepts.includes(currentDept);
             if (exists) deptSelect.value = currentDept;
@@ -2810,7 +3347,7 @@ function renderSectionsList() {
     const ul2 = document.getElementById('sectionsListOnly');
     if (ul) ul.innerHTML = '';
     if (ul2) ul2.innerHTML = '';
-    
+
     activeSections.forEach((s, idx) => {
         if (ul) {
             const li = document.createElement('li');
@@ -2821,7 +3358,7 @@ function renderSectionsList() {
                 <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="removeSection(${idx})"><i class="fa-solid fa-xmark"></i></button>`;
             ul.appendChild(li);
         }
-        
+
         if (ul2) {
             const li2 = document.createElement('li');
             li2.className = 'list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center py-2';
@@ -2863,7 +3400,7 @@ function removeSection(idx) {
     showToast('Section Removed', `Section ${removed.name} removed.`);
 }
 
-function handleClassAdvisorLogin(e) {
+async function handleClassAdvisorLogin(e) {
     e.preventDefault();
     if (currentUserRole !== 'FACULTY') {
         alert('Class Advisor View is available only inside the Faculty view.');
@@ -2871,13 +3408,52 @@ function handleClassAdvisorLogin(e) {
     }
     const username = String(document.getElementById('advisorLoginUsername').value || '').trim().toLowerCase();
     const password = String(document.getElementById('advisorLoginPassword').value || '');
-    const faculty = staffDirectory.find(s => buildClassAdvisorUsername(s.name) === username && s.classAdvisorFor);
+
+    let faculty = staffDirectory.find(s => buildClassAdvisorUsername(s.name) === username && s.classAdvisorFor);
+    if (!faculty) {
+        try {
+            const res = await apiFetch('/api/teachers');
+            if (res && res.ok) {
+                const dbTeachers = await res.json();
+                const hit = dbTeachers.find(t => {
+                    if (!t.classAdvisorFor) return false;
+                    const nm = t.displayName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim();
+                    const uname = (t.user && t.user.username) ? t.user.username.toLowerCase() : '';
+                    return buildClassAdvisorUsername(nm) === username || buildClassAdvisorUsername(`${t.firstName || ''} ${t.lastName || ''}`) === username || uname === username;
+                });
+                if (hit) {
+                    faculty = {
+                        name: hit.name || `${hit.firstName || ''} ${hit.lastName || ''}`.trim(),
+                        displayName: hit.displayName || hit.name,
+                        classAdvisorFor: hit.classAdvisorFor,
+                        userUsername: (hit.user && hit.user.username) ? hit.user.username : buildGeneratedUsername('FACULTY', hit.displayName || hit.name)
+                    };
+                }
+            }
+        } catch (_) { }
+    } else if (!faculty.userUsername) {
+        faculty = { ...faculty, userUsername: buildGeneratedUsername('FACULTY', faculty.name) };
+    }
+
     if (!faculty) {
         alert('Invalid Class Advisor username or this faculty member is not assigned as a Class Advisor.');
         return;
     }
     const assignedSection = String(faculty.classAdvisorFor || '').trim();
-    if (!assignedSection || getClassAdvisorPassword(username) !== password) {
+    let verifiedAdvisor = (getClassAdvisorPassword(username) === password);
+    if (!verifiedAdvisor && assignedSection) {
+        // Also verify against backend Faculty account credentials (e.g. fkeerj012345 / password123)
+        try {
+            const authUsername = (faculty.userUsername || username);
+            const authRes = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: authUsername, password })
+            });
+            if (authRes && authRes.ok) verifiedAdvisor = true;
+        } catch (_) { }
+    }
+    if (!assignedSection || !verifiedAdvisor) {
         alert('Invalid Class Advisor username/password or advisor assignment.');
         return;
     }
@@ -2997,21 +3573,70 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
             </div>
 
             ${students.length === 0 ? '<div class="alert alert-warning mt-2">No students are currently enrolled in this class.</div>' : `
-            <div class="table-responsive">
+            <div class="p-3 rounded border border-warning bg-dark mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <h6 class="fw-bold text-warning mb-0"><i class="fa-solid fa-pen-to-square me-1"></i> Enrolled Students Semester Change</h6>
+                    <span id="caSelectedCountBadge" class="badge bg-info text-dark">0 selected</span>
+                </div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">New Semester *</label>
+                        <select id="caTargetSemSelect" class="form-select form-select-sm bg-dark text-white border-secondary">
+                            <option value="1">Semester 1</option>
+                            <option value="2">Semester 2</option>
+                            <option value="3">Semester 3</option>
+                            <option value="4" selected>Semester 4</option>
+                            <option value="5">Semester 5</option>
+                            <option value="6">Semester 6</option>
+                            <option value="7">Semester 7</option>
+                            <option value="8">Semester 8</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label small text-muted mb-1">Semester Change Remark / Mark</label>
+                        <input type="text" id="caSemChangeNote" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Promoted to Even Sem" />
+                    </div>
+                    <div class="col-md-4 d-grid">
+                        <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="window.applyClassAdvisorSemChanges?.()">
+                            <i class="fa-solid fa-check-double me-1"></i> Mark Semester Changes
+                        </button>
+                    </div>
+                </div>
+                <div id="caSemChangeAlert" class="alert d-none small py-2 mt-2 mb-0"></div>
+            </div>
+
+            <div class="table-responsive mb-3">
                 <table class="table table-dark table-striped table-hover align-middle small">
-                    <thead><tr><th>#</th><th>Roll No</th><th>Name</th><th>Class / Section</th><th>Semester</th><th>Personal Email</th><th>College Mail ID</th><th>Mobile</th><th>Parent Mobile 1</th><th>Parent Mobile 2</th><th>Action</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th style="width:36px;"><input type="checkbox" class="form-check-input" id="caSelectAllChk" title="Select all students" onchange="window.toggleCaSelectAllStudents?.(this.checked)" /></th>
+                            <th>#</th>
+                            <th>Roll No</th>
+                            <th>Name</th>
+                            <th>Class / Section</th>
+                            <th>Semester &amp; Status</th>
+                            <th>Personal Email</th>
+                            <th>College Mail ID</th>
+                            <th>Mobile</th>
+                            <th>Parent Mobile 1</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
                     <tbody>${students.map((s, i) => {
-            return `<tr>
+            const semBadge = s.semesterMarked
+                ? `<span class="badge bg-success ms-1" title="${String(s.semesterChangeNote || '').replace(/"/g, '&quot;')}">Marked</span><div class="text-info" style="font-size:0.7rem;">${s.semesterChangeNote || ''}</div>`
+                : '';
+            return `<tr class="${s.semesterMarked ? 'table-active' : ''}">
+                            <td><input type="checkbox" class="form-check-input ca-student-chk" value="${s.id}" onchange="window.updateCaSelectedCount?.()" /></td>
                             <td class="text-muted">${i + 1}</td>
                             <td><code class="text-warning fw-bold">${s.registerNumber || '-'}</code></td>
                             <td><strong>${(s.firstName || '')} ${(s.lastName || '')}</strong></td>
                             <td><span class="badge bg-primary">${s.section ? (s.section.sectionName || '-') : '-'}</span></td>
-                            <td class="text-center">${s.semester || '-'}</td>
+                            <td class="text-center"><span class="fw-bold text-white">Sem ${s.semester || '-'}</span>${semBadge}</td>
                             <td><small>${s.email || '-'}</small></td>
                             <td><small>${s.collegeEmail || '-'}</small></td>
                             <td>${s.phone || '-'}</td>
                             <td>${s.parentPhone1 || '-'}</td>
-                            <td>${s.parentPhone2 || '-'}</td>
                             <td>
                                 <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id})" title="Delete student"><i class="fa-solid fa-trash"></i></button>
                             </td>
@@ -3019,7 +3644,40 @@ window.renderClassAdvisorStudents = async function (section, faculty) {
         }).join('')}</tbody>
                 </table>
             </div>`}
+
+            <div class="p-3 rounded border border-info bg-secondary bg-opacity-10 mt-2">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h6 class="fw-bold text-info mb-0"><i class="fa-solid fa-file-arrow-up me-1"></i> Publish PDF / Image File for <span class="text-warning">${section}</span> Only</h6>
+                    <span class="badge bg-secondary">Visible only to ${section} students</span>
+                </div>
+                <form onsubmit="window.publishClassAdvisorDocument(event)">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-1">File Title *</label>
+                            <input type="text" id="caDocTitle" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. Updated Sem 4 Circular" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-1">Note / Description</label>
+                            <input type="text" id="caDocNote" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Optional note for class students" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-1">PDF or Image File *</label>
+                            <input type="file" id="caDocFile" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif" class="form-control form-control-sm bg-dark text-white border-secondary" required />
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <button type="submit" class="btn btn-sm btn-info text-dark fw-bold">
+                                <i class="fa-solid fa-upload me-1"></i> Publish
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div id="caDocAlert" class="alert d-none small py-2 mt-2 mb-0"></div>
+                <div id="caPublishedDocsList" class="mt-3 small text-muted">Loading published files for ${section}...</div>
+            </div>
         `;
+        window._caCurrentSection = section;
+        window._caCurrentFaculty = faculty;
+        window.loadCaPublishedDocuments?.(section);
     } catch (e) {
         body.innerHTML = '<div class="alert alert-danger">Error loading students from server.</div>';
     }
@@ -3063,7 +3721,7 @@ window.handleClassAdvisorAddStudent = async function (e, prefilledSection) {
         semester: parseInt(semester),
         department: { name: deptId },
         course: { name: courseId },
-        section: { sectionName: secId }
+        section: { sectionName: buildCanonicalStudentSection(courseId, deptId, secId, semester) }
     };
 
     try {
@@ -3086,7 +3744,7 @@ window.handleClassAdvisorAddStudent = async function (e, prefilledSection) {
     }
 };
 
-window.searchStudentInRoster = function() {
+window.searchStudentInRoster = function () {
     const input = document.getElementById('rosterSearchRegNo');
     if (!input) return;
     const query = input.value.trim();
@@ -3128,7 +3786,7 @@ window.openStudentDetailsModal = async function (searchQuery = '') {
             data.forEach((s, i) => {
                 let username = s.registerNumber ? String(s.registerNumber).toLowerCase() : '-';
                 if (s.user && s.user.username) username = s.user.username;
-                
+
                 let password = 'student123';
                 if (s.user && s.user.rawPassword) {
                     password = s.user.rawPassword;
@@ -3137,9 +3795,9 @@ window.openStudentDetailsModal = async function (searchQuery = '') {
                     const last4 = phoneStr.length >= 4 ? phoneStr.slice(-4) : '0000';
                     password = s.firstName.split(' ')[0].toUpperCase() + last4;
                 }
-                
+
                 const secDisplay = s.section ? (s.section.sectionName || s.section.name || s.section.id || s.section) : '-';
-                
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${s.registerNumber || '-'}</td>
@@ -3218,13 +3876,13 @@ window.openAddStudentDirectly = function () {
     }, 200);
 }
 
-window.renderFacultyDetailsView = async function() {
+window.renderFacultyDetailsView = async function () {
     if (currentUserRole !== 'FACULTY' && currentUserRole !== 'ADMIN') return;
 
     const body = document.getElementById('facultyDetailsBody');
     if (body) {
         body.innerHTML = '<tr><td colSpan="6" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading faculty data...</td></tr>';
-        
+
         try {
             const token = localStorage.getItem('jwt_token') || '';
             const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
@@ -3232,7 +3890,7 @@ window.renderFacultyDetailsView = async function() {
             if (res.ok) {
                 const facultyList = await res.json();
                 const myUsername = String(localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
-                
+
                 body.innerHTML = facultyList.map((f, i) => {
                     const username = f.user ? f.user.username : '';
                     const canEdit = (username.toLowerCase() === myUsername);
@@ -3241,7 +3899,7 @@ window.renderFacultyDetailsView = async function() {
                     const collegeEmail = f.user ? (f.user.email || '') : '';
                     const fId = f.id;
                     const userId = f.user ? f.user.id : 'null';
-                    
+
                     return `<tr>
                         <td>${f.displayName || f.name || '-'}</td>
                         <td>${deptName}</td>
@@ -3254,7 +3912,7 @@ window.renderFacultyDetailsView = async function() {
             } else {
                 body.innerHTML = '<tr><td colSpan="6" class="text-center text-danger py-4">Failed to load faculty details.</td></tr>';
             }
-        } catch(e) {
+        } catch (e) {
             body.innerHTML = '<tr><td colSpan="6" class="text-center text-danger py-4">Error connecting to server.</td></tr>';
         }
     }
@@ -3263,30 +3921,30 @@ window.renderFacultyDetailsView = async function() {
     if (credentialsPanel) credentialsPanel.classList.toggle('d-none', currentUserRole !== 'ADMIN');
 }
 
-window.saveFacultyEmailsBackend = async function(userId, teacherId) {
+window.saveFacultyEmailsBackend = async function (userId, teacherId) {
     if (currentUserRole !== 'FACULTY' && currentUserRole !== 'ADMIN') {
         alert('Unauthorized.');
         return;
     }
-    
+
     const pEl = document.getElementById(`fac_p_email_${teacherId}`);
     const cEl = document.getElementById(`fac_c_email_${teacherId}`);
     const personalEmail = pEl ? pEl.value.trim().toLowerCase() : '';
     const collegeEmail = cEl ? cEl.value.trim().toLowerCase() : '';
-    
+
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRe.test(personalEmail) || !emailRe.test(collegeEmail)) {
         alert('Both Personal Email and College Mail ID are compulsory and must be valid email addresses.');
         return;
     }
-    
+
     try {
         const token = localStorage.getItem('jwt_token') || '';
-        const headers = { 
+        const headers = {
             'Authorization': 'Bearer ' + token,
             'Content-Type': 'application/json'
         };
-        
+
         const getRes = await fetch(`/api/teachers/${teacherId}`, { headers });
         if (!getRes.ok) {
             alert('Failed to retrieve teacher for update');
@@ -3295,13 +3953,13 @@ window.saveFacultyEmailsBackend = async function(userId, teacherId) {
         const teacherData = await getRes.json();
         teacherData.personalEmail = personalEmail;
         teacherData.collegeEmail = collegeEmail;
-        
+
         const res = await fetch(`/api/teachers/${teacherId}`, {
             method: 'PUT',
             headers: headers,
             body: JSON.stringify(teacherData)
         });
-        
+
         if (res.ok) {
             showToast('Faculty Details Saved', 'Your personal and college email details were saved successfully.');
             window.renderFacultyDetailsView();
@@ -3321,14 +3979,14 @@ async function openStudentProfileModal() {
 
     const body = document.getElementById('studentProfileBody');
     if (!body) return;
-    
+
     // Unconditionally fetch from API to get the most updated admin details
     let s = null;
     let username = localStorage.getItem('sece_logged_in_user');
     try {
         const userInfo = JSON.parse(localStorage.getItem('user_info'));
         if (userInfo && userInfo.username) username = userInfo.username;
-    } catch (e) {}
+    } catch (e) { }
 
     try {
         body.innerHTML = '<div class="text-center py-2"><div class="spinner-border text-success" role="status"></div></div>';
@@ -3336,8 +3994,8 @@ async function openStudentProfileModal() {
         const res = await fetchFn('/api/students');
         if (res.ok) {
             const data = await res.json();
-            const backendStudent = data.find(st => 
-                (st.user && st.user.username === username) || 
+            const backendStudent = data.find(st =>
+                (st.user && st.user.username === username) ||
                 (st.registerNumber && String(st.registerNumber).toLowerCase() === String(username).toLowerCase())
             );
             if (backendStudent) {
@@ -3385,7 +4043,7 @@ async function openStudentProfileModal() {
                 <div class="col-6"><strong>Parent Mobile 1:</strong><br>${s.parentPhone1 || '-'}</div>
                 <div class="col-6"><strong>Parent Mobile 2:</strong><br>${s.parentPhone2 || '-'}</div>
                 <div class="col-6"><strong>Resident Type:</strong><br>${s.residentType || 'Day Scholar'}</div>
-                <div class="col-6"><strong>Room / Block:</strong><br>${s.roomNumber ? s.roomNumber + ' / ' + (s.hostelBlock||'') : '-'}</div>
+                <div class="col-6"><strong>Room / Block:</strong><br>${s.roomNumber ? s.roomNumber + ' / ' + (s.hostelBlock || '') : '-'}</div>
                 <div class="col-6"><strong>Username:</strong><br><code>${computedUsername}</code></div>
                 <div class="col-6"><strong>Password:</strong><br><code class="text-warning">${password}</code></div>
             </div>`;
@@ -3464,7 +4122,10 @@ function loadAdminResources() {
     } catch (_) { return { subjects: [], venues: [] }; }
 }
 let adminResources = loadAdminResources();
-function saveAdminResources() { localStorage.setItem(RESOURCES_STORAGE_KEY, JSON.stringify(adminResources)); }
+function saveAdminResources() {
+    localStorage.setItem(RESOURCES_STORAGE_KEY, JSON.stringify(adminResources));
+    if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
+}
 
 function mergeCustomSubjectsIntoCourseList() {
     adminResources.subjects.forEach(s => {
@@ -3486,23 +4147,23 @@ function renderAdminResourcesUI() {
     if (subList) {
         // All built-in TT subjects (editable via override, deletable)
         const builtInDefaults = [
-            { code: 'SE',        title: 'Software Engineering',                     faculty: 'Dr.S.K.Harikarthick',                        venue: 'SF 04' },
-            { code: 'JAVA',      title: 'Java Programming',                         faculty: 'Mr.M.Karthickraja',                          venue: 'SF 04' },
-            { code: 'AIML',      title: 'Artificial Intelligence & ML',             faculty: 'Dr.N.Saranya',                               venue: 'SF 04' },
-            { code: 'DM',        title: 'Discrete Mathematics',                     faculty: 'Dr.N.Murugavelli',                           venue: 'SF 04' },
-            { code: 'DAA',       title: 'Design & Analysis of Algorithms',          faculty: 'Mr.R.Karthick',                              venue: 'SF 04' },
-            { code: 'DBMS',      title: 'Database Management Systems',              faculty: 'Ms.E.Saranya',                               venue: 'SF 04' },
-            { code: 'UHV',       title: 'Universal Human Values',                   faculty: 'Dr.M.P.Sindhu',                              venue: 'SF 04' },
-            { code: 'COE',       title: 'Center of Excellence',                     faculty: 'Domain Experts',                             venue: 'COE Lab' },
-            { code: 'SS',        title: 'Soft Skills',                              faculty: 'Placement Team',                             venue: 'SF 04' },
-            { code: 'ALT',       title: 'Advanced Logical Thinking',                faculty: 'Placement Team',                             venue: 'SF 05' },
-            { code: 'LIB',       title: 'Library Hour',                             faculty: '-',                                          venue: 'Library' },
-            { code: 'TWM',       title: 'Tutor Ward Meeting',                       faculty: 'Class Advisor',                              venue: 'SF 04' },
-            { code: 'AIML LAB',  title: 'AIML Laboratory',                          faculty: 'Dr.N.Saranya / Dr.M.Praveen',                venue: 'Intel AI Lab' },
-            { code: 'JAVA LAB',  title: 'Java Programming Laboratory',              faculty: 'Mr.M.Karthickraja / Mr.B.Saravanan',         venue: 'Full Stack Lab' },
-            { code: 'SE LAB',    title: 'Software Engineering Laboratory',          faculty: 'Dr.S.K.Harikarthick / Mr.P.Arunprakash',     venue: 'Intel AI Lab' },
-            { code: 'DAA LAB',   title: 'Design & Analysis Lab',                    faculty: 'Mr.R.Karthick / Ms.Rajeswari',               venue: 'Full Stack Lab' },
-            { code: 'DBMS LAB',  title: 'Database Management Lab',                  faculty: 'Ms.E.Saranya / Dr.K.Suresh kumar',           venue: 'Cloud & DevOps Lab' },
+            { code: 'SE', title: 'Software Engineering', faculty: 'Dr.S.K.Harikarthick', venue: 'SF 04' },
+            { code: 'JAVA', title: 'Java Programming', faculty: 'Mr.M.Karthickraja', venue: 'SF 04' },
+            { code: 'AIML', title: 'Artificial Intelligence & ML', faculty: 'Dr.N.Saranya', venue: 'SF 04' },
+            { code: 'DM', title: 'Discrete Mathematics', faculty: 'Dr.N.Murugavelli', venue: 'SF 04' },
+            { code: 'DAA', title: 'Design & Analysis of Algorithms', faculty: 'Mr.R.Karthick', venue: 'SF 04' },
+            { code: 'DBMS', title: 'Database Management Systems', faculty: 'Ms.E.Saranya', venue: 'SF 04' },
+            { code: 'UHV', title: 'Universal Human Values', faculty: 'Dr.M.P.Sindhu', venue: 'SF 04' },
+            { code: 'COE', title: 'Center of Excellence', faculty: 'Domain Experts', venue: 'COE Lab' },
+            { code: 'SS', title: 'Soft Skills', faculty: 'Placement Team', venue: 'SF 04' },
+            { code: 'ALT', title: 'Advanced Logical Thinking', faculty: 'Placement Team', venue: 'SF 05' },
+            { code: 'LIB', title: 'Library Hour', faculty: '-', venue: 'Library' },
+            { code: 'TWM', title: 'Tutor Ward Meeting', faculty: 'Class Advisor', venue: 'SF 04' },
+            { code: 'AIML LAB', title: 'AIML Laboratory', faculty: 'Dr.N.Saranya / Dr.M.Praveen', venue: 'Intel AI Lab' },
+            { code: 'JAVA LAB', title: 'Java Programming Laboratory', faculty: 'Mr.M.Karthickraja / Mr.B.Saravanan', venue: 'Full Stack Lab' },
+            { code: 'SE LAB', title: 'Software Engineering Laboratory', faculty: 'Dr.S.K.Harikarthick / Mr.P.Arunprakash', venue: 'Intel AI Lab' },
+            { code: 'DAA LAB', title: 'Design & Analysis Lab', faculty: 'Mr.R.Karthick / Ms.Rajeswari', venue: 'Full Stack Lab' },
+            { code: 'DBMS LAB', title: 'Database Management Lab', faculty: 'Ms.E.Saranya / Dr.K.Suresh kumar', venue: 'Cloud & DevOps Lab' },
         ];
 
         // Merge courseReferenceList
@@ -3519,7 +4180,7 @@ function renderAdminResourcesUI() {
         try {
             builtInOverrides = JSON.parse(localStorage.getItem('sece_builtin_subject_overrides') || '{}');
             hiddenBuiltIns = JSON.parse(localStorage.getItem('sece_hidden_builtin_subjects') || '[]');
-        } catch(e) {}
+        } catch (e) { }
 
         // Custom rows (fully editable + removable)
         const customRows = adminResources.subjects.map((s, i) =>
@@ -3547,10 +4208,10 @@ function renderAdminResourcesUI() {
             .filter(s => !hiddenBuiltIns.includes(s.code))
             .map((s, i) => {
                 const ov = builtInOverrides[s.code] || {};
-                const code    = ov.code    || s.code;
-                const title   = ov.title   || s.title;
+                const code = ov.code || s.code;
+                const title = ov.title || s.title;
                 const faculty = ov.faculty || s.faculty;
-                const venue   = ov.venue   || s.venue;
+                const venue = ov.venue || s.venue;
                 const isEdited = !!builtInOverrides[s.code];
                 return `<tr>
                     <td><span class="badge ${isEdited ? 'bg-warning text-dark' : 'bg-secondary'}">${code}</span></td>
@@ -3574,15 +4235,15 @@ function renderAdminResourcesUI() {
             '<tr><td colspan="5" class="text-muted text-center py-3">No subjects found.</td></tr>';
     }
 
-            if (venueList) {
+    if (venueList) {
         // Collect built-in venues from defaults and active sections
         const builtInVenueNames = new Set([
             'SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'
         ]);
-        
-        courseReferenceList.forEach(c => { if(c.venue && c.venue !== '-' && c.venue !== 'TBD') builtInVenueNames.add(c.venue.trim()); });
-        activeSections.forEach(s => { if(s.classroom && s.classroom !== '-' && s.classroom !== 'TBD') builtInVenueNames.add(s.classroom.trim()); });
-        
+
+        courseReferenceList.forEach(c => { if (c.venue && c.venue !== '-' && c.venue !== 'TBD') builtInVenueNames.add(c.venue.trim()); });
+        activeSections.forEach(s => { if (s.classroom && s.classroom !== '-' && s.classroom !== 'TBD') builtInVenueNames.add(s.classroom.trim()); });
+
         const builtInVenues = Array.from(builtInVenueNames).map(name => ({ name, type: 'Built-in', block: '', capacity: '' }));
 
         // Load venue overrides
@@ -3591,7 +4252,7 @@ function renderAdminResourcesUI() {
         try {
             builtInVenueOverrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}');
             hiddenBuiltInVenues = JSON.parse(localStorage.getItem('sece_hidden_builtin_venues') || '[]');
-        } catch(e) {}
+        } catch (e) { }
 
         const customRows = adminResources.venues.map((v, i) =>
             `<div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center" style="background:rgba(13,202,240,0.05) !important;">
@@ -3671,9 +4332,9 @@ function handleAddSubject(e) {
 }
 
 
-window.editAdminSubject = function(type, id) {
+window.editAdminSubject = function (type, id) {
     if (!adminOnly()) return;
-    
+
     // Find the subject
     let subject = null;
     let originalCode = null;
@@ -3683,7 +4344,7 @@ window.editAdminSubject = function(type, id) {
     } else {
         originalCode = id;
         let overrides = {};
-        try { overrides = JSON.parse(localStorage.getItem('sece_builtin_subject_overrides') || '{}'); } catch(e){}
+        try { overrides = JSON.parse(localStorage.getItem('sece_builtin_subject_overrides') || '{}'); } catch (e) { }
         subject = overrides[id];
         if (!subject) {
             // Need to find it from built-in defaults if not overridden yet. We can grab it from courseReferenceList
@@ -3715,7 +4376,7 @@ window.editAdminSubject = function(type, id) {
             }
         }
     }
-    
+
     if (!subject) return;
 
     let modal = document.getElementById('editSubjectModalDynamic');
@@ -3759,69 +4420,69 @@ window.editAdminSubject = function(type, id) {
                 </div>
             </div>
         `);
-        
-        document.getElementById('dynamicEditSubjectForm').addEventListener('submit', function(e) {
+
+        document.getElementById('dynamicEditSubjectForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const origCode = document.getElementById('editSubjectOriginalCode').value;
             const t = document.getElementById('editSubjectType').value;
             const customIdx = document.getElementById('editSubjectCustomIndex').value;
-            
+
             const code = document.getElementById('editSubjectCode').value.trim().toUpperCase();
             const title = document.getElementById('editSubjectTitle').value.trim();
             const faculty = document.getElementById('editSubjectFaculty').value.trim();
             const venue = document.getElementById('editSubjectVenue').value.trim();
-            
+
             if (t === 'custom') {
                 adminResources.subjects[customIdx] = { ...adminResources.subjects[customIdx], code, short: code, title, faculty, venue };
                 saveAdminResources();
                 // Also update courseReferenceList
                 const refIdx = courseReferenceList.findIndex(c => c.short === origCode);
-                if(refIdx >= 0) {
+                if (refIdx >= 0) {
                     courseReferenceList[refIdx] = { ...courseReferenceList[refIdx], short: code, code: `${code} ${title}`, faculty, venue };
                 }
             } else {
                 let overrides = {};
-                try { overrides = JSON.parse(localStorage.getItem('sece_builtin_subject_overrides') || '{}'); } catch(e){}
+                try { overrides = JSON.parse(localStorage.getItem('sece_builtin_subject_overrides') || '{}'); } catch (e) { }
                 overrides[origCode] = { code, title, faculty, venue };
                 localStorage.setItem('sece_builtin_subject_overrides', JSON.stringify(overrides));
             }
-            
+
             bootstrap.Modal.getInstance(document.getElementById('editSubjectModalDynamic')).hide();
             renderAdminResourcesUI();
             renderCourseRefTable();
             populateEditSubjectSelect();
-            if(window.renderFacultyPersonalTT) window.renderFacultyPersonalTT();
+            if (window.renderFacultyPersonalTT) window.renderFacultyPersonalTT();
             showToast('Subject Updated', `${code} has been updated.`);
         });
     }
-    
+
     document.getElementById('editSubjectOriginalCode').value = originalCode;
     document.getElementById('editSubjectType').value = type;
-    document.getElementById('editSubjectCustomIndex').value = id; 
-    
+    document.getElementById('editSubjectCustomIndex').value = id;
+
     const codeInput = document.getElementById('editSubjectCode');
     codeInput.value = subject.code || originalCode;
-    codeInput.disabled = (type === 'builtin'); 
-    
+    codeInput.disabled = (type === 'builtin');
+
     document.getElementById('editSubjectTitle').value = subject.title || '';
     document.getElementById('editSubjectFaculty').value = subject.faculty || '';
     document.getElementById('editSubjectVenue').value = subject.venue || '';
-    
+
     new bootstrap.Modal(document.getElementById('editSubjectModalDynamic')).show();
 };
 
-window.deleteAdminSubject = function(type, id) {
+window.deleteAdminSubject = function (type, id) {
     if (!adminOnly()) return;
-    
+
     if (type === 'custom') {
         if (!confirm('Are you sure you want to delete this custom subject?')) return;
         const removed = adminResources.subjects.splice(id, 1)[0];
         saveAdminResources();
-        
+
         // Remove from course reference list
         const ci = courseReferenceList.findIndex(c => c.short === removed.short);
         if (ci >= 0) courseReferenceList.splice(ci, 1);
-        
+
         renderAdminResourcesUI();
         renderCourseRefTable();
         populateEditSubjectSelect();
@@ -3829,7 +4490,7 @@ window.deleteAdminSubject = function(type, id) {
     } else {
         if (!confirm('Are you sure you want to hide this built-in subject? It will not appear in the View Subjects list but will still function in the timetable.')) return;
         let hidden = [];
-        try { hidden = JSON.parse(localStorage.getItem('sece_hidden_builtin_subjects') || '[]'); } catch(e){}
+        try { hidden = JSON.parse(localStorage.getItem('sece_hidden_builtin_subjects') || '[]'); } catch (e) { }
         if (!hidden.includes(id)) {
             hidden.push(id);
             localStorage.setItem('sece_hidden_builtin_subjects', JSON.stringify(hidden));
@@ -3839,12 +4500,12 @@ window.deleteAdminSubject = function(type, id) {
     }
 };
 
-window.editAdminVenue = function(type, id) {
+window.editAdminVenue = function (type, id) {
     if (!adminOnly()) return;
-    
+
     let venue = null;
     let originalName = null;
-    
+
     if (type === 'custom') {
         venue = adminResources.venues[id];
         originalName = typeof venue === 'string' ? venue : venue.name;
@@ -3852,7 +4513,7 @@ window.editAdminVenue = function(type, id) {
     } else {
         originalName = id;
         let overrides = {};
-        try { overrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}'); } catch(e){}
+        try { overrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}'); } catch (e) { }
         venue = overrides[id] || { name: id, type: 'Built-in', block: '', capacity: '' };
     }
 
@@ -3897,28 +4558,28 @@ window.editAdminVenue = function(type, id) {
                 </div>
             </div>
         `);
-        
-        document.getElementById('dynamicEditVenueForm').addEventListener('submit', function(e) {
+
+        document.getElementById('dynamicEditVenueForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const origName = document.getElementById('editVenueOriginalName').value;
             const t = document.getElementById('editVenueType').value;
             const customIdx = document.getElementById('editVenueCustomIndex').value;
-            
+
             const name = document.getElementById('editVenueName').value.trim();
             const typeVal = document.getElementById('editVenueTypeInput').value.trim();
             const block = document.getElementById('editVenueBlock').value.trim();
             const capacity = document.getElementById('editVenueCapacity').value.trim();
-            
+
             if (t === 'custom') {
                 adminResources.venues[customIdx] = { name, type: typeVal, block, capacity };
                 saveAdminResources();
             } else {
                 let overrides = {};
-                try { overrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}'); } catch(e){}
+                try { overrides = JSON.parse(localStorage.getItem('sece_builtin_venue_overrides') || '{}'); } catch (e) { }
                 overrides[origName] = { name, type: typeVal, block, capacity };
                 localStorage.setItem('sece_builtin_venue_overrides', JSON.stringify(overrides));
             }
-            
+
             bootstrap.Modal.getInstance(document.getElementById('editVenueModalDynamic')).hide();
             renderAdminResourcesUI();
             showToast('Venue Updated', `${name} has been updated.`);
@@ -3927,22 +4588,22 @@ window.editAdminVenue = function(type, id) {
 
     document.getElementById('editVenueOriginalName').value = originalName;
     document.getElementById('editVenueType').value = type;
-    document.getElementById('editVenueCustomIndex').value = id; 
-    
+    document.getElementById('editVenueCustomIndex').value = id;
+
     const nameInput = document.getElementById('editVenueName');
     nameInput.value = venue.name || originalName;
-    nameInput.disabled = (type === 'builtin'); 
-    
+    nameInput.disabled = (type === 'builtin');
+
     document.getElementById('editVenueTypeInput').value = venue.type || '';
     document.getElementById('editVenueBlock').value = venue.block || '';
     document.getElementById('editVenueCapacity').value = venue.capacity || '';
-    
+
     new bootstrap.Modal(document.getElementById('editVenueModalDynamic')).show();
 };
 
-window.deleteAdminVenue = function(type, id) {
+window.deleteAdminVenue = function (type, id) {
     if (!adminOnly()) return;
-    
+
     if (type === 'custom') {
         if (!confirm('Are you sure you want to delete this custom venue?')) return;
         adminResources.venues.splice(id, 1);
@@ -3952,7 +4613,7 @@ window.deleteAdminVenue = function(type, id) {
     } else {
         if (!confirm('Are you sure you want to hide this built-in venue?')) return;
         let hidden = [];
-        try { hidden = JSON.parse(localStorage.getItem('sece_hidden_builtin_venues') || '[]'); } catch(e){}
+        try { hidden = JSON.parse(localStorage.getItem('sece_hidden_builtin_venues') || '[]'); } catch (e) { }
         if (!hidden.includes(id)) {
             hidden.push(id);
             localStorage.setItem('sece_hidden_builtin_venues', JSON.stringify(hidden));
@@ -3969,7 +4630,7 @@ function importAdminSubjectExcel(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         try {
             const data = e.target.result;
             const workbook = XLSX.read(data, { type: 'binary' });
@@ -3981,27 +4642,27 @@ function importAdminSubjectExcel(event) {
                 alert('The imported file is empty or missing headers.');
                 return;
             }
-            
+
             let addedCount = 0;
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
                 if (!row || row.length === 0) continue;
-                
+
                 const code = String(row[0] || '').trim().toUpperCase();
                 const title = String(row[1] || '').trim();
                 const faculty = String(row[2] || '').trim();
                 const venue = String(row[3] || '').trim();
-                
+
                 if (!code || !title) continue;
-                
+
                 const short = code;
-                if (!adminResources.subjects.some(s => s.code === code) && 
+                if (!adminResources.subjects.some(s => s.code === code) &&
                     !courseReferenceList.some(s => s.code === code || s.short === short)) {
                     adminResources.subjects.push({ short, code, title, faculty, category: 'cat-theory', venue });
                     addedCount++;
                 }
             }
-            
+
             if (addedCount > 0) {
                 saveAdminResources();
                 mergeCustomSubjectsIntoCourseList();
@@ -4061,24 +4722,24 @@ function handleAddVenue(e) {
     const type = document.getElementById('newVenueType') ? document.getElementById('newVenueType').value.trim() : '';
     const block = document.getElementById('newVenueBlock') ? document.getElementById('newVenueBlock').value.trim() : '';
     const capacity = document.getElementById('newVenueCapacity') ? document.getElementById('newVenueCapacity').value.trim() : '';
-    
+
     if (!venueName) return;
-    
+
     // Check built-in venues too
     const builtInVenueNames = new Set([
         'SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'
     ]);
-    courseReferenceList.forEach(c => { if(c.venue && c.venue !== '-' && c.venue !== 'TBD') builtInVenueNames.add(c.venue.trim().toLowerCase()); });
-    activeSections.forEach(s => { if(s.classroom && s.classroom !== '-' && s.classroom !== 'TBD') builtInVenueNames.add(s.classroom.trim().toLowerCase()); });
-    
+    courseReferenceList.forEach(c => { if (c.venue && c.venue !== '-' && c.venue !== 'TBD') builtInVenueNames.add(c.venue.trim().toLowerCase()); });
+    activeSections.forEach(s => { if (s.classroom && s.classroom !== '-' && s.classroom !== 'TBD') builtInVenueNames.add(s.classroom.trim().toLowerCase()); });
+
     const isBuiltIn = builtInVenueNames.has(venueName.toLowerCase());
     const isCustom = adminResources.venues.some(v => (typeof v === 'string' ? v.toLowerCase() : v.name.toLowerCase()) === venueName.toLowerCase());
-    
+
     if (isBuiltIn || isCustom) {
         alert('That venue already exists.');
         return;
     }
-    
+
     const venueObj = { name: venueName, type: type, block: block, capacity: capacity };
     adminResources.venues.push(venueObj);
     saveAdminResources();
@@ -4094,7 +4755,7 @@ function importAdminVenueExcel(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         try {
             const data = e.target.result;
             const workbook = XLSX.read(data, { type: 'binary' });
@@ -4106,25 +4767,25 @@ function importAdminVenueExcel(event) {
                 alert('The imported file is empty or missing headers.');
                 return;
             }
-            
+
             let addedCount = 0;
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
                 if (!row || row.length === 0) continue;
-                
+
                 const venueName = String(row[0] || '').trim();
                 const type = String(row[1] || '').trim();
                 const block = String(row[2] || '').trim();
                 const capacity = String(row[3] || '').trim();
-                
+
                 if (!venueName) continue;
-                
+
                 if (!adminResources.venues.some(v => (typeof v === 'string' ? v.toLowerCase() : (v.name || '').toLowerCase()) === venueName.toLowerCase())) {
                     adminResources.venues.push({ name: venueName, type: type, block: block, capacity: capacity });
                     addedCount++;
                 }
             }
-            
+
             if (addedCount > 0) {
                 saveAdminResources();
                 renderAdminResourcesUI();
@@ -4179,6 +4840,14 @@ function populateEditSubjectSelect() {
     adminResources.subjects.forEach(s => {
         if (!entries.some(e => e[0] === s.short)) entries.push([s.short, `${s.code} ${s.title}`]);
     });
+    const liveCatalog = window._ttSuggestionCatalog;
+    if (liveCatalog && Array.isArray(liveCatalog.subjects)) {
+        liveCatalog.subjects.forEach(s => {
+            if (s.label && !entries.some(e => e[0].toUpperCase() === s.label.toUpperCase())) {
+                entries.push([s.label, s.title || s.code || s.label]);
+            }
+        });
+    }
     const datalist = document.getElementById('subjectOptions');
     if (datalist) {
         datalist.innerHTML = entries.map(([value, label]) =>
@@ -4191,7 +4860,6 @@ function populateEditSubjectSelect() {
 function populateEditVenueSelect() {
     const input = document.getElementById('editVenue');
     if (!input || input.tagName === 'SELECT') return;
-    // Keep the existing editable text field while showing a datalist of saved venues.
     let dl = document.getElementById('savedVenueOptions');
     if (!dl) {
         dl = document.createElement('datalist');
@@ -4199,7 +4867,36 @@ function populateEditVenueSelect() {
         document.body.appendChild(dl);
         input.setAttribute('list', 'savedVenueOptions');
     }
-    dl.innerHTML = adminResources.venues.map(v => `<option value="${v}"></option>`).join('');
+    const seen = new Set();
+    const opts = [];
+    const addV = (name) => {
+        const clean = String(typeof name === 'string' ? name : (name && (name.name || name.label)) || '').trim();
+        if (!clean || clean === '-' || clean.toUpperCase() === 'TBA' || seen.has(clean.toUpperCase())) return;
+        seen.add(clean.toUpperCase());
+        opts.push(clean);
+    };
+    ['SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'].forEach(addV);
+    (adminResources.venues || []).forEach(addV);
+    (activeSections || []).forEach(s => addV(s.classroom));
+    const liveCatalog = window._ttSuggestionCatalog;
+    if (liveCatalog && Array.isArray(liveCatalog.venues)) liveCatalog.venues.forEach(addV);
+    dl.innerHTML = opts.map(v => `<option value="${v.replace(/"/g, '&quot;')}"></option>`).join('');
+
+    // Keep Staff datalist (#savedStaffOptions) synced for Edit Period modal too
+    const staffDl = document.getElementById('savedStaffOptions');
+    if (staffDl) {
+        const staffSeen = new Set();
+        const staffNames = [];
+        const addS = (n) => {
+            const clean = String(typeof n === 'string' ? n : (n && (n.label || n.name)) || '').trim();
+            if (!clean || clean === '-' || staffSeen.has(clean.toUpperCase())) return;
+            staffSeen.add(clean.toUpperCase());
+            staffNames.push(clean);
+        };
+        if (Array.isArray(staffDirectory)) staffDirectory.forEach(addS);
+        if (liveCatalog && Array.isArray(liveCatalog.staff)) liveCatalog.staff.forEach(addS);
+        staffDl.innerHTML = staffNames.map(s => `<option value="${s.replace(/"/g, '&quot;')}"></option>`).join('');
+    }
 }
 
 // =========================
@@ -4405,6 +5102,33 @@ function downloadTimetablePNG() {
     });
 }
 
+function printTimetableOnly() {
+    // Close open sidebar dropdowns so menu overlay never prints
+    document.querySelectorAll('.dropdown-menu.show').forEach(el => el.classList.remove('show'));
+    document.querySelectorAll('[data-bs-toggle="dropdown"][aria-expanded="true"]').forEach(el => el.setAttribute('aria-expanded', 'false'));
+
+    const modalIds = ['adminViewStudentTtModal', 'adminFacultyTimetableModal', 'adminViewEditTimetableModal'];
+    let activeModal = null;
+    for (const id of modalIds) {
+        const m = document.getElementById(id);
+        if (m && m.classList.contains('show')) { activeModal = m; break; }
+    }
+
+    const cleanup = () => {
+        document.body.classList.remove('printing-modal-tt');
+        if (activeModal) activeModal.classList.remove('print-modal-active');
+        window.removeEventListener('afterprint', cleanup);
+    };
+
+    if (activeModal) {
+        document.body.classList.add('printing-modal-tt');
+        activeModal.classList.add('print-modal-active');
+    }
+    window.addEventListener('afterprint', cleanup);
+    requestAnimationFrame(() => setTimeout(() => window.print(), 60));
+}
+window.printTimetableOnly = printTimetableOnly;
+
 // Export Timetable as CSV
 /* replaced */
 
@@ -4437,6 +5161,7 @@ async function fetchPeriodNotificationsFromAPI() {
             venue: '',
             source: n.source || 'manual'
         })).filter(n => n.date >= todayDateStr());
+        updateWebsiteNotificationBadge(_periodNotifCache);
         return _periodNotifCache;
     } catch (e) {
         console.warn('Period notifications API unavailable, using localStorage fallback:', e);
@@ -4444,6 +5169,30 @@ async function fetchPeriodNotificationsFromAPI() {
             const a = JSON.parse(localStorage.getItem(PERIOD_NOTIFICATIONS_KEY) || '[]');
             return Array.isArray(a) ? a : [];
         } catch (_) { return []; }
+    }
+}
+
+function updateWebsiteNotificationBadge(notifList) {
+    const badge = document.getElementById('headerNotifBadge');
+    if (!badge) return;
+    const arr = Array.isArray(notifList) ? notifList : loadPeriodNotifications();
+    let count = 0;
+    if (currentUserRole === 'STUDENT') {
+        const rec = typeof currentStudentRecord === 'function' ? currentStudentRecord() : null;
+        const studentSec = (rec && rec.sec) || localStorage.getItem('sece_last_viewed_section') || currentSection || '';
+        const normStu = normalizeSectionCompare(studentSec);
+        count = arr.filter(n => {
+            const nSec = normalizeSectionCompare(n.section);
+            return normStu && nSec && nSec === normStu;
+        }).length;
+    } else {
+        count = arr.length;
+    }
+    if (count > 0) {
+        badge.innerText = String(count);
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
     }
 }
 
@@ -4470,9 +5219,8 @@ async function savePeriodNotificationToAPI(notif) {
         source: notif.source || 'manual'
     };
     try {
-        const res = await fetch('/api/operations/period-notifications', {
+        const res = await apiFetch('/api/operations/period-notifications', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error('Save failed');
@@ -4527,19 +5275,25 @@ async function renderPeriodNotifications() {
     await fetchPeriodNotificationsFromAPI();
     const arr = purgeExpiredPeriodNotifications();
 
-    // Filter to only show notifications for the CURRENT view's Section if applicable, unless they don't have a section attached.
+    // Filter strictly to ONLY show notifications for the Student's own Class / Section
     let filteredArr = arr;
-    // Only strictly filter by section for Students. Faculty and Admins need to see all active notifications.
     if (currentUserRole === 'STUDENT') {
-        let studentSec = currentSection;
+        let studentSec = localStorage.getItem('sece_last_viewed_section') || currentSection || '';
         if (typeof currentStudentRecord === 'function') {
             const rec = currentStudentRecord();
             if (rec && rec.sec) {
                 studentSec = rec.sec;
             }
         }
-        if (studentSec && studentSec !== '') {
-            filteredArr = arr.filter(n => !n.section || n.section === studentSec || n.section === 'All');
+        const normStuSec = normalizeSectionCompare(studentSec);
+        if (normStuSec) {
+            filteredArr = arr.filter(n => {
+                const normNSec = normalizeSectionCompare(n.section);
+                if (normNSec === 'ALL' && n.source === 'manual') return true;
+                return normNSec !== '' && normNSec === normStuSec;
+            });
+        } else {
+            filteredArr = [];
         }
     }
 
@@ -4778,17 +5532,23 @@ window.onSubjectSelectChange = onSubjectSelectChange;
 window.setAsWednesdayALT = setAsWednesdayALT;
 window.savePeriodChanges = savePeriodChanges;
 window.quickAssignWednesdayALT = quickAssignWednesdayALT;
-window.showTtPopup = function() {
+window.showTtPopup = function () {
     const wrapper = document.getElementById('ttPopupOverlayWrapper');
     if (wrapper) {
         wrapper.classList.remove('d-none');
         wrapper.classList.remove('tt-fullscreen-modal'); // ensure it's inline
-        // Hide the fixed close button since we will add an inline one
         const closeBtn = document.getElementById('closeTtPopupBtn');
         if (closeBtn) closeBtn.classList.add('d-none');
+        if (typeof window.loadTimetableData === 'function') {
+            window.loadTimetableData().then(() => {
+                renderTimetableGrid();
+                renderCourseRefTable();
+            });
+        }
+        wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 };
-window.closeTtPopup = function() {
+window.closeTtPopup = function () {
     const wrapper = document.getElementById('ttPopupOverlayWrapper');
     const closeBtn = document.getElementById('closeTtPopupBtn');
     if (wrapper && closeBtn) {
@@ -4806,7 +5566,7 @@ window.openManageStudentsModal = function () {
     loadRecentStudents();
 };
 
-window.parseStudentDisplayData = function(s) {
+window.parseStudentDisplayData = function (s) {
     let deptDisplay = s.dept || (s.department && (s.department.code || s.department.name)) || (typeof s.department === 'string' ? s.department : '-');
     let classDisplay = s.class || (typeof s.course === 'string' ? s.course : (s.course && (s.course.code || s.course.name))) || '-';
     let secDisplay = s.sec || (typeof s.section === 'string' ? s.section : (s.section && (s.section.sectionName || s.section.id))) || '-';
@@ -4820,7 +5580,7 @@ window.parseStudentDisplayData = function(s) {
             secDisplay = parts.slice(2).join(' ');
         }
     }
-    
+
     if (semDisplay === '-') {
         if (classDisplay === 'I') semDisplay = '1';
         else if (classDisplay === 'II') semDisplay = '3';
@@ -4875,30 +5635,30 @@ async function loadRecentStudents() {
                     return;
                 }
                 displayData.reverse().forEach((s, idx) => {
-                const tr = document.createElement('tr');
-                const roll = s.registerNumber || s.roll || '-';
-                const fName = s.firstName || s.name || '';
-                const lName = s.lastName || '';
-                const name = (fName + ' ' + lName).trim() || '-';
-                
-                // Extract dept, class, sec, sem from existing objects if available
-                let deptDisplay = '-', classDisplay = '-', secDisplay = '-', semDisplay = '-';
-                if (window.parseStudentDisplayData && s.registerNumber) {
-                    const pd = window.parseStudentDisplayData(s);
-                    deptDisplay = pd.deptDisplay; classDisplay = pd.classDisplay; secDisplay = pd.secDisplay; semDisplay = pd.semDisplay;
-                } else {
-                    secDisplay = s.section ? (s.section.sectionName || s.section.name) : (s.sec || '-');
-                    if (secDisplay && secDisplay !== '-') {
-                        const parts = secDisplay.split(' ');
-                        if (parts.length >= 3) {
-                            classDisplay = parts[0];
-                            deptDisplay = parts[1];
-                            secDisplay = parts.slice(2).join(' ');
+                    const tr = document.createElement('tr');
+                    const roll = s.registerNumber || s.roll || '-';
+                    const fName = s.firstName || s.name || '';
+                    const lName = s.lastName || '';
+                    const name = (fName + ' ' + lName).trim() || '-';
+
+                    // Extract dept, class, sec, sem from existing objects if available
+                    let deptDisplay = '-', classDisplay = '-', secDisplay = '-', semDisplay = '-';
+                    if (window.parseStudentDisplayData && s.registerNumber) {
+                        const pd = window.parseStudentDisplayData(s);
+                        deptDisplay = pd.deptDisplay; classDisplay = pd.classDisplay; secDisplay = pd.secDisplay; semDisplay = pd.semDisplay;
+                    } else {
+                        secDisplay = s.section ? (s.section.sectionName || s.section.name) : (s.sec || '-');
+                        if (secDisplay && secDisplay !== '-') {
+                            const parts = secDisplay.split(' ');
+                            if (parts.length >= 3) {
+                                classDisplay = parts[0];
+                                deptDisplay = parts[1];
+                                secDisplay = parts.slice(2).join(' ');
+                            }
                         }
                     }
-                }
 
-                tr.innerHTML = `
+                    tr.innerHTML = `
                     <td class="text-muted">${idx + 1}</td>
                     <td><code class="text-warning fw-bold">${roll}</code></td>
                     <td><strong>${name}</strong></td>
@@ -4917,8 +5677,8 @@ async function loadRecentStudents() {
                         <button class="btn btn-sm btn-outline-danger" onclick="window.deletePersistentStudent(${s.id || `'${roll}'`})" title="Delete student"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 `;
-                list.appendChild(tr);
-            });
+                    list.appendChild(tr);
+                });
             }
         }
     } catch (err) {
@@ -4931,50 +5691,73 @@ async function loadRecentStudents() {
 window._credDataCache = [];
 window._credCurrentRole = 'STUDENT';
 
-window.renderCredentialsList = async function() {
+window.renderCredentialsList = async function () {
     const tbody = document.getElementById('credentialsTableBody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading credentials...</td></tr>';
-    
+
     try {
         const token = localStorage.getItem('jwt_token') || '';
         const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
-        
+
         // Fetch all data in parallel
         const [credRes, studentRes, teacherRes] = await Promise.all([
             fetch('/api/admin/credentials', { headers }),
             fetch('/api/students', { headers }),
             fetch('/api/teachers', { headers })
         ]);
-        
+
         let creds = [];
         let students = [];
         let teachers = [];
-        
+
         let debugStatus = `credRes: ${credRes.status} ${credRes.statusText}`;
-        
-        if (credRes.ok) creds = await credRes.json();
-        if (studentRes.ok) students = await studentRes.json();
-        if (teacherRes.ok) teachers = await teacherRes.json();
-        
+        if (credRes.ok && studentRes.ok && teacherRes.ok) {
+            creds = await credRes.json();
+            students = await studentRes.json();
+            teachers = await teacherRes.json();
+        } else {
+            console.warn("Backend unavailable or failed. Using local storage data.");
+            studentsRoster.forEach(s => {
+                const uname = s.username || (s.roll ? s.roll.toLowerCase() : '');
+                creds.push({
+                    username: uname,
+                    role: 'STUDENT',
+                    rawPassword: getStoredPassword(uname) || getStudentPassword(s),
+                    active: 'true'
+                });
+            });
+            staffDirectory.forEach(t => {
+                const u = buildGeneratedUsername('FACULTY', t.name);
+                creds.push({
+                    username: u,
+                    role: 'FACULTY',
+                    rawPassword: getStoredPassword(u) || buildGeneratedPassword('FACULTY', u),
+                    active: 'true'
+                });
+            });
+            students = studentsRoster;
+            teachers = staffDirectory;
+        }
+
         window._debugFetchStatus = debugStatus;
-        
+
         // Enhance credentials with extra info
         window._credDataCache = creds.map(c => {
             const extra = { name: '-', sectionDept: '-', isAdvisor: false };
             if (c.role === 'ROLE_STUDENT' || c.role === 'STUDENT') {
-                const s = students.find(x => (x.user && x.user.username === c.username) || x.username === c.username || x.registerNumber?.toLowerCase() === c.username);
+                const s = students.find(x => (x.user && x.user.username === c.username) || x.username === c.username || x.registerNumber?.toLowerCase() === c.username || (x.roll && x.roll.toLowerCase() === c.username));
                 if (s) {
                     extra.name = s.name || s.studentName || s.firstName || '-';
-                    extra.sectionDept = s.section ? s.section.sectionName : (s.department ? s.department.name : '-');
+                    extra.sectionDept = s.section ? s.section.sectionName : (s.department ? s.department.name : (s.sec || '-'));
                     extra.entityId = s.id || s.registerNumber || s.roll || `'${s.roll}'`;
                 }
             } else if (c.role === 'ROLE_FACULTY' || c.role === 'FACULTY') {
-                const t = teachers.find(x => (x.user && x.user.username === c.username) || x.username === c.username);
+                const t = teachers.find(x => (x.user && x.user.username === c.username) || x.username === c.username || buildGeneratedUsername('FACULTY', x.name) === c.username);
                 if (t) {
                     extra.name = t.displayName || t.name || t.firstName || '-';
                     extra.sectionDept = t.department ? (t.department.name || t.department) : (t.dept || '-');
-                    extra.entityId = t.id || t.employeeId || `'${t.employeeId}'`;
+                    extra.entityId = t.id || t.employeeId || `'${t.name}'`;
                     if (t.classAdvisorFor && t.classAdvisorFor.trim() !== '') {
                         extra.isAdvisor = true;
                     }
@@ -4982,26 +5765,26 @@ window.renderCredentialsList = async function() {
             }
             return { ...c, ...extra };
         });
-        
+
         // Switch to the default tab
         window.switchCredTab('STUDENT');
-        
+
     } catch (e) {
         tbody.innerHTML = '<tr><td colSpan="6" class="text-center text-danger py-4">Error loading data.</td></tr>';
     }
 };
 
-window.switchCredTab = function(roleType) {
+window.switchCredTab = function (roleType) {
     window._credCurrentRole = roleType;
     document.getElementById('credTabStudents')?.classList.remove('active', 'text-white', 'text-dark');
     document.getElementById('credTabFaculty')?.classList.remove('active', 'text-white', 'text-dark');
     document.getElementById('credTabAdvisor')?.classList.remove('active', 'text-white', 'text-dark');
-    
+
     // reset unselected to their normal colors
     document.getElementById('credTabStudents')?.classList.add('text-info');
     document.getElementById('credTabFaculty')?.classList.add('text-info');
     document.getElementById('credTabAdvisor')?.classList.add('text-warning');
-    
+
     if (roleType === 'STUDENT') {
         const el = document.getElementById('credTabStudents');
         el?.classList.remove('text-info');
@@ -5015,17 +5798,17 @@ window.switchCredTab = function(roleType) {
         el?.classList.remove('text-warning');
         el?.classList.add('active', 'text-dark', 'fw-bold');
     }
-    
+
     window.filterCredentials();
 };
 
-window.filterCredentials = function() {
+window.filterCredentials = function () {
     const tbody = document.getElementById('credentialsTableBody');
     if (!tbody || !window._credDataCache) return;
-    
+
     const input = document.getElementById('credSearchInput');
     const query = input ? input.value.toLowerCase().trim() : '';
-    
+
     // Filter by role
     let filtered = window._credDataCache.filter(c => {
         if (window._credCurrentRole === 'STUDENT') return c.role === 'ROLE_STUDENT' || c.role === 'STUDENT';
@@ -5033,26 +5816,21 @@ window.filterCredentials = function() {
         if (window._credCurrentRole === 'CLASS_ADVISOR') return (c.role === 'ROLE_FACULTY' || c.role === 'FACULTY') && c.isAdvisor;
         return false;
     });
-    
+
     // Filter by query
     if (query) {
-        filtered = filtered.filter(c => 
+        filtered = filtered.filter(c =>
             (c.username && c.username.toLowerCase().includes(query)) ||
             (c.name && c.name.toLowerCase().includes(query)) ||
             (c.sectionDept && c.sectionDept.toLowerCase().includes(query))
         );
     }
-    
+
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colSpan="7" class="text-center text-muted py-4">
-            No records found. <br/>
-            DEBUG: Status = ${window._debugFetchStatus || 'unknown'}. <br/>
-            DEBUG: Cache Length = ${window._credDataCache ? window._credDataCache.length : 'null'}. <br/>
-            DEBUG: Cache = ${JSON.stringify(window._credDataCache).substring(0, 200)}...
-        </td></tr>`;
+        tbody.innerHTML = '<tr><td colSpan="7" class="text-center text-muted py-4">No matching credentials found.</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = filtered.map((c, idx) => `
         <tr>
             <td>${idx + 1}</td>
@@ -5088,7 +5866,7 @@ window.filterCredentials = function() {
     `).join('');
 };
 
-window.adminResetPassword = function(username) {
+window.adminResetPassword = function (username) {
     document.getElementById('resetPasswordUsername').textContent = username;
     document.getElementById('resetPasswordUsernameInput').value = username;
     document.getElementById('adminNewPassword').value = '';
@@ -5096,15 +5874,15 @@ window.adminResetPassword = function(username) {
     modal.show();
 };
 
-window.adminSubmitResetPassword = async function() {
+window.adminSubmitResetPassword = async function () {
     const username = document.getElementById('resetPasswordUsernameInput').value;
     const newPassword = document.getElementById('adminNewPassword').value;
-    
+
     if (!newPassword || newPassword.length < 6) {
         showToast('Password must be at least 6 characters long.', 'danger');
         return;
     }
-    
+
     try {
         const token = localStorage.getItem('jwt_token') || '';
         const res = await fetch('/api/admin/credentials/reset', {
@@ -5115,13 +5893,13 @@ window.adminSubmitResetPassword = async function() {
             },
             body: JSON.stringify({ username, newPassword })
         });
-        
+
         if (res.ok) {
             showToast('Password reset successfully!', 'success');
             const modalEl = document.getElementById('adminResetPasswordModal');
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
-            
+
             // Reload credentials to show updated password
             window.renderCredentialsList();
         } else {
@@ -5133,11 +5911,11 @@ window.adminSubmitResetPassword = async function() {
     }
 };
 
-window.renderAdminFacultyDetails = async function() {
+window.renderAdminFacultyDetails = async function () {
     const tbody = document.getElementById('adminFacultyDetailsBody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading faculty data...</td></tr>';
-    
+
     try {
         const token = localStorage.getItem('jwt_token') || '';
         const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
@@ -5154,7 +5932,7 @@ window.renderAdminFacultyDetails = async function() {
     }
 };
 
-window.searchAdminFacultyDetails = function() {
+window.searchAdminFacultyDetails = function () {
     const input = document.getElementById('adminFacultySearchInput');
     if (!input || !window._allAdminFacultyCache) return;
     const query = input.value.toLowerCase().trim();
@@ -5164,15 +5942,15 @@ window.searchAdminFacultyDetails = function() {
     }
     const filtered = window._allAdminFacultyCache.filter(f => {
         return (f.name && f.name.toLowerCase().includes(query)) ||
-               (f.collegeEmail && f.collegeEmail.toLowerCase().includes(query)) ||
-               (f.user && f.user.username && f.user.username.toLowerCase().includes(query)) ||
-               (f.displayName && f.displayName.toLowerCase().includes(query)) ||
-               (f.department && f.department.name && f.department.name.toLowerCase().includes(query));
+            (f.collegeEmail && f.collegeEmail.toLowerCase().includes(query)) ||
+            (f.user && f.user.username && f.user.username.toLowerCase().includes(query)) ||
+            (f.displayName && f.displayName.toLowerCase().includes(query)) ||
+            (f.department && f.department.name && f.department.name.toLowerCase().includes(query));
     });
     window._renderAdminFacultyTable(filtered);
 };
 
-window._renderAdminFacultyTable = function(facultyList) {
+window._renderAdminFacultyTable = function (facultyList) {
     const tbody = document.getElementById('adminFacultyDetailsBody');
     if (!tbody) return;
     if (!facultyList || facultyList.length === 0) {
@@ -5262,11 +6040,11 @@ window.loadAdminFullFaculty = async function () {
     }
 };
 
-window.editPersistentFaculty = function(id) {
+window.editPersistentFaculty = function (id) {
     if (!window.lastLoadedFaculty) return;
     const t = window.lastLoadedFaculty.find(f => f.id === id || f.name === id);
     if (!t) return;
-    
+
     try {
         const m1 = bootstrap.Modal.getInstance(document.getElementById('adminFacultyDetailsModal'));
         if (m1) m1.hide();
@@ -5274,32 +6052,32 @@ window.editPersistentFaculty = function(id) {
         if (m2) m2.hide();
         const m3 = bootstrap.Modal.getInstance(document.getElementById('manageFacultyModal'));
         if (m3) m3.hide();
-    } catch(e) {}
-    
+    } catch (e) { }
+
     window.currentEditFacultyDepartment = t.department;
-    
+
     document.getElementById('editFacultyId').value = t.id || '';
     document.getElementById('editFacultyEmpId').value = t.employeeId || '';
     document.getElementById('editFacultyFirstName').value = t.firstName || (t.name ? t.name.split(' ')[0] : '');
-    document.getElementById('editFacultyLastName').value = t.lastName || (t.name ? t.name.substring(t.name.indexOf(' ')+1) : '');
+    document.getElementById('editFacultyLastName').value = t.lastName || (t.name ? t.name.substring(t.name.indexOf(' ') + 1) : '');
     document.getElementById('editFacultyDept').value = t.department ? (t.department.name || t.department) : (t.dept || '');
     document.getElementById('editFacultySubject').value = t.subjectHandling || '';
     document.getElementById('editFacultyPersonalEmail').value = t.personalEmail || t.email || '';
     document.getElementById('editFacultyCollegeEmail').value = t.collegeEmail || '';
     document.getElementById('editFacultyPhone1').value = t.phone1 || t.phone || '';
     document.getElementById('editFacultyPhone2').value = t.phone2 || '';
-    
+
     const modal = new bootstrap.Modal(document.getElementById('editFacultyModal'));
     modal.show();
 };
 
-window.saveEditFaculty = async function() {
+window.saveEditFaculty = async function () {
     const id = document.getElementById('editFacultyId').value;
     if (!id) {
         alert("Cannot update faculty without an ID.");
         return;
     }
-    
+
     const deptInput = document.getElementById('editFacultyDept').value.trim();
     let deptObj = window.currentEditFacultyDepartment;
     if (typeof deptObj === 'string' || !deptObj) {
@@ -5307,40 +6085,40 @@ window.saveEditFaculty = async function() {
     } else {
         deptObj = { ...deptObj, name: deptInput };
     }
-    
+
     const payload = {
         employeeId: document.getElementById('editFacultyEmpId').value.trim(),
         firstName: document.getElementById('editFacultyFirstName').value.trim(),
         lastName: document.getElementById('editFacultyLastName').value.trim(),
-        department: deptObj, 
+        department: deptObj,
         subjectHandling: document.getElementById('editFacultySubject').value.trim(),
         personalEmail: document.getElementById('editFacultyPersonalEmail').value.trim(),
         collegeEmail: document.getElementById('editFacultyCollegeEmail').value.trim(),
         phone1: document.getElementById('editFacultyPhone1').value.trim(),
         phone2: document.getElementById('editFacultyPhone2').value.trim()
     };
-    
+
     try {
         const res = await apiFetch(`/api/teachers/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        
+
         if (res.ok) {
             showToast('Success', 'Faculty details updated successfully.', 'success');
             const m = bootstrap.Modal.getInstance(document.getElementById('editFacultyModal'));
-            if(m) m.hide();
-            
+            if (m) m.hide();
+
             // Refresh data from backend
             if (window.loadAdminFullFaculty) await window.loadAdminFullFaculty();
-            
+
             // Re-open search modal and trigger search to show updated changes
             try {
                 const adminFacModal = new bootstrap.Modal(document.getElementById('adminFacultyDetailsModal'));
                 adminFacModal.show();
                 if (window.searchAdminFacultyDetails) window.searchAdminFacultyDetails();
-            } catch(e){}
+            } catch (e) { }
         } else {
             alert('Failed to update faculty details. ' + await res.text());
         }
@@ -5462,7 +6240,7 @@ window.submitManageStudentForm = async function (e) {
         'ECE': 'BTECH-ECE'
     };
     const actualCourseId = deptCourseMap[deptId] || 'BTECH-' + deptId;
-    const fullSectionName = courseId + ' ' + deptId + ' ' + secId;
+    const fullSectionName = buildCanonicalStudentSection(courseId, deptId, secId, semester);
 
     const payload = {
         firstName: firstName,
@@ -5528,7 +6306,7 @@ window.submitAddFacultyForm = async function (e) {
     try {
         alertBox.classList.remove('d-none', 'alert-success', 'alert-danger');
         alertBox.innerText = 'Adding faculty...';
-        
+
         const res = await apiFetch('/api/teachers', {
             method: 'POST',
             body: JSON.stringify(payload)
@@ -5537,12 +6315,12 @@ window.submitAddFacultyForm = async function (e) {
             alertBox.classList.add('alert-success');
             alertBox.innerText = 'Faculty member added successfully! User account provisioned.';
             document.getElementById('manageFacultyForm').reset();
-            
+
             // Refresh tables to show the new data
             if (window.renderAdminFacultyDetails) window.renderAdminFacultyDetails();
             if (window.renderCredentialsList) window.renderCredentialsList();
             if (window.loadAdminFullFaculty) window.loadAdminFullFaculty();
-            
+
             setTimeout(() => alertBox.classList.add('d-none'), 5000);
         } else {
             alertBox.classList.add('alert-danger');
@@ -5611,9 +6389,6 @@ window.renderAdminResourcesUI = renderAdminResourcesUI;
 window.handleAddSubject = handleAddSubject;
 window.importAdminSubjectExcel = importAdminSubjectExcel;
 window.removeAdminSubject = removeAdminSubject;
-window.editAdminSubject = window.editAdminSubject;
-window.saveEditSubject = window.saveEditSubject;
-window.deleteAdminSubject = window.deleteAdminSubject;
 window.handleAdminAddClass = handleAdminAddClass;
 window.handleAddVenue = handleAddVenue;
 window.importAdminVenueExcel = importAdminVenueExcel;
@@ -5638,11 +6413,11 @@ window.renderPeriodNotifications = renderPeriodNotifications;
 window.createFacultyChangeNotification = createFacultyChangeNotification;
 window.showToast = showToast;
 
-window.updateBannerHeaders = function(targetSec) {
+window.updateBannerHeaders = function (targetSec) {
     let metaBatch = null;
     let metaSemStr = null;
     let metaAyStr = null;
-    
+
     if (targetSec) {
         try {
             const ttStr = localStorage.getItem('sece_tt_built_' + targetSec);
@@ -5652,14 +6427,14 @@ window.updateBannerHeaders = function(targetSec) {
                     const b = parseInt(ttData.metadata.batch);
                     if (!isNaN(b)) {
                         metaBatch = `${b} - ${b + 4}`;
-                        
+
                         const y = parseInt(ttData.metadata.year);
                         const s = parseInt(ttData.metadata.semester);
-                        
+
                         if (!isNaN(y) && !isNaN(s)) {
                             const roman = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
                             metaSemStr = `${roman[y] || y} Year / ${roman[s] || s} Semester`;
-                            
+
                             const ayStart = b + y - 1;
                             metaAyStr = `${ayStart} - ${ayStart + 1}`;
                         }
@@ -5709,7 +6484,7 @@ window.saveBatchSemEdit = function () {
     const yearSelect = document.getElementById('modalYearSelectStandalone') || document.getElementById('modalYearSelect');
     const semSelect = document.getElementById('modalSemSelectStandalone') || document.getElementById('modalSemSelect');
     const ayInput = document.getElementById('modalAcademicYearStandalone') || document.getElementById('modalAcademicYear');
-    
+
     const batchStart = batchInput ? parseInt(batchInput.value) || 2024 : 2024;
     const year = yearSelect ? yearSelect.value : "III Year";
     const sem = semSelect ? semSelect.value : "III Semester";
@@ -5842,12 +6617,12 @@ function _getFacultyTTKey() {
 // Render the saved faculty personal TT as a read-only panel in the faculty dashboard
 /* replaced */
 
-window.searchUserCredentials = async function() {
+window.searchUserCredentials = async function () {
     const input = document.getElementById('credentialSearchInput');
     const query = input ? input.value.trim().toLowerCase() : '';
-    
+
     const fetchFn = (typeof apiFetch === 'function') ? apiFetch : fetch;
-    
+
     // Students
     const studentsTbody = document.getElementById('credStudentsList');
     if (studentsTbody) {
@@ -5857,13 +6632,13 @@ window.searchUserCredentials = async function() {
             const res = await fetchFn('/api/students');
             if (res.ok) students = await res.json();
         } catch (e) { console.warn("Failed to load students for credentials view", e); }
-        
-        const filtered = query ? students.filter(s => 
+
+        const filtered = query ? students.filter(s =>
             (s.roll && String(s.roll).toLowerCase().includes(query)) ||
             (s.registerNumber && String(s.registerNumber).toLowerCase().includes(query)) ||
             (getStudentFullName(s).toLowerCase().includes(query))
         ) : students;
-        
+
         if (filtered.length === 0) {
             studentsTbody.innerHTML = '<tr><td colSpan="4" class="text-center text-muted py-4">No students found.</td></tr>';
         } else {
@@ -5890,7 +6665,7 @@ window.searchUserCredentials = async function() {
             }).join('');
         }
     }
-    
+
     // Faculty
     const facultyTbody = document.getElementById('credFacultyList');
     if (facultyTbody) {
@@ -5900,12 +6675,12 @@ window.searchUserCredentials = async function() {
             const res = await fetchFn('/api/teachers');
             if (res.ok) facultyList = await res.json();
         } catch (e) { console.warn("Failed to load faculty for credentials view", e); }
-        
-        const filtered = query ? facultyList.filter(f => 
+
+        const filtered = query ? facultyList.filter(f =>
             (getFacultyFullName(f).toLowerCase().includes(query)) ||
             (f.department && f.department.code && String(f.department.code).toLowerCase().includes(query))
         ) : facultyList;
-        
+
         if (filtered.length === 0) {
             facultyTbody.innerHTML = '<tr><td colSpan="4" class="text-center text-muted py-4">No faculty found.</td></tr>';
         } else {
@@ -5931,12 +6706,12 @@ window.searchUserCredentials = async function() {
     if (advisorTbody) {
         let advisors = (window.staffDirectory || []).filter(s => s.classAdvisorFor);
         if (query) {
-            advisors = advisors.filter(a => 
+            advisors = advisors.filter(a =>
                 (a.displayName || a.name || '').toLowerCase().includes(query) ||
                 (a.classAdvisorFor || '').toLowerCase().includes(query)
             );
         }
-        
+
         if (advisors.length === 0) {
             advisorTbody.innerHTML = '<tr><td colSpan="4" class="text-center text-muted py-4">No Class Advisors found.</td></tr>';
         } else {
@@ -5954,13 +6729,13 @@ window.searchUserCredentials = async function() {
     }
 };
 
-window.searchAdminFacultyDetails = async function() {
+window.searchAdminFacultyDetails = async function () {
     const tbody = document.getElementById('adminFacultyDetailsBody');
     const searchInput = document.getElementById('adminFacultySearchInput');
     if (!tbody) return;
-    
+
     tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">Loading faculty details...</td></tr>';
-    
+
     let facultyList = window.lastLoadedFaculty;
     if (!facultyList || facultyList.length === 0) {
         try {
@@ -5975,10 +6750,10 @@ window.searchAdminFacultyDetails = async function() {
             facultyList = window.staffDirectory || [];
         }
     }
-    
+
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
-    
-    const filtered = query ? facultyList.filter(f => 
+
+    const filtered = query ? facultyList.filter(f =>
         (f.employeeId && f.employeeId.toLowerCase().includes(query)) ||
         (f.firstName && f.firstName.toLowerCase().includes(query)) ||
         (f.lastName && f.lastName.toLowerCase().includes(query)) ||
@@ -5990,11 +6765,11 @@ window.searchAdminFacultyDetails = async function() {
         tbody.innerHTML = '<tr><td colSpan="8" class="text-center text-muted py-4">No faculty found.</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = filtered.map(f => {
         const name = ((f.firstName || '') + ' ' + (f.lastName || '')).trim() || f.name || '-';
         const dept = f.department ? (f.department.name || f.department) : (f.dept || '-');
-        
+
         return `
         <tr>
             <td class="align-middle">
@@ -6044,18 +6819,18 @@ function updateAnnouncementTicker() {
         const role = typeof getEffectiveRole === 'function' ? getEffectiveRole() : '';
         const today = typeof todayDateStr === 'function' ? todayDateStr() : new Date().toISOString().split('T')[0];
         const allNotifs = loadPeriodNotifications().filter(n => n.date === today);
-        
+
         if (role === 'STUDENT') {
             let studentSec = window.currentSection;
             if (typeof currentStudentRecord === 'function') {
                 const rec = currentStudentRecord();
                 if (rec && rec.sec) studentSec = rec.sec;
             }
-            
+
             // For the badge: match the modal logic which shows all relevant notifications
             const classNotifs = allNotifs.filter(n => !n.section || n.section === studentSec || n.section === 'All');
             badgeCount = classNotifs.length;
-            
+
             // For the marquee: only show specific class substitutions
             const exactClassNotifs = allNotifs.filter(n => n.section === window.currentSection);
             exactClassNotifs.forEach(n => {
@@ -6065,13 +6840,13 @@ function updateAnnouncementTicker() {
                 announcements.push({ text: msg });
             });
         } else if (role === 'ADMIN' || role === 'FACULTY') {
-            allNotifs.forEach(n => {
+            allNotifs.filter(n => n.source !== 'admin_faculty_tt_change').forEach(n => {
                 let msg = `Substitution (${n.section}): `;
                 if (n.originalFaculty) msg += `Faculty ${n.originalFaculty} is absent, `;
                 msg += `Period ${n.period} handled by ${n.staff}.`;
                 announcements.push({ text: msg });
             });
-            
+
             // For the badge: match the adminAbsentNotifModal logic (unique absent faculties)
             const todaysLeaves = {};
             if (typeof coverageRequests !== 'undefined') {
@@ -6084,34 +6859,38 @@ function updateAnnouncementTicker() {
                     if (sub.date === today && sub.originalFaculty) todaysLeaves[sub.originalFaculty] = true;
                 });
             }
-            allNotifs.forEach(n => {
+            allNotifs.filter(n => n.source !== 'admin_faculty_tt_change').forEach(n => {
                 let fac = n.originalFaculty;
-            if (!fac || fac.trim() === '') {
-                const pIdx = parseInt(n.period) - 1;
-                const sec = n.section || (typeof currentSection !== 'undefined' ? currentSection : 'II CSE C');
-                let dayName = n.day;
-                if (!dayName) {
-                    const daysArr = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                    const dObj = new Date(n.date);
-                    if (!isNaN(dObj.getTime())) dayName = daysArr[dObj.getDay()];
+                if (!fac || fac.trim() === '') {
+                    const pIdx = parseInt(n.period) - 1;
+                    const sec = n.section || (typeof currentSection !== 'undefined' ? currentSection : 'II CSE C');
+                    let dayName = n.day;
+                    if (!dayName) {
+                        const daysArr = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                        const dObj = new Date(n.date);
+                        if (!isNaN(dObj.getTime())) dayName = daysArr[dObj.getDay()];
+                    }
+
+                    if (sec && dayName && timetableData[sec] && timetableData[sec][dayName] && timetableData[sec][dayName][pIdx]) {
+                        fac = timetableData[sec][dayName][pIdx].faculty;
+                    }
+                    if (!fac || fac.trim() === '' || fac === '-') {
+                        fac = 'Unknown/Vacant Faculty';
+                    }
                 }
-                
-                if (sec && dayName && timetableData[sec] && timetableData[sec][dayName] && timetableData[sec][dayName][pIdx]) {
-                    fac = timetableData[sec][dayName][pIdx].faculty;
-                }
-                if (!fac || fac.trim() === '' || fac === '-') {
-                    fac = 'Unknown/Vacant Faculty';
-                }
-            }
                 todaysLeaves[fac] = true;
             });
-            badgeCount = Object.keys(todaysLeaves).length;
+            const adminFacCount = (role === 'FACULTY' && typeof getFacultyAdminTtNotifications === 'function')
+                ? getFacultyAdminTtNotifications().length
+                : 0;
+            badgeCount = Object.keys(todaysLeaves).length + adminFacCount;
         }
     }
 
-    // Update the notification badge on the bell icon
+    // Update the notification badge on the bell icon only when changed
     const badge = document.getElementById('headerNotifBadge');
-    if (badge) {
+    if (badge && window._lastBadgeCount !== badgeCount) {
+        window._lastBadgeCount = badgeCount;
         if (badgeCount > 0) {
             badge.innerText = badgeCount;
             badge.style.display = 'block';
@@ -6121,7 +6900,11 @@ function updateAnnouncementTicker() {
     }
 
     if (announcements.length === 0) {
-        container.style.display = 'none';
+        if (window._lastTickerVisible !== false) {
+            window._lastTickerVisible = false;
+            window._lastTickerHtml = '';
+            container.style.display = 'none';
+        }
         return;
     }
 
@@ -6130,17 +6913,23 @@ function updateAnnouncementTicker() {
         `<i class="fa-solid fa-star text-warning me-2" style="font-size:0.8rem"></i><span class="me-5 fw-bold">${a.text}</span>`
     ).join('<span class="mx-3 text-warning opacity-75">&#9733;</span>');
 
-    marquee.innerHTML = tickerHtml;
-    container.style.display = 'block';
+    if (window._lastTickerHtml !== tickerHtml) {
+        window._lastTickerHtml = tickerHtml;
+        marquee.innerHTML = tickerHtml;
+    }
+    if (window._lastTickerVisible !== true) {
+        window._lastTickerVisible = true;
+        container.style.display = 'block';
+    }
 }
 window.updateAnnouncementTicker = updateAnnouncementTicker;
 
-// Persistent polling: every 1.5s keep the ticker in sync with localStorage
-// This survives React re-renders since it runs independently
-setInterval(updateAnnouncementTicker, 1500);
+// Sync ticker with localStorage without restarting marquee animation unnecessarily
+if (window.__announcementTickerInterval) clearInterval(window.__announcementTickerInterval);
+window.__announcementTickerInterval = setInterval(updateAnnouncementTicker, 3000);
 
 
-window.renderAnnouncements = function() {
+window.renderAnnouncements = function () {
     const tbody = document.getElementById('manageAnnouncementsBody');
     const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
 
@@ -6163,7 +6952,7 @@ window.renderAnnouncements = function() {
 
 window.renderManageAnnouncementsList = window.renderAnnouncements;
 
-window.addAnnouncement = function() {
+window.addAnnouncement = function () {
     const input = document.getElementById('newAnnouncementInput');
     if (!input || !input.value.trim()) { alert('Please enter an announcement text.'); return; }
     const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
@@ -6173,7 +6962,7 @@ window.addAnnouncement = function() {
     window.renderAnnouncements();
 };
 
-window.deleteAnnouncement = function(idx) {
+window.deleteAnnouncement = function (idx) {
     if (!confirm('Delete this announcement?')) return;
     const announcements = JSON.parse(localStorage.getItem('sece_announcements') || '[]');
     announcements.splice(idx, 1);
@@ -6181,7 +6970,7 @@ window.deleteAnnouncement = function(idx) {
     window.renderAnnouncements();
 };
 
-window.renderAssignTaskList = async function() {
+window.renderAssignTaskList = async function () {
     const secSel = document.getElementById('newTaskSectionInput');
     if (secSel && secSel.options.length <= 1) {
         secSel.innerHTML = '<option value="">Loading sections...</option>';
@@ -6224,10 +7013,10 @@ window.renderAssignTaskList = async function() {
     }
 };
 
-window.addAssignTask = function() {
+window.addAssignTask = function () {
     const input = document.getElementById('newTaskInput');
     const secSel = document.getElementById('newTaskSectionInput');
-    
+
     if (!secSel || !secSel.value) {
         alert('Please select a section.');
         return;
@@ -6236,9 +7025,9 @@ window.addAssignTask = function() {
         alert('Please enter a task message.');
         return;
     }
-    
+
     const sectionName = secSel.options[secSel.selectedIndex].getAttribute('data-name') || secSel.options[secSel.selectedIndex].text;
-    
+
     const tasks = JSON.parse(localStorage.getItem('sece_class_tasks') || '[]');
     tasks.unshift({
         sectionId: secSel.value,
@@ -6246,13 +7035,13 @@ window.addAssignTask = function() {
         text: input.value.trim(),
         date: new Date().toLocaleString()
     });
-    
+
     localStorage.setItem('sece_class_tasks', JSON.stringify(tasks));
     input.value = '';
     window.renderAssignTaskList();
 };
 
-window.deleteAssignTask = function(idx) {
+window.deleteAssignTask = function (idx) {
     if (!confirm('Delete this task?')) return;
     const tasks = JSON.parse(localStorage.getItem('sece_class_tasks') || '[]');
     tasks.splice(idx, 1);
@@ -6260,11 +7049,11 @@ window.deleteAssignTask = function(idx) {
     window.renderAssignTaskList();
 };
 
-window.editAssignTask = function(idx) {
+window.editAssignTask = function (idx) {
     const tasks = JSON.parse(localStorage.getItem('sece_class_tasks') || '[]');
     const t = tasks[idx];
     if (!t) return;
-    
+
     const newText = prompt('Edit Task Message:', t.text);
     if (newText !== null && newText.trim() !== '') {
         t.text = newText.trim();
@@ -6274,19 +7063,19 @@ window.editAssignTask = function(idx) {
     }
 };
 
-window.renderStudentTasks = async function() {
+window.renderStudentTasks = async function () {
     const listDiv = document.getElementById('studentTasksList');
     if (!listDiv) return;
-    
+
     listDiv.innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading tasks...</div>';
-    
+
     // Get student section
     const username = localStorage.getItem('sece_logged_in_user');
     if (!username) {
         listDiv.innerHTML = '<div class="alert alert-danger">Error: Not logged in.</div>';
         return;
     }
-    
+
     let sectionId = null;
     try {
         const token = localStorage.getItem('jwt_token') || '';
@@ -6304,21 +7093,21 @@ window.renderStudentTasks = async function() {
     } catch (e) {
         console.error(e);
     }
-    
+
     if (!sectionId) {
         listDiv.innerHTML = '<div class="alert alert-warning">Could not determine your class section. Make sure you are assigned to a section.</div>';
         return;
     }
-    
+
     // Fetch tasks from local storage
     const tasks = JSON.parse(localStorage.getItem('sece_class_tasks') || '[]');
     const myTasks = tasks.filter(t => parseInt(t.sectionId) === sectionId);
-    
+
     if (myTasks.length === 0) {
         listDiv.innerHTML = '<div class="text-center text-muted py-4"><i class="fa-solid fa-mug-hot text-secondary mb-2" style="font-size:2rem;"></i><br/>No active tasks for your class right now!</div>';
         return;
     }
-    
+
     listDiv.innerHTML = myTasks.map(t => `
         <div class="card bg-dark border-warning shadow-sm">
             <div class="card-body">
@@ -6332,17 +7121,17 @@ window.renderStudentTasks = async function() {
     `).join('');
 };
 
-window.shareViaWhatsApp = function() {
+window.shareViaWhatsApp = function () {
     const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
     window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent('Check out the SECE Timetable App: ' + link), '_blank');
 };
 
-window.shareViaMessage = function() {
+window.shareViaMessage = function () {
     const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
     window.open('sms:?body=' + encodeURIComponent('Check out the SECE Timetable App: ' + link), '_blank');
 };
 
-window.shareViaWebAPI = function() {
+window.shareViaWebAPI = function () {
     const link = document.getElementById('shareAppLinkInput')?.value || window.location.href;
     if (navigator.share) {
         navigator.share({
@@ -6356,34 +7145,34 @@ window.shareViaWebAPI = function() {
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize the ticker bar immediately if there are saved announcements
-    setTimeout(() => { if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker(); }, 800);
+function _initModalListeners() {
+    setTimeout(() => { if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker(); }, 300);
 
-    // Poll for modals occasionally since React might render them after DOMContentLoaded
-    setInterval(() => {
+    let attempts = 0;
+    const bindModals = () => {
+        attempts++;
         const credModalEl = document.getElementById('viewCredentialsModal');
         if (credModalEl && !credModalEl.dataset.initialized) {
             credModalEl.dataset.initialized = 'true';
-            credModalEl.addEventListener('show.bs.modal', () => { if (window.searchUserCredentials) window.searchUserCredentials(); });
+            credModalEl.addEventListener('show.bs.modal', () => { if (window.renderCredentialsList) window.renderCredentialsList(); });
         }
-        
+
         const adminFacModalEl = document.getElementById('adminFacultyDetailsModal');
         if (adminFacModalEl && !adminFacModalEl.dataset.initialized) {
             adminFacModalEl.dataset.initialized = 'true';
-            adminFacModalEl.addEventListener('show.bs.modal', () => { if (window.searchAdminFacultyDetails) window.searchAdminFacultyDetails(); });
+            adminFacModalEl.addEventListener('show.bs.modal', () => { if (window.renderAdminFacultyDetails) window.renderAdminFacultyDetails(); });
         }
-        
+
         const annModalEl = document.getElementById('manageAnnouncementsModal');
         if (annModalEl && !annModalEl.dataset.initialized) {
             annModalEl.dataset.initialized = 'true';
             annModalEl.addEventListener('show.bs.modal', () => { if (window.renderAnnouncements) window.renderAnnouncements(); });
         }
-        
+
         const shareModalEl = document.getElementById('shareAppModal');
         if (shareModalEl && !shareModalEl.dataset.initialized) {
             shareModalEl.dataset.initialized = 'true';
-            shareModalEl.addEventListener('show.bs.modal', () => { 
+            shareModalEl.addEventListener('show.bs.modal', () => {
                 const input = document.getElementById('shareAppLinkInput');
                 if (input) input.value = window.location.origin;
             });
@@ -6394,16 +7183,79 @@ document.addEventListener('DOMContentLoaded', () => {
             avtModalEl.addEventListener('show.bs.modal', () => { if (window.initAdminViewEditTimetableModal) window.initAdminViewEditTimetableModal(); });
         }
 
-        // Ensure ticker is visible whenever the ticker container appears
+        const adminFacTtModalEl = document.getElementById('adminFacultyTimetableModal');
+        if (adminFacTtModalEl && !adminFacTtModalEl.dataset.initialized) {
+            adminFacTtModalEl.dataset.initialized = 'true';
+            adminFacTtModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+                if (window.openAdminFacultyTimetableModal) window.openAdminFacultyTimetableModal();
+            });
+        }
+
+        const uploadAssignModalEl = document.getElementById('adminUploadAssignTtModal');
+        if (uploadAssignModalEl && !uploadAssignModalEl.dataset.initialized) {
+            uploadAssignModalEl.dataset.initialized = 'true';
+            uploadAssignModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+                if (window.openUploadAssignTtModal) window.openUploadAssignTtModal();
+            });
+        }
+
+        const ttBuilderModalEl = document.getElementById('timetableBuilderModal');
+        if (ttBuilderModalEl && !ttBuilderModalEl.dataset.initialized) {
+            ttBuilderModalEl.dataset.initialized = 'true';
+            ttBuilderModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+            });
+        }
+
+        const myTtModalEl = document.getElementById('myTimetableModal');
+        if (myTtModalEl && !myTtModalEl.dataset.initialized) {
+            myTtModalEl.dataset.initialized = 'true';
+            myTtModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+            });
+        }
+
+        const editPeriodModalEl = document.getElementById('editPeriodModal');
+        if (editPeriodModalEl && !editPeriodModalEl.dataset.initialized) {
+            editPeriodModalEl.dataset.initialized = 'true';
+            editPeriodModalEl.addEventListener('show.bs.modal', () => {
+                if (window.refreshTtSuggestionCatalog) window.refreshTtSuggestionCatalog(true);
+            });
+        }
+
+        const viewStuTtModalEl = document.getElementById('adminViewStudentTtModal');
+        if (viewStuTtModalEl && !viewStuTtModalEl.dataset.initialized) {
+            viewStuTtModalEl.dataset.initialized = 'true';
+            viewStuTtModalEl.addEventListener('show.bs.modal', () => { if (window.openAdminViewStudentTtModal) window.openAdminViewStudentTtModal(); });
+        }
+
         const ticker = document.getElementById('announcementTickerContainer');
         if (ticker && !ticker.dataset.initialized) {
             ticker.dataset.initialized = 'true';
             if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
         }
-    }, 1000);
-});
 
-window.editPersistentStudent = async function(id) {
+        const allDone = credModalEl && adminFacModalEl && annModalEl && shareModalEl && avtModalEl && adminFacTtModalEl && uploadAssignModalEl && viewStuTtModalEl && ticker;
+        if ((allDone || attempts >= 15) && window.__modalInitInterval) {
+            clearInterval(window.__modalInitInterval);
+            window.__modalInitInterval = null;
+        }
+    };
+
+    bindModals();
+    if (window.__modalInitInterval) clearInterval(window.__modalInitInterval);
+    window.__modalInitInterval = setInterval(bindModals, 500);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initModalListeners);
+} else {
+    _initModalListeners();
+}
+
+window.editPersistentStudent = async function (id) {
     let student = studentsRoster.find(s => s.id === id || s.roll === id || s.registerNumber === id);
     if (!student) {
         try {
@@ -6420,25 +7272,25 @@ window.editPersistentStudent = async function(id) {
         }
     }
     document.getElementById('esId').value = student.id || student.roll;
-    
+
     const fName = student.firstName || student.name || '';
     const nameParts = (student.firstName ? fName : fName.split(' '));
     document.getElementById('esFirstName').value = student.firstName || nameParts[0] || '';
     document.getElementById('esLastName').value = student.lastName || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
-    
+
     document.getElementById('esRegNo').value = student.registerNumber || student.roll || '';
     document.getElementById('esEmail').value = student.email || '';
     document.getElementById('esCollegeEmail').value = student.collegeEmail || '';
     document.getElementById('esPhone').value = student.phone || '';
     document.getElementById('esParentPhone1').value = student.parentPhone1 || '';
     document.getElementById('esParentPhone2').value = student.parentPhone2 || '';
-    
+
     let dept = '-', course = '-', sec = '-';
     if (student.department && student.department.name) dept = student.department.name;
     else if (student.dept) dept = student.dept;
-    
+
     if (student.course && student.course.name) course = student.course.name;
-    
+
     let secDisplay = student.section ? (student.section.sectionName || student.section.name) : (student.sec || '-');
     if (secDisplay && secDisplay !== '-') {
         const parts = secDisplay.split(' ');
@@ -6450,7 +7302,7 @@ window.editPersistentStudent = async function(id) {
             sec = secDisplay;
         }
     }
-    
+
     document.getElementById('esDept').value = dept;
     document.getElementById('esCourse').value = course;
     document.getElementById('esSection').value = sec;
@@ -6458,23 +7310,23 @@ window.editPersistentStudent = async function(id) {
     document.getElementById('esResidentType').value = student.residentType || '';
     document.getElementById('esHostelBlock').value = student.hostelBlock || '';
     document.getElementById('esRoomNumber').value = student.roomNumber || '';
-    
+
     try {
         const m1 = bootstrap.Modal.getInstance(document.getElementById('manageStudentsModal'));
         if (m1) m1.hide();
         const m2 = bootstrap.Modal.getInstance(document.getElementById('studentDetailsOnlyModal'));
         if (m2) m2.hide();
-    } catch(e) {}
-    
+    } catch (e) { }
+
     const esHostelFields = document.getElementById('esHostelFields');
     if (esHostelFields) {
         if (student.residentType === 'Hosteller') esHostelFields.classList.remove('d-none');
         else esHostelFields.classList.add('d-none');
     }
-    
+
     const alertBox = document.getElementById('editStudentAlert');
     if (alertBox) alertBox.classList.add('d-none');
-    
+
     const modalEl = document.getElementById('editStudentModal');
     if (modalEl) {
         const modal = new bootstrap.Modal(modalEl);
@@ -6482,7 +7334,7 @@ window.editPersistentStudent = async function(id) {
     }
 };
 
-window.submitEditStudentForm = async function(e) {
+window.submitEditStudentForm = async function (e) {
     const id = document.getElementById('esId').value;
     const fName = document.getElementById('esFirstName').value;
     const lName = document.getElementById('esLastName').value;
@@ -6515,12 +7367,12 @@ window.submitEditStudentForm = async function(e) {
 
     const deptCourseMap = { 'CSE': 'BTECH-CSE', 'IT': 'BTECH-IT', 'AI&DS': 'BTECH-AIDS', 'AI&ML': 'BTECH-AIML', 'ECE': 'BTECH-ECE' };
     const actualCourseId = deptCourseMap[deptId] || 'BTECH-' + deptId;
-    const fullSectionName = courseId + ' ' + deptId + ' ' + secId;
+    const fullSectionName = buildCanonicalStudentSection(courseId, deptId, secId, semester);
 
     const payload = {
         firstName: firstName, lastName: lastName, registerNumber: regNo,
         email: email || collegeEmail, collegeEmail: collegeEmail, phone: phone,
-        parentPhone1: parentPhone1, parentPhone2: parentPhone2 || null, residentType: residentType, 
+        parentPhone1: parentPhone1, parentPhone2: parentPhone2 || null, residentType: residentType,
         hostelBlock: hostelBlock, roomNumber: roomNumber, semester: parseInt(semester),
         department: { name: deptId }, course: { name: actualCourseId }, section: { sectionName: fullSectionName }
     };
@@ -6548,32 +7400,32 @@ window.submitEditStudentForm = async function(e) {
     }
 };
 
-window.initAdminViewEditTimetableModal = function() {
+window.initAdminViewEditTimetableModal = function () {
     const deptSelect = document.getElementById('avtDeptSelect');
     if (!deptSelect) return;
-    
+
     // Extract unique departments from activeSections, filtering out junk values
     const depts = [...new Set(activeSections.map(s => s.dept))]
         .filter(d => d && d !== 'Select Department...' && d.trim() !== '')
         .sort();
-        
-    deptSelect.innerHTML = '<option value="">Select Department...</option>' + 
+
+    deptSelect.innerHTML = '<option value="">Select Department...</option>' +
         depts.map(d => `<option value="${d}">${d}</option>`).join('');
-    
+
     document.getElementById('avtSectionSelect').innerHTML = '<option value="">Select Department First...</option>';
 };
 
-window.avtDeptChanged = function(deptName) {
+window.avtDeptChanged = function (deptName) {
     const sectionSelect = document.getElementById('avtSectionSelect');
     if (!sectionSelect) return;
-    
+
     if (!deptName || deptName === 'Select Department...') {
         sectionSelect.innerHTML = '<option value="">Select Department First...</option>';
         return;
     }
-    
+
     const sections = activeSections.filter(s => s.dept === deptName).sort((a, b) => a.name.localeCompare(b.name));
-    sectionSelect.innerHTML = '<option value="">Select Section...</option>' + 
+    sectionSelect.innerHTML = '<option value="">Select Section...</option>' +
         sections.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
 };
 
@@ -6603,7 +7455,7 @@ function saveBuilderTtColumns() {
     localStorage.setItem('builder_tt_cols', JSON.stringify(builderTtColumns));
 }
 
-window.addBuilderPeriodCol = function() {
+window.addBuilderPeriodCol = function () {
     const newIdx = builderTtColumns.length + 1;
     const newKey = 'P' + newIdx + '_' + Date.now().toString().slice(-4);
     builderTtColumns.push({
@@ -6616,7 +7468,7 @@ window.addBuilderPeriodCol = function() {
     if (window.currentTimetableSection) window.renderTimetableBuilderGrid(window.currentTimetableSection);
 };
 
-window.swapBuilderCol = function(idx, dir) {
+window.swapBuilderCol = function (idx, dir) {
     if (idx + dir < 0 || idx + dir >= builderTtColumns.length) return;
     const temp = builderTtColumns[idx];
     builderTtColumns[idx] = builderTtColumns[idx + dir];
@@ -6625,7 +7477,7 @@ window.swapBuilderCol = function(idx, dir) {
     if (window.currentTimetableSection) window.renderTimetableBuilderGrid(window.currentTimetableSection);
 };
 
-window.removeBuilderCol = function(idx) {
+window.removeBuilderCol = function (idx) {
     if (confirm('Are you sure you want to remove this period column?')) {
         builderTtColumns.splice(idx, 1);
         saveBuilderTtColumns();
@@ -6633,23 +7485,23 @@ window.removeBuilderCol = function(idx) {
     }
 };
 
-window.updateBuilderColLabel = function(idx, val) {
+window.updateBuilderColLabel = function (idx, val) {
     builderTtColumns[idx].label = val;
     saveBuilderTtColumns();
 };
 
-window.renderTimetableBuilderGrid = function(section) {
+window.renderTimetableBuilderGrid = function (section) {
     const thead = document.getElementById('ttBuilderHead');
     const tbody = document.getElementById('ttBuilderGrid');
     if (!tbody || !thead) return;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    
+
     const savedDataStr = localStorage.getItem(`sece_tt_built_${section}`);
     let savedData = null;
     if (savedDataStr) {
-        try { savedData = JSON.parse(savedDataStr); } catch (e) {}
+        try { savedData = JSON.parse(savedDataStr); } catch (e) { }
     }
-    
+
     document.getElementById('ttBuildAdvisor').value = (savedData && savedData.advisor) ? savedData.advisor : '';
     document.getElementById('ttBuildTutors').value = (savedData && savedData.tutors) ? savedData.tutors : '';
 
@@ -6660,7 +7512,7 @@ window.renderTimetableBuilderGrid = function(section) {
     builderTtColumns.forEach((col, i) => {
         const val = headers[col.key] || col.defTime;
         const colorClass = (col.isBreak && col.key !== 'ACT') ? 'text-warning' : '';
-        
+
         headHtml += `<th class="${colorClass}">
             <input type="text" style="background:transparent; border:none; color:inherit; text-align:center; font-weight:bold; width:100%; margin-top:8px" value="${col.label.replace(/"/g, '&quot;')}" onchange="updateBuilderColLabel(${i}, this.value)" />
             <div class="d-flex justify-content-between px-1 mb-1 mt-1 text-muted" style="font-size: 0.75rem;">
@@ -6690,7 +7542,7 @@ window.renderTimetableBuilderGrid = function(section) {
     tbody.innerHTML = html;
 };
 
-window.saveTimetableBuilder = function() {
+window.saveTimetableBuilder = async function () {
     const section = window.currentTimetableSection;
     if (!section) return;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -6705,7 +7557,7 @@ window.saveTimetableBuilder = function() {
         headers: {},
         grid: {}
     };
-    
+
     loadBuilderTtColumns();
     builderTtColumns.forEach(col => {
         const hEl = document.getElementById(`ttBuildHdr_${col.key}`);
@@ -6721,29 +7573,43 @@ window.saveTimetableBuilder = function() {
             }
         });
     });
-    
-    localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
-    
-    fetch('/api/timetable/save-manual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section: section, grid: data.grid })
-    }).then(r => r.ok ? r.json() : Promise.reject())
-      .then(() => console.log('Saved to MySQL Database successfully'))
-      .catch(() => console.warn('Failed to save to MySQL Database'));
 
-    showToast('Success', `Timetable for ${section} saved!`);
-    
+    localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
+    localStorage.removeItem('class_tt_' + section);
+
+    try {
+        const res = await apiFetch('/api/timetable/save-manual', {
+            method: 'POST',
+            body: JSON.stringify({
+                section: section,
+                semester: parseInt(data.metadata.semester, 10) || 3,
+                grid: data.grid
+            })
+        });
+        if (res && res.ok) {
+            const resData = await res.json();
+            showToast('Success', resData.message || `Timetable for ${section} saved to database!`);
+        } else {
+            showToast('Saved Locally', `Timetable for ${section} saved locally (database sync returned an error).`, 'warning');
+        }
+    } catch (err) {
+        console.warn('Failed to save to Database:', err);
+        showToast('Saved Locally', `Timetable for ${section} saved locally.`, 'warning');
+    }
+
     const modalEl = bootstrap.Modal.getInstance(document.getElementById('timetableBuilderModal'));
     if (modalEl) modalEl.hide();
-    
+
     timetableData = loadSavedTimetable();
-    if (currentSection === section) {
+    if (typeof window.loadTimetableData === 'function') await window.loadTimetableData();
+    if (currentSection === section || !currentSection) {
+        currentSection = section;
         renderTimetableGrid();
+        renderCourseRefTable();
     }
 };
 
-window.submitAdminViewEditTimetable = function() {
+window.submitAdminViewEditTimetable = function () {
     const batch = document.getElementById('avtBatchInput').value;
     const dept = document.getElementById('avtDeptSelect').value;
     const section = document.getElementById('avtSectionSelect').value;
@@ -6758,7 +7624,7 @@ window.submitAdminViewEditTimetable = function() {
     window.currentTimetableSection = section;
     window.currentTimetableYear = year;
     window.currentTimetableSemester = semester;
-    
+
     window.renderTimetableBuilderGrid(section);
     const selectionModalEl = bootstrap.Modal.getInstance(document.getElementById('adminViewEditTimetableModal'));
     if (selectionModalEl) selectionModalEl.hide();
@@ -6766,7 +7632,7 @@ window.submitAdminViewEditTimetable = function() {
     builderModalEl.show();
 };
 
-window.openShareAppModal = function() {
+window.openShareAppModal = function () {
     const url = window.location.origin + '/';
     const linkInput = document.getElementById('shareAppLinkInput');
     if (linkInput) linkInput.value = url;
@@ -6775,16 +7641,16 @@ window.openShareAppModal = function() {
     const modalEl = document.getElementById('shareAppModal');
     if (modalEl) new bootstrap.Modal(modalEl).show();
 };
-window.shareViaWhatsApp = function() {
+window.shareViaWhatsApp = function () {
     const text = `Check out this Smart Timetable platform: ${window.location.origin + '/'}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
 };
-window.shareViaMessage = function() {
+window.shareViaMessage = function () {
     const text = `Check out this Smart Timetable platform: ${window.location.origin + '/'}`;
     const separator = (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) ? '&' : '?';
     window.open(`sms:${separator}body=${encodeURIComponent(text)}`, '_self');
 };
-window.shareViaWebAPI = function() {
+window.shareViaWebAPI = function () {
     if (navigator.share) {
         navigator.share({ title: 'Smart Timetable Platform', text: 'Check out this platform!', url: window.location.origin + '/' }).catch(e => console.warn(e));
     } else {
@@ -6796,7 +7662,7 @@ window.shareViaWebAPI = function() {
 
 /* replaced */
 
-window.deptChanged = function(dept) {
+window.deptChanged = function (dept) {
     currentDept = dept;
     localStorage.setItem('sece_last_viewed_dept', dept);
     populateSectionSelects();
@@ -6805,13 +7671,13 @@ window.deptChanged = function(dept) {
     renderTimetableGrid();
 };
 
-window.sectionChanged = function(sec) {
+window.sectionChanged = function (sec) {
     currentSection = sec;
     localStorage.setItem('sece_last_viewed_section', sec);
     renderTimetableGrid();
 };
 
-window.importTimetableImage = async function(event) {
+window.importTimetableImage = async function (event) {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -6833,7 +7699,7 @@ window.importTimetableImage = async function(event) {
                 if (errJson && errJson.error) {
                     errText = errJson.error;
                 }
-            } catch (e) {}
+            } catch (e) { }
             throw new Error(errText);
         }
 
@@ -6843,6 +7709,10 @@ window.importTimetableImage = async function(event) {
             data = JSON.parse(jsonText);
         } catch (e) {
             throw new Error("Invalid JSON response from AI");
+        }
+
+        if (data && !data.data && data.needsClientOcr && data.previewImage) {
+            data.data = await _extractGridViaClientOcr(data.previewImage);
         }
 
         if (data && data.data) {
@@ -6856,7 +7726,7 @@ window.importTimetableImage = async function(event) {
                         const inputId = `ttb_${day}_P${p}`;
                         const input = document.getElementById(inputId);
                         if (input) {
-                            const per = periods[p-1];
+                            const per = periods[p - 1];
                             if (per && per.sub && per.sub.toUpperCase() !== 'FREE' && per.sub.toUpperCase() !== 'BREAK') {
                                 let val = per.sub;
                                 if (per.faculty) val += `, ${per.faculty}`;
@@ -6886,15 +7756,15 @@ window.importTimetableImage = async function(event) {
             alert('Could not detect a timetable table in this image. Please upload a clear timetable screenshot.');
         }
     }
-    
+
     // Reset the input so it can be used again
     event.target.value = '';
 };
 
-window.importTimetableExcel = async function(event) {
+window.importTimetableExcel = async function (event) {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     const section = window.currentTimetableSection;
     if (!section) {
         alert("Please open a specific timetable section before importing.");
@@ -6905,7 +7775,7 @@ window.importTimetableExcel = async function(event) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('section', section);
-    
+
     showToast('Uploading Excel', 'Sending to backend for parsing...', 'info');
 
     try {
@@ -6913,9 +7783,9 @@ window.importTimetableExcel = async function(event) {
             method: 'POST',
             body: formData
         });
-        
+
         const json = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(json.error || 'Backend failed to process Excel file');
         }
@@ -6936,64 +7806,79 @@ window.importTimetableExcel = async function(event) {
                 }
             }
         });
-        
+
         // Save the builder automatically so the main timetable view updates!
         window.saveTimetableBuilder();
-        
+
         showToast('Excel Imported Successfully', json.message || 'Timetable updated in database and UI refreshed.', 'success');
-        
+
     } catch (error) {
         console.error('Error importing Excel via API:', error);
         alert('Error parsing the Excel file: ' + error.message);
     }
-    
+
     event.target.value = '';
 };
 
-window.fetchStudentDynamicDashboard = async function() {
+window.fetchStudentDynamicDashboard = async function () {
     try {
         const token = localStorage.getItem("jwt_token");
         if (!token) return;
-        
+
         const response = await fetch("/api/student/dashboard/current", {
             headers: {
                 "Authorization": "Bearer " + token
             }
         });
-        
+
+        if (response.status === 401) {
+            if (window.dynamicDashboardInterval) {
+                clearInterval(window.dynamicDashboardInterval);
+                window.dynamicDashboardInterval = null;
+            }
+            return;
+        }
         if (!response.ok) return;
-        
+
         const data = await response.json();
-        
+
         const dynContainer = document.getElementById("studentDynamicDashboard");
         const alertLegacy = document.getElementById("studentUpcomingClassAlert");
-        
+
         if (dynContainer) dynContainer.classList.remove("d-none");
         if (alertLegacy) alertLegacy.classList.add("d-none");
-        
+
         if (data.status === "NO_PROFILE") {
-            if(document.getElementById("dynCurrentName")) document.getElementById("dynCurrentName").innerText = "Profile Incomplete";
-            if(document.getElementById("dynCurrentSubject")) {
+            if (document.getElementById("dynCurrentName")) document.getElementById("dynCurrentName").innerText = "Profile Incomplete";
+            if (document.getElementById("dynCurrentSubject")) {
                 document.getElementById("dynCurrentSubject").innerText = data.message;
                 document.getElementById("dynCurrentSubject").classList.replace("text-warning", "text-danger");
             }
-            if(document.getElementById("dynCurrentFaculty")) document.getElementById("dynCurrentFaculty").parentElement.style.display = "none";
-            if(document.getElementById("dynCurrentRoom")) document.getElementById("dynCurrentRoom").parentElement.style.display = "none";
+            if (document.getElementById("dynCurrentFaculty")) document.getElementById("dynCurrentFaculty").parentElement.style.display = "none";
+            if (document.getElementById("dynCurrentRoom")) document.getElementById("dynCurrentRoom").parentElement.style.display = "none";
             return;
         }
 
-        // Populate Profile Info
+        // Populate Profile Info & bind Student's exact section (never keep another class from localStorage)
         if (data.student && document.getElementById("dynStudentProfile")) {
             document.getElementById("dynStudentProfile").innerHTML = `<i class="fa-solid fa-graduation-cap me-1"></i>${data.student.year} Yr ${data.student.department} - Sec ${data.student.section}`;
-            
-            // Set currentSection to the full section name so timetable renders correctly
+
             const secName = data.student.fullSectionName || data.student.section;
             if (secName) {
+                const changed = currentSection !== secName;
+                currentSection = secName;
                 window.currentSection = secName;
                 localStorage.setItem('sece_last_viewed_section', secName);
+                const ttTitleHeader = document.getElementById('ttTitleHeader');
+                if (ttTitleHeader) ttTitleHeader.innerText = secName;
+                if (changed) {
+                    window.updateBannerHeaders?.(secName);
+                    renderTimetableGrid();
+                    renderCourseRefTable();
+                }
             }
         }
-        
+
         // Handle HOLIDAY or AFTER/BEFORE college
         const statusBox = document.getElementById("dynCurrentStatusMessage");
         const statusText = document.getElementById("dynStatusText");
@@ -7002,75 +7887,89 @@ window.fetchStudentDynamicDashboard = async function() {
         const timeBox = document.getElementById("dynCurrentTime");
         const nextBadge = document.getElementById("dynNextPeriodBadge");
         const nextText = document.getElementById("dynNextPeriodText");
-        
-        if(detailsBox) detailsBox.classList.add("d-none");
-        if(statusBox) statusBox.classList.add("d-none");
-        if(nextBadge) nextBadge.classList.add("d-none");
-        if(nameBox) nameBox.innerText = data.status.replace(/_/g, " ");
-        if(timeBox) timeBox.innerText = "--:--";
 
-        if (data.status === "HOLIDAY" || data.status === "BEFORE_COLLEGE" || data.status === "AFTER_COLLEGE") {
-            if(statusBox) statusBox.classList.remove("d-none");
-            if(statusText) {
-                 statusText.innerText = data.status === "HOLIDAY" ? "Holiday! No Classes" : (data.status === "BEFORE_COLLEGE" ? "Classes haven't started yet" : "Classes are over for today");
-                 statusText.className = "fw-bold mb-0 text-success";
+        if (detailsBox) detailsBox.classList.add("d-none");
+        if (statusBox) statusBox.classList.add("d-none");
+        if (nextBadge) nextBadge.classList.add("d-none");
+        if (nameBox) nameBox.innerText = data.status.replace(/_/g, " ");
+        if (timeBox) timeBox.innerText = "--:--";
+
+        window.currentStudentSemester = data.student?.semester || null;
+        window.awaitingStudentTimetable = Boolean(data.awaitingTimetable);
+
+        if (data.awaitingTimetable) {
+            if (statusBox) statusBox.classList.remove("d-none");
+            if (statusText) {
+                statusText.innerText = "AWAITING NEW TT";
+                statusText.className = "fw-bold mb-0 text-warning";
+            }
+            if (nameBox) nameBox.innerText = "New Semester Timetable Not Assigned Yet";
+            if (timeBox) timeBox.innerText = data.student?.semester ? `Semester ${data.student.semester}` : "Pending Admin Assignment";
+            if (window.currentTimetableEntriesLoaded && typeof renderTimetableGrid === 'function') {
+                renderTimetableGrid();
+            }
+        } else if (data.status === "HOLIDAY" || data.status === "BEFORE_COLLEGE" || data.status === "AFTER_COLLEGE") {
+            if (statusBox) statusBox.classList.remove("d-none");
+            if (statusText) {
+                statusText.innerText = data.status === "HOLIDAY" ? "Holiday! No Classes" : (data.status === "BEFORE_COLLEGE" ? "Classes haven't started yet" : "Classes are over for today");
+                statusText.className = "fw-bold mb-0 text-success";
             }
         } else if (data.status === "CURRENT_PERIOD") {
-            if(detailsBox) detailsBox.classList.remove("d-none");
-            if(nameBox) nameBox.innerText = data.currentPeriod.name;
-            if(timeBox) timeBox.innerText = `${data.currentPeriod.startTime} - ${data.currentPeriod.endTime}`;
-            if(document.getElementById("dynCurrentSubject")) {
+            if (detailsBox) detailsBox.classList.remove("d-none");
+            if (nameBox) nameBox.innerText = data.currentPeriod.name;
+            if (timeBox) timeBox.innerText = `${data.currentPeriod.startTime} - ${data.currentPeriod.endTime}`;
+            if (document.getElementById("dynCurrentSubject")) {
                 document.getElementById("dynCurrentSubject").innerText = data.currentPeriod.subject;
                 document.getElementById("dynCurrentSubject").className = "fw-bold mb-3 text-warning";
             }
-            if(document.getElementById("dynCurrentFaculty")) document.getElementById("dynCurrentFaculty").innerText = data.currentPeriod.faculty || "TBA";
-            if(document.getElementById("dynCurrentRoom")) document.getElementById("dynCurrentRoom").innerText = data.currentPeriod.room || "TBA";
+            if (document.getElementById("dynCurrentFaculty")) document.getElementById("dynCurrentFaculty").innerText = data.currentPeriod.faculty || "TBA";
+            if (document.getElementById("dynCurrentRoom")) document.getElementById("dynCurrentRoom").innerText = data.currentPeriod.room || "TBA";
         } else if (data.status === "NO_CLASS") {
-             if(statusBox) statusBox.classList.remove("d-none");
-             if(statusText) {
-                 statusText.innerText = "FREE HOUR";
-                 statusText.className = "fw-bold mb-0 text-info";
-             }
-             if(nameBox) nameBox.innerText = data.currentPeriod.name;
-             if(timeBox) timeBox.innerText = `${data.currentPeriod.startTime} - ${data.currentPeriod.endTime}`;
+            if (statusBox) statusBox.classList.remove("d-none");
+            if (statusText) {
+                statusText.innerText = "FREE HOUR";
+                statusText.className = "fw-bold mb-0 text-info";
+            }
+            if (nameBox) nameBox.innerText = data.currentPeriod.name;
+            if (timeBox) timeBox.innerText = `${data.currentPeriod.startTime} - ${data.currentPeriod.endTime}`;
         } else {
-             // Breaks (TEA_BREAK, LUNCH_BREAK, ACTIVITY)
-             if(statusBox) statusBox.classList.remove("d-none");
-             if(statusText) {
-                 statusText.innerText = data.status.replace(/_/g, " ");
-                 statusText.className = "fw-bold mb-0 text-warning";
-             }
-             if(nameBox) nameBox.innerText = "Break Time";
-             if (data.currentPeriod && timeBox) {
+            // Breaks (TEA_BREAK, LUNCH_BREAK, ACTIVITY)
+            if (statusBox) statusBox.classList.remove("d-none");
+            if (statusText) {
+                statusText.innerText = data.status.replace(/_/g, " ");
+                statusText.className = "fw-bold mb-0 text-warning";
+            }
+            if (nameBox) nameBox.innerText = "Break Time";
+            if (data.currentPeriod && timeBox) {
                 timeBox.innerText = `${data.currentPeriod.startTime} - ${data.currentPeriod.endTime}`;
-             }
+            }
         }
-        
+
         if (data.nextPeriod) {
-            if(nextBadge) nextBadge.classList.remove("d-none");
-            if(nextText) nextText.innerText = `${data.nextPeriod.name}: ${data.nextPeriod.subject}`;
+            if (nextBadge) nextBadge.classList.remove("d-none");
+            if (nextText) nextText.innerText = `${data.nextPeriod.name}: ${data.nextPeriod.subject}`;
         }
-        
+
         // Populate Today's Timetable List
         const ttList = document.getElementById("dynTodayTimetableList");
-        if(ttList) {
+        if (ttList) {
             ttList.innerHTML = "";
             if (data.todayTimetable && data.todayTimetable.length > 0) {
                 data.todayTimetable.forEach(p => {
                     const li = document.createElement("li");
                     li.className = "list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center";
-                    
+
                     let isCurrent = false;
                     if (data.currentPeriod && data.currentPeriod.name === p.name) isCurrent = true;
-                    
+
                     if (isCurrent) {
                         li.classList.replace("bg-dark", "bg-primary");
                         li.classList.add("bg-gradient");
                     }
-                    
+
                     const timeSpan = `<span class="badge ${isCurrent ? "bg-light text-dark" : "bg-secondary"} me-2">${p.startTime}</span>`;
                     const subjectName = p.subject === "FREE" ? `<span class="text-muted">FREE</span>` : p.subject;
-                    
+
                     li.innerHTML = `<div>${timeSpan} <span class="fw-bold">${subjectName}</span></div>
                                     <div class="small ${isCurrent ? "text-light" : "text-info"}">${p.room || ""}</div>`;
                     ttList.appendChild(li);
@@ -7079,21 +7978,21 @@ window.fetchStudentDynamicDashboard = async function() {
                 ttList.innerHTML = "<li class='list-group-item bg-dark text-muted text-center py-3 border-secondary small'>No schedule available for today.</li>";
             }
         }
-        
+
     } catch (e) {
         console.error("Failed to fetch student dynamic dashboard", e);
     }
 };
 
-// Force start polling in case switchRole missed it
+// Poll student live period card every 30 seconds while on /student
 if (window.dynamicDashboardInterval) clearInterval(window.dynamicDashboardInterval);
 window.dynamicDashboardInterval = setInterval(() => {
-    if (localStorage.getItem("sece_logged_in_role") === "STUDENT") {
+    if (window.location.pathname === '/student' && localStorage.getItem("sece_logged_in_role") === "STUDENT") {
         if (typeof window.fetchStudentDynamicDashboard === 'function') {
             window.fetchStudentDynamicDashboard();
         }
     }
-}, 3000);
+}, 30000);
 
 
 
@@ -7109,7 +8008,7 @@ function loadFacultyTtColumns() {
             console.error('Error parsing faculty_tt_cols', e);
         }
     }
-    
+
     if (parsed && Array.isArray(parsed) && parsed.length > 0) {
         facultyTtColumns = parsed;
     } else {
@@ -7132,7 +8031,7 @@ function saveFacultyTtColumns() {
     localStorage.setItem('faculty_tt_cols_' + _getFacultyTTKey(), JSON.stringify(facultyTtColumns));
 }
 
-window.addFacultyPeriodCol = function() {
+window.addFacultyPeriodCol = function () {
     const newIdx = facultyTtColumns.length + 1;
     const newKey = 'P' + newIdx + '_' + Date.now().toString().slice(-4);
     facultyTtColumns.push({
@@ -7145,7 +8044,7 @@ window.addFacultyPeriodCol = function() {
     if (window.renderMyTimetable) window.renderMyTimetable();
 };
 
-window.swapFacultyCol = function(idx, dir) {
+window.swapFacultyCol = function (idx, dir) {
     if (idx + dir < 0 || idx + dir >= facultyTtColumns.length) return;
     const temp = facultyTtColumns[idx];
     facultyTtColumns[idx] = facultyTtColumns[idx + dir];
@@ -7154,7 +8053,7 @@ window.swapFacultyCol = function(idx, dir) {
     if (window.renderMyTimetable) window.renderMyTimetable();
 };
 
-window.removeFacultyCol = function(idx) {
+window.removeFacultyCol = function (idx) {
     if (confirm('Are you sure you want to remove this period?')) {
         facultyTtColumns.splice(idx, 1);
         saveFacultyTtColumns();
@@ -7162,25 +8061,25 @@ window.removeFacultyCol = function(idx) {
     }
 };
 
-window.updateFacultyColLabel = function(idx, val) {
+window.updateFacultyColLabel = function (idx, val) {
     facultyTtColumns[idx].label = val;
     saveFacultyTtColumns();
 };
 
-window.renderMyTimetable = function() {
+window.renderMyTimetable = function () {
     const tbody = document.getElementById('myTimetableBody');
     if (!tbody) return;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch(e) {}
-    
+    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch (e) { }
+
     loadFacultyTtColumns();
     const thead = document.getElementById('myTimetableHead');
-    
+
     let thHtml = '<tr><th style="width: 90px">Day</th>';
     const headers = saved._headers || {};
-    
+
     facultyTtColumns.forEach((col, i) => {
         const timeVal = headers[col.key] || col.defTime;
         if (col.isBreak && col.key !== 'ACT') {
@@ -7204,7 +8103,7 @@ window.renderMyTimetable = function() {
         }
     });
     thHtml += '</tr>';
-    
+
     if (thead) thead.innerHTML = thHtml;
 
     let html = '';
@@ -7212,7 +8111,7 @@ window.renderMyTimetable = function() {
         const d = saved[day] || {};
         const esc = v => String(v || '').replace(/"/g, '&quot;');
         html += `<tr><td class="align-middle text-white fw-bold">${day}</td>`;
-        
+
         facultyTtColumns.forEach(col => {
             if (col.isBreak && col.key !== 'ACT') {
                 html += `<td class="align-middle text-muted small text-center">${col.label.toUpperCase()}</td>`;
@@ -7225,13 +8124,13 @@ window.renderMyTimetable = function() {
     tbody.innerHTML = html;
 };
 
-window.renderFacultyPersonalTT = function() {
+window.renderFacultyPersonalTT = function () {
     const container = document.getElementById('facultyPersonalTTPanel');
     if (!container) return;
 
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch(e) {}
-    
+    try { saved = JSON.parse(localStorage.getItem(_getFacultyTTKey()) || '{}'); } catch (e) { }
+
     loadFacultyTtColumns();
 
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -7253,7 +8152,7 @@ window.renderFacultyPersonalTT = function() {
     }
 
     let html = `<div class="table-responsive"><table class="table table-dark table-bordered table-sm text-center align-middle mb-0" style="table-layout: fixed;"><thead><tr><th style="width: 90px;">Day</th>`;
-    
+
     facultyTtColumns.forEach(col => {
         const timeStr = headers[col.key] || col.defTime;
         if (col.isBreak && col.key !== 'ACT') {
@@ -7267,7 +8166,7 @@ window.renderFacultyPersonalTT = function() {
     days.forEach(day => {
         const d = saved[day] || {};
         let rowHtml = `<tr><td class="text-white fw-bold">${day}</td>`;
-        
+
         facultyTtColumns.forEach(col => {
             if (col.isBreak && col.key !== 'ACT') {
                 rowHtml += `<td class="text-muted small">${col.label.toUpperCase()}</td>`;
@@ -7276,13 +8175,17 @@ window.renderFacultyPersonalTT = function() {
                 if (!val.trim()) {
                     rowHtml += `<td class="text-muted" style="font-size: 0.85rem;">FREE</td>`;
                 } else {
-                    const parts = val.split(',').map(s => s.trim());
+                    const parts = val.split(',').map(s => s.trim()).filter(Boolean);
                     if (parts.length >= 3) {
                         rowHtml += `<td class="text-info fw-bold" style="font-size: 0.85rem;">${parts[1]}<br/><small class="text-white fw-normal">${parts[0]}</small><br/><small class="text-muted">${parts[2]}</small></td>`;
                     } else if (parts.length === 2) {
-                        rowHtml += `<td class="text-info fw-bold" style="font-size: 0.85rem;">${parts[1]}<br/><small class="text-white fw-normal">${parts[0]}</small></td>`;
+                        if (/^(I|II|III|IV)\s+/i.test(parts[0])) {
+                            rowHtml += `<td class="text-info fw-bold" style="font-size: 0.85rem;">${parts[0]}<br/><small class="text-muted fw-normal">${parts[1]}</small></td>`;
+                        } else {
+                            rowHtml += `<td class="text-info fw-bold" style="font-size: 0.85rem;">${parts[1]}<br/><small class="text-white fw-normal">${parts[0]}</small></td>`;
+                        }
                     } else {
-                        rowHtml += `<td class="text-info fw-bold" style="font-size: 0.85rem;">${parts[0]}</td>`;
+                        rowHtml += `<td class="text-info fw-bold" style="font-size: 0.85rem;">${parts[0] || ''}</td>`;
                     }
                 }
             }
@@ -7295,10 +8198,10 @@ window.renderFacultyPersonalTT = function() {
     container.innerHTML = html;
 };
 
-window.saveMyTimetable = function() {
+window.saveMyTimetable = function () {
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const data = {};
-    
+
     loadFacultyTtColumns();
 
     data._headers = {};
@@ -7316,7 +8219,17 @@ window.saveMyTimetable = function() {
         });
     });
 
-    localStorage.setItem(_getFacultyTTKey(), JSON.stringify(data));
+    data._columns = facultyTtColumns;
+    const jsonStr = JSON.stringify(data);
+    localStorage.setItem(_getFacultyTTKey(), jsonStr);
+
+    const uname = String(localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
+    if (uname && localStorage.getItem('jwt_token')) {
+        apiFetch(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`, {
+            method: 'POST',
+            body: JSON.stringify({ dataJson: jsonStr })
+        }).catch(err => console.warn('Could not sync faculty timetable to backend:', err));
+    }
 
     if (typeof bootstrap !== 'undefined') {
         const modalEl = document.getElementById('myTimetableModal');
@@ -7335,18 +8248,18 @@ function exportTimetableCSV() {
         const uname = String(localStorage.getItem('sece_logged_in_user') || 'faculty').toUpperCase();
         const ttKey = 'faculty_personal_tt_' + uname.toLowerCase();
         let saved = {};
-        try { saved = JSON.parse(localStorage.getItem(ttKey) || '{}'); } catch(e) {}
-        
+        try { saved = JSON.parse(localStorage.getItem(ttKey) || '{}'); } catch (e) { }
+
         loadFacultyTtColumns();
-        
+
         let csv = 'Day';
         facultyTtColumns.forEach(col => {
             csv += ',' + col.label.replace(/,/g, '');
         });
         csv += '\n';
-        
+
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        
+
         days.forEach(day => {
             const d = saved[day] || {};
             let row = [day];
@@ -7379,7 +8292,7 @@ function exportTimetableCSV() {
 
     days.forEach(day => {
         const periods = data[day] || [];
-        const row = [day, ...periods.map(p => `"${p.sub} (${p.faculty} - ${p.venue})"` )];
+        const row = [day, ...periods.map(p => `"${p.sub} (${p.faculty} - ${p.venue})"`)];
         csv += row.join(',') + '\n';
     });
 
@@ -7416,8 +8329,8 @@ function loadMcTtColumns(sectionKey) {
     let savedCols = null;
     try {
         savedCols = JSON.parse(localStorage.getItem('mc_tt_cols_' + sectionKey));
-    } catch(e){}
-    
+    } catch (e) { }
+
     if (savedCols && Array.isArray(savedCols) && savedCols.length > 0) {
         mcTtColumns = savedCols;
     } else {
@@ -7429,7 +8342,7 @@ function saveMcTtColumns(sectionKey) {
     localStorage.setItem('mc_tt_cols_' + sectionKey, JSON.stringify(mcTtColumns));
 }
 
-window.initManageClassTt = function() {
+window.initManageClassTt = function () {
     // Automatically load the default selected class timetable when the modal opens
     document.getElementById('mcTtGridContainer').classList.remove('d-none');
     if (window.loadManageClassTt) {
@@ -7437,7 +8350,7 @@ window.initManageClassTt = function() {
     }
 };
 
-window.mcSwapCol = function(idx, dir) {
+window.mcSwapCol = function (idx, dir) {
     if (idx + dir < 0 || idx + dir >= mcTtColumns.length) return;
     const temp = mcTtColumns[idx];
     mcTtColumns[idx] = mcTtColumns[idx + dir];
@@ -7447,7 +8360,7 @@ window.mcSwapCol = function(idx, dir) {
     window.renderManageClassTt(sectionKey);
 };
 
-window.mcRemoveCol = function(idx) {
+window.mcRemoveCol = function (idx) {
     if (confirm('Are you sure you want to remove this period?')) {
         mcTtColumns.splice(idx, 1);
         const sectionKey = _getMcSectionKey();
@@ -7456,13 +8369,13 @@ window.mcRemoveCol = function(idx) {
     }
 };
 
-window.mcUpdateColLabel = function(idx, val) {
+window.mcUpdateColLabel = function (idx, val) {
     mcTtColumns[idx].label = val;
     const sectionKey = _getMcSectionKey();
     saveMcTtColumns(sectionKey);
 };
 
-window.mcAddPeriodCol = function() {
+window.mcAddPeriodCol = function () {
     const keyStr = "P" + (new Date().getTime().toString().substring(8));
     mcTtColumns.push({ label: 'New', key: keyStr, defTime: '00.00 - 00.00' });
     const sectionKey = _getMcSectionKey();
@@ -7477,30 +8390,30 @@ function _getMcSectionKey() {
     return `${yr} ${dept} ${sec}`;
 }
 
-window.loadManageClassTt = function() {
+window.loadManageClassTt = function () {
     const sectionKey = _getMcSectionKey();
     document.getElementById('mcTtTitle').innerText = 'Editing: ' + sectionKey;
     document.getElementById('mcTtGridContainer').classList.remove('d-none');
     window.renderManageClassTt(sectionKey);
 };
 
-window.renderManageClassTt = async function(sectionKey) {
+window.renderManageClassTt = async function (sectionKey) {
     const tbody = document.getElementById('mcTtBody');
     if (!tbody) return;
-    
+
     loadMcTtColumns(sectionKey);
-    
+
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     let saved = {};
     let hasSavedData = false;
-    try { 
+    try {
         let raw = localStorage.getItem('class_tt_' + sectionKey);
         if (raw) {
             saved = JSON.parse(raw);
             hasSavedData = true;
         }
-    } catch(e) {}
-    
+    } catch (e) { }
+
     // If no saved data in localStorage, fetch from backend API
     if (!hasSavedData) {
         try {
@@ -7513,7 +8426,7 @@ window.renderManageClassTt = async function(sectionKey) {
                     let sn = (s.sectionName || '').toUpperCase();
                     return sn === q1 || sn === q2 || sn.includes(q1) || sn.includes(q2);
                 });
-                
+
                 if (matchSec) {
                     const ttRes = await fetch('/api/timetable/section/' + matchSec.id, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sece_token') } });
                     if (ttRes.ok) {
@@ -7535,13 +8448,13 @@ window.renderManageClassTt = async function(sectionKey) {
                     }
                 }
             }
-        } catch(e) { console.error("Error fetching section timetable", e); }
+        } catch (e) { console.error("Error fetching section timetable", e); }
     }
-    
+
     const thead = document.getElementById('mcTtHead');
     let thHtml = '<tr><th>Day</th>';
     const headers = saved._headers || {};
-    
+
     mcTtColumns.forEach((col, i) => {
         const timeVal = headers[col.key] || col.defTime;
         if (col.isBreak && col.key !== 'ACT') {
@@ -7568,7 +8481,7 @@ window.renderManageClassTt = async function(sectionKey) {
     });
     thHtml += '</tr>';
     thead.innerHTML = thHtml;
-    
+
     let html = '';
     days.forEach(day => {
         let dayData = saved[day] || {};
@@ -7580,13 +8493,13 @@ window.renderManageClassTt = async function(sectionKey) {
                 const cellData = dayData[col.key] || 'FREE';
                 let val = typeof cellData === 'object' ? cellData.value : cellData;
                 let type = typeof cellData === 'object' ? cellData.type : 'Permanent';
-                
+
                 html += `<td style="min-width: 120px; vertical-align: middle;">
                     <input type="text" id="mcTtCell_${day}_${col.key}" style="background:transparent; border:none; outline:none; text-align:center; width:100%; font-weight:700;" class="${val !== 'FREE' ? 'text-info' : 'text-secondary'}" value="${val}" />
                     <div class="mt-1 d-flex justify-content-center">
-                        <select id="mcTtType_${day}_${col.key}" style="background:transparent; border:1px solid rgba(255,255,255,0.1); border-radius:3px; outline:none; text-align:center; font-size: 0.65rem;" class="${type==='Temporary'?'text-warning':'text-muted'}">
-                            <option style="background:#212529" value="Permanent" ${type==='Permanent'?'selected':''}>Perm</option>
-                            <option style="background:#212529" value="Temporary" ${type==='Temporary'?'selected':''}>Temp</option>
+                        <select id="mcTtType_${day}_${col.key}" style="background:transparent; border:1px solid rgba(255,255,255,0.1); border-radius:3px; outline:none; text-align:center; font-size: 0.65rem;" class="${type === 'Temporary' ? 'text-warning' : 'text-muted'}">
+                            <option style="background:#212529" value="Permanent" ${type === 'Permanent' ? 'selected' : ''}>Perm</option>
+                            <option style="background:#212529" value="Temporary" ${type === 'Temporary' ? 'selected' : ''}>Temp</option>
                         </select>
                     </div>
                 </td>`;
@@ -7597,16 +8510,16 @@ window.renderManageClassTt = async function(sectionKey) {
     tbody.innerHTML = html;
 };
 
-window.saveManageClassTt = function() {
+window.saveManageClassTt = function () {
     const sectionKey = _getMcSectionKey();
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     let data = { _headers: {} };
-    
+
     mcTtColumns.forEach(col => {
         const hInput = document.getElementById(`mcTtHeader${col.key}`);
         if (hInput) data._headers[col.key] = hInput.value;
     });
-    
+
     days.forEach(day => {
         data[day] = {};
         mcTtColumns.forEach(col => {
@@ -7620,18 +8533,18 @@ window.saveManageClassTt = function() {
             }
         });
     });
-    
+
     localStorage.setItem('class_tt_' + sectionKey, JSON.stringify(data));
     showToast('Success', 'Class timetable saved successfully!', 'success');
     bootstrap.Modal.getInstance(document.getElementById('manageClassTtModal')).hide();
-    
+
     if (typeof renderTimetableGrid === 'function') {
         renderTimetableGrid();
     }
 };
 
 
-window.handleChangePasswordSubmit = async function(e) {
+window.handleChangePasswordSubmit = async function (e) {
     e.preventDefault();
     const cpCurrent = document.getElementById('cpCurrentPassword').value;
     const cpNew = document.getElementById('cpNewPassword').value;
@@ -7673,17 +8586,17 @@ window.handleChangePasswordSubmit = async function(e) {
 
 
 
-window.openFacultyProfileModal = async function() {
+window.openFacultyProfileModal = async function () {
     if (currentUserRole !== 'FACULTY') { alert('This profile is available only to Faculty accounts.'); return; }
 
     const body = document.getElementById('facultyProfileBody');
     if (!body) return;
-    
+
     let username = localStorage.getItem('sece_logged_in_user');
     try {
         const userInfo = JSON.parse(localStorage.getItem('user_info'));
         if (userInfo && userInfo.username) username = userInfo.username;
-    } catch (e) {}
+    } catch (e) { }
 
     try {
         body.innerHTML = '<div class="text-center py-2"><div class="spinner-border text-info" role="status"></div></div>';
@@ -7692,14 +8605,14 @@ window.openFacultyProfileModal = async function() {
         if (res.ok) {
             const facultyList = await res.json();
             const f = facultyList.find(st => st.user && String(st.user.username).toLowerCase() === String(username).toLowerCase());
-            
+
             if (f) {
                 const computedUsername = f.user ? f.user.username : username;
                 const password = getStoredPassword(computedUsername) || 'faculty123';
                 const deptName = f.department ? f.department.name : '-';
                 const personalEmail = f.user ? (f.user.personalEmail || '-') : '-';
                 const collegeEmail = f.user ? (f.user.email || '-') : '-';
-                
+
                 body.innerHTML = `
                     <div class="row g-3 small">
                         <div class="col-12 text-center mb-3">
@@ -7743,7 +8656,7 @@ window.saveStaffDirectory = saveStaffDirectory;
 
 
 
-window.renderManageClassAdvisors = async function() {
+window.renderManageClassAdvisors = async function () {
     const selFac = document.getElementById('advisorSelectFaculty');
     const selClass = document.getElementById('advisorSelectClass');
     const tbody = document.getElementById('classAdvisorsTbody');
@@ -7780,9 +8693,9 @@ window.renderManageClassAdvisors = async function() {
     }
 
     // Use activeSections for classes, matching the View Sections modal
-    let sections = (typeof activeSections !== 'undefined' && Array.isArray(activeSections)) 
-                   ? activeSections.map(s => s.name) 
-                   : [];
+    let sections = (typeof activeSections !== 'undefined' && Array.isArray(activeSections))
+        ? activeSections.map(s => s.name)
+        : [];
 
     if (!sections || sections.length === 0) {
         if (window.studentsData && window.studentsData.length > 0) {
@@ -7792,11 +8705,11 @@ window.renderManageClassAdvisors = async function() {
             sections = [...new Set([...ttSections, 'II CSE C', 'II CSE D', 'II IT A', 'II AI&DS A'])];
         }
     }
-    
+
     sections = [...new Set(sections)].sort();
 
     if (selClass) {
-        selClass.innerHTML = '<option value="">-- Choose Class --</option>' + sections.map(s => 
+        selClass.innerHTML = '<option value="">-- Choose Class --</option>' + sections.map(s =>
             `<option value="${s}">${s}</option>`
         ).join('');
     }
@@ -7814,9 +8727,9 @@ window.renderManageClassAdvisors = async function() {
                 uniqueFacs.push(f);
             }
         }
-        
+
         const advisors = uniqueFacs.filter(s => s.classAdvisorFor && s.classAdvisorFor.trim() !== '');
-        
+
         if (advisors.length === 0) {
             tbody.innerHTML = '<tr><td colSpan="3" class="text-center text-muted">No class advisors assigned yet.</td></tr>';
         } else {
@@ -7838,10 +8751,10 @@ window.renderManageClassAdvisors = async function() {
     }
 };
 
-window.assignClassAdvisor = function() {
+window.assignClassAdvisor = function () {
     const facName = document.getElementById('advisorSelectFaculty').value;
     const className = document.getElementById('advisorSelectClass').value;
-    
+
     if (!facName || !className) {
         alert('Please select both faculty and class.');
         return;
@@ -7866,18 +8779,18 @@ window.assignClassAdvisor = function() {
         fac = { name: facName, displayName: facName, dept: dept, status: 'Available' };
         window.staffDirectory.push(fac);
     }
-    
+
     fac.classAdvisorFor = className;
     window.saveStaffDirectory();
     window.renderManageClassAdvisors();
     showToast('Assigned', `${fac.displayName || fac.name} is now the Class Advisor for ${className}.`);
-    
+
     if (window.renderCredentialsList && document.getElementById('viewCredentialsModal').classList.contains('show')) {
         window.renderCredentialsList();
     }
 };
 
-window.removeClassAdvisor = function(facName) {
+window.removeClassAdvisor = function (facName) {
     if (!confirm('Are you sure you want to remove this Class Advisor?')) return;
     const fac = window.staffDirectory.find(s => s.name === facName);
     if (fac) {
@@ -7885,10 +8798,2135 @@ window.removeClassAdvisor = function(facName) {
         window.saveStaffDirectory();
         window.renderManageClassAdvisors();
         showToast('Removed', `Class Advisor role removed for ${fac.displayName || fac.name}.`);
-        
+
         // Refresh credentials list if it's open
         if (window.renderCredentialsList && document.getElementById('viewCredentialsModal').classList.contains('show')) {
             window.renderCredentialsList();
         }
     }
 };
+
+// =========================
+// ACADEMIC YEAR & EXCEL IMPORT HANDLERS
+// =========================
+window.openEditAyModal = function () {
+    const ayInput = document.getElementById('ayStartYearInput');
+    const saved = localStorage.getItem('sece_global_custom_ay') || '2026 - 2027';
+    if (ayInput) {
+        const m = saved.match(/^(\d{4})/);
+        if (m) ayInput.value = m[1];
+    }
+    const modalEl = document.getElementById('editAyModal');
+    if (modalEl) new bootstrap.Modal(modalEl).show();
+};
+
+window.saveAcademicYear = function () {
+    const ayInput = document.getElementById('ayStartYearInput');
+    const startYear = ayInput ? parseInt(ayInput.value, 10) : 2026;
+    if (isNaN(startYear) || startYear < 2000 || startYear > 3000) {
+        alert('Please enter a valid academic start year.');
+        return;
+    }
+    const ayText = `${startYear} - ${startYear + 1}`;
+    localStorage.setItem('sece_global_custom_ay', ayText);
+
+    const ayHeader = document.getElementById('ayTextHeader');
+    if (ayHeader) {
+        if (ayHeader.tagName === 'INPUT') ayHeader.value = ayText;
+        else ayHeader.innerText = ayText;
+    }
+    const ayStudents = document.getElementById('ayTextHeaderStudents');
+    if (ayStudents) ayStudents.innerText = ayText;
+
+    const modalEl = document.getElementById('editAyModal');
+    const modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+    if (modal) modal.hide();
+    showToast('Academic Year Updated', `Academic year set to ${ayText}.`);
+};
+
+function _readExcelRows(file) {
+    return new Promise((resolve, reject) => {
+        if (typeof XLSX === 'undefined') {
+            reject(new Error('Excel parser library (XLSX) is not loaded.'));
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+                const sheet = wb.Sheets[wb.SheetNames[0]];
+                resolve(XLSX.utils.sheet_to_json(sheet, { defval: '' }));
+            } catch (err) {
+                reject(err);
+            }
+        };
+        reader.onerror = () => reject(new Error('Failed to read selected file.'));
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+function _pickCol(row, keys) {
+    const entries = Object.entries(row || {});
+    for (const key of keys) {
+        const found = entries.find(([k]) => k.trim().toLowerCase() === key.toLowerCase());
+        if (found && String(found[1]).trim() !== '') return String(found[1]).trim();
+    }
+    return '';
+}
+
+window.importStudentExcel = async function (event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+        const rows = await _readExcelRows(file);
+        if (!rows.length) { alert('The selected file contains no student rows.'); return; }
+        let added = 0, failed = 0;
+        for (const r of rows) {
+            const regNo = _pickCol(r, ['Register Number', 'Reg No', 'Roll No', 'registerNumber']);
+            const firstName = _pickCol(r, ['First Name', 'firstName', 'Name']);
+            const lastName = _pickCol(r, ['Last Name', 'lastName']) || '.';
+            if (!regNo || !firstName) { failed++; continue; }
+
+            const dept = _pickCol(r, ['Department', 'Dept', 'department']) || 'CSE';
+            const course = _pickCol(r, ['Course', 'Class', 'course']) || 'BTECH-' + dept;
+            const sec = _pickCol(r, ['Section', 'section']) || 'II ' + dept + ' A';
+            const sem = parseInt(_pickCol(r, ['Semester', 'Sem', 'semester']) || '3', 10) || 3;
+            const email = _pickCol(r, ['Personal Email', 'Email', 'email']) || `${regNo.toLowerCase()}@example.com`;
+            const collegeEmail = _pickCol(r, ['College Email', 'collegeEmail']) || `${regNo.toLowerCase()}@sece.ac.in`;
+
+            const payload = {
+                firstName, lastName, registerNumber: regNo,
+                email, collegeEmail,
+                phone: _pickCol(r, ['Mobile Number', 'Mobile', 'Phone', 'phone']) || '9999999999',
+                parentPhone1: _pickCol(r, ['Parent 1 Mobile', 'Parent Phone 1', 'parentPhone1']) || '9999999999',
+                parentPhone2: _pickCol(r, ['Parent 2 Mobile', 'Parent Phone 2', 'parentPhone2']) || null,
+                residentType: _pickCol(r, ['Resident Type', 'residentType']) || 'Day Scholar',
+                semester: sem,
+                department: { name: dept },
+                course: { name: course },
+                section: { sectionName: sec }
+            };
+            const res = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(payload) });
+            if (res.ok) added++; else failed++;
+        }
+        if (typeof loadRecentStudents === 'function') loadRecentStudents();
+        showToast('Student Import Complete', `Imported ${added} student(s)${failed ? `, ${failed} skipped` : ''}.`);
+    } catch (err) {
+        alert('Error importing students: ' + err.message);
+    } finally {
+        event.target.value = '';
+    }
+};
+
+window.importFacultyExcel = async function (event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+        const rows = await _readExcelRows(file);
+        if (!rows.length) { alert('The selected file contains no faculty rows.'); return; }
+        let added = 0, failed = 0;
+        for (const r of rows) {
+            const firstName = _pickCol(r, ['First Name', 'firstName', 'Name']);
+            const lastName = _pickCol(r, ['Last Name', 'lastName']) || '.';
+            if (!firstName) { failed++; continue; }
+
+            const dept = _pickCol(r, ['Department', 'Dept', 'department']) || 'CSE';
+            const personalEmail = _pickCol(r, ['Personal Email', 'Email', 'personalEmail']) || `${firstName.toLowerCase()}@example.com`;
+            const collegeEmail = _pickCol(r, ['College Email', 'collegeEmail']) || `${firstName.toLowerCase()}@sece.ac.in`;
+
+            const payload = {
+                employeeId: _pickCol(r, ['Employee ID', 'Faculty ID', 'employeeId']) || ('EMP' + Date.now().toString().slice(-6) + added),
+                firstName, lastName,
+                personalEmail, collegeEmail,
+                phone1: _pickCol(r, ['Mobile Number 1', 'Mobile 1', 'Phone', 'phone1']) || '9999999999',
+                phone2: _pickCol(r, ['Mobile Number 2', 'Mobile 2', 'phone2']) || '',
+                subjectHandling: _pickCol(r, ['Subject Handling', 'Subject', 'subjectHandling']) || 'General',
+                department: { code: dept }
+            };
+            const res = await apiFetch('/api/teachers', { method: 'POST', body: JSON.stringify(payload) });
+            if (res.ok) added++; else failed++;
+        }
+        if (window.renderAdminFacultyDetails) window.renderAdminFacultyDetails();
+        if (window.loadAdminFullFaculty) window.loadAdminFullFaculty();
+        if (window.renderCredentialsList) window.renderCredentialsList();
+        showToast('Faculty Import Complete', `Imported ${added} faculty member(s)${failed ? `, ${failed} skipped` : ''}.`);
+    } catch (err) {
+        alert('Error importing faculty: ' + err.message);
+    } finally {
+        event.target.value = '';
+    }
+};
+
+window.importFacultyTimetableExcel = async function (event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+        const rows = await _readExcelRows(file);
+        if (!rows.length) { alert('The selected Excel file has no rows.'); return; }
+        rows.forEach(r => {
+            const rawDay = _pickCol(r, ['Day', 'Day Order', 'day']);
+            if (!rawDay) return;
+            const day = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase();
+            for (let p = 1; p <= 7; p++) {
+                const val = _pickCol(r, [`Period ${p}`, `P${p}`, `${p}`]);
+                const input = document.getElementById(`myTt_${day}_P${p}`);
+                if (input && val) input.value = val;
+            }
+        });
+        if (typeof window.saveMyTimetable === 'function') window.saveMyTimetable();
+        showToast('Timetable Imported', 'Personal timetable imported from Excel.');
+    } catch (err) {
+        alert('Error importing personal timetable: ' + err.message);
+    } finally {
+        event.target.value = '';
+    }
+};
+
+// =========================
+// ADMIN: VIEW & EDIT FACULTY TIMETABLE + TARGETED FACULTY NOTIFICATIONS
+// =========================
+function _defaultFacultyTtColumnsList() {
+    return [
+        { key: 'P1', label: 'Period 1', isBreak: false, defTime: '08.40 - 09.40' },
+        { key: 'P2', label: 'Period 2', isBreak: false, defTime: '09.40 - 10.40' },
+        { key: 'P3', label: 'Period 3', isBreak: false, defTime: '11.00 - 12.00' },
+        { key: 'TEA', label: 'Tea Break', isBreak: true, defTime: '12.00 - 12.15' },
+        { key: 'P4', label: 'Period 4', isBreak: false, defTime: '12.15 - 01.15' },
+        { key: 'P5', label: 'Period 5', isBreak: false, defTime: '01.15 - 02.00' },
+        { key: 'LUNCH', label: 'Lunch Break', isBreak: true, defTime: '02.00 - 02.40' },
+        { key: 'ACT', label: 'Activity', isBreak: false, defTime: '02.40 - 03.30' },
+        { key: 'P6', label: 'Period 6', isBreak: false, defTime: '03.30 - 04.20' },
+        { key: 'P7', label: 'Period 7', isBreak: false, defTime: '04.20 - 05.10' }
+    ];
+}
+
+function _parseJsonSafe(str, fallback) {
+    try {
+        const v = JSON.parse(str);
+        return v && typeof v === 'object' ? v : fallback;
+    } catch (_) {
+        return fallback;
+    }
+}
+
+window.syncFacultyPersonalTtFromBackend = async function (targetUsername) {
+    const uname = String(targetUsername || localStorage.getItem('sece_logged_in_user') || '').trim().toLowerCase();
+    if (!uname) return null;
+    try {
+        const res = await fetch(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`);
+        if (!res.ok) return null;
+        const body = await res.json();
+        if (body && body.dataJson && body.dataJson !== '{}') {
+            const parsed = _parseJsonSafe(body.dataJson, null);
+            if (parsed && Object.keys(parsed).length > 0) {
+                localStorage.setItem('faculty_personal_tt_' + uname, body.dataJson);
+                if (Array.isArray(parsed._columns) && parsed._columns.length > 0) {
+                    localStorage.setItem('faculty_tt_cols_faculty_personal_tt_' + uname, JSON.stringify(parsed._columns));
+                }
+                return parsed;
+            }
+        }
+    } catch (e) {
+        console.warn('Unable to sync faculty timetable from backend:', e);
+    }
+    return null;
+};
+
+let _adminFacTtColumns = [];
+let _adminFacTtTeachers = [];
+let _adminFacTtSnapshot = {};
+
+window.openAdminFacultyTimetableModal = async function () {
+    if (window._adminFacTtOpeningPromise) return window._adminFacTtOpeningPromise;
+    window._adminFacTtOpeningPromise = (async () => {
+        try {
+            const sel = document.getElementById('adminFacTtSelect');
+            const alertBox = document.getElementById('adminFacTtAlert');
+            const noteEl = document.getElementById('adminFacTtNote');
+            const notifyDayEl = document.getElementById('adminFacTtNotifyDay');
+            if (alertBox) alertBox.classList.add('d-none');
+            if (noteEl) noteEl.value = '';
+            if (notifyDayEl) notifyDayEl.value = 'AUTO';
+            if (!sel) return;
+
+            sel.innerHTML = '<option value="">-- Loading Faculty --</option>';
+            let teachers = [];
+            try {
+                const token = localStorage.getItem('jwt_token') || '';
+                const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+                const res = await fetch('/api/teachers', { headers });
+                if (res.ok) teachers = await res.json();
+            } catch (e) {
+                console.warn('Could not load teachers from backend:', e);
+            }
+            if (!Array.isArray(teachers) || teachers.length === 0) {
+                teachers = (window.staffDirectory || []).map(s => ({
+                    id: null,
+                    employeeId: buildGeneratedUsername('FACULTY', s.name),
+                    name: s.displayName || s.name,
+                    displayName: s.displayName || s.name,
+                    department: { code: s.dept || '' },
+                    user: { username: buildGeneratedUsername('FACULTY', s.name) }
+                }));
+            }
+
+            _adminFacTtTeachers = teachers.filter(t => (t.user && t.user.username) || t.employeeId || t.username);
+            if (_adminFacTtTeachers.length === 0) {
+                sel.innerHTML = '<option value="">No faculty members found</option>';
+                return;
+            }
+
+            sel.innerHTML = _adminFacTtTeachers.map(t => {
+                const uname = ((t.user && t.user.username) || t.username || t.employeeId || '').toLowerCase();
+                const disp = t.displayName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() || uname;
+                const dept = t.department ? (t.department.code || t.department.name || '') : (t.dept || '');
+                return `<option value="${uname}">${disp}${dept ? ' (' + dept + ')' : ''} [${uname}]</option>`;
+            }).join('');
+
+            await window.loadAdminFacultyTimetable();
+        } finally {
+            window._adminFacTtOpeningPromise = null;
+        }
+    })();
+    return window._adminFacTtOpeningPromise;
+};
+
+function _renderAdminFacTtGrid(saved) {
+    const thead = document.getElementById('adminFacTtHead');
+    const tbody = document.getElementById('adminFacTtBody');
+    if (!thead || !tbody) return;
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const headers = saved._headers || {};
+    const esc = v => String(v || '').replace(/"/g, '&quot;');
+
+    let thHtml = '<tr><th style="width: 95px;">Day</th>';
+    _adminFacTtColumns.forEach((col, i) => {
+        const timeVal = headers[col.key] || col.defTime || '';
+        if (col.isBreak && col.key !== 'ACT') {
+            thHtml += `<th class="text-warning position-relative">
+                <div class="d-flex justify-content-between px-1 mb-1">
+                    ${i > 0 ? `<i class="fa-solid fa-caret-left" style="cursor:pointer" onclick="window.swapAdminFacultyCol(${i}, -1)"></i>` : `<span></span>`}
+                    ${i < _adminFacTtColumns.length - 1 ? `<i class="fa-solid fa-caret-right" style="cursor:pointer" onclick="window.swapAdminFacultyCol(${i}, 1)"></i>` : `<span></span>`}
+                </div>
+                ${col.label}
+                <input type="text" id="adminFacTtHdr_${col.key}" class="form-control form-control-sm bg-dark text-warning border-secondary text-center mt-1" style="font-size: 0.72rem; padding: 0.2rem;" value="${esc(timeVal)}" />
+            </th>`;
+        } else {
+            thHtml += `<th class="position-relative">
+                <div class="d-flex justify-content-between px-1 text-muted mb-1">
+                    ${i > 0 ? `<i class="fa-solid fa-caret-left" style="cursor:pointer" onclick="window.swapAdminFacultyCol(${i}, -1)"></i>` : `<span></span>`}
+                    <i class="fa-solid fa-trash text-danger" style="cursor:pointer" onclick="window.removeAdminFacultyCol(${i})"></i>
+                    ${i < _adminFacTtColumns.length - 1 ? `<i class="fa-solid fa-caret-right" style="cursor:pointer" onclick="window.swapAdminFacultyCol(${i}, 1)"></i>` : `<span></span>`}
+                </div>
+                <input type="text" value="${esc(col.label)}" class="form-control form-control-sm bg-transparent border-0 text-white text-center p-0 mb-1" onchange="window.updateAdminFacultyColLabel(${i}, this.value)" style="font-size: 0.8rem; font-weight: bold;" />
+                <input type="text" id="adminFacTtHdr_${col.key}" class="form-control form-control-sm bg-dark text-white border-secondary text-center mt-1" style="font-size: 0.72rem; padding: 0.2rem;" value="${esc(timeVal)}" />
+            </th>`;
+        }
+    });
+    thHtml += '</tr>';
+    thead.innerHTML = thHtml;
+
+    let bodyHtml = '';
+    days.forEach(day => {
+        const d = saved[day] || {};
+        bodyHtml += `<tr><td class="align-middle text-white fw-bold">${day}</td>`;
+        _adminFacTtColumns.forEach(col => {
+            if (col.isBreak && col.key !== 'ACT') {
+                bodyHtml += `<td class="align-middle text-muted small text-center">${col.label.toUpperCase()}</td>`;
+            } else {
+                bodyHtml += `<td><input type="text" id="adminFacTt_${day}_${col.key}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(d[col.key])}" placeholder="FREE" /></td>`;
+            }
+        });
+        bodyHtml += '</tr>';
+    });
+    tbody.innerHTML = bodyHtml;
+}
+
+function _collectAdminFacTtData() {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const data = { _headers: {}, _columns: _adminFacTtColumns };
+    _adminFacTtColumns.forEach(col => {
+        data._headers[col.key] = (document.getElementById('adminFacTtHdr_' + col.key) || {}).value || col.defTime || '';
+    });
+    days.forEach(day => {
+        data[day] = {};
+        _adminFacTtColumns.forEach(col => {
+            if (!col.isBreak || col.key === 'ACT') {
+                const el = document.getElementById(`adminFacTt_${day}_${col.key}`);
+                data[day][col.key] = el ? el.value.trim() : '';
+            }
+        });
+    });
+    return data;
+}
+
+window.loadAdminFacultyTimetable = async function () {
+    const sel = document.getElementById('adminFacTtSelect');
+    const metaEl = document.getElementById('adminFacTtMeta');
+    const alertBox = document.getElementById('adminFacTtAlert');
+    if (alertBox) alertBox.classList.add('d-none');
+    if (!sel || !sel.value) return;
+
+    const uname = sel.value.toLowerCase();
+    const teacher = _adminFacTtTeachers.find(t => ((t.user && t.user.username) || t.username || t.employeeId || '').toLowerCase() === uname);
+    const dispName = teacher ? (teacher.displayName || teacher.name || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim()) : uname;
+    const dept = teacher && teacher.department ? (teacher.department.name || teacher.department.code || '') : '';
+    if (metaEl) {
+        metaEl.innerHTML = `<i class="fa-solid fa-user-tie me-1"></i> Viewing timetable for <strong>${dispName}</strong> (${uname})${dept ? ` &bull; ${dept}` : ''}`;
+    }
+
+    let saved = await window.syncFacultyPersonalTtFromBackend(uname);
+    if (!saved) {
+        saved = _parseJsonSafe(localStorage.getItem('faculty_personal_tt_' + uname) || '{}', {});
+    }
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const hasPersonalData = days.some(d => saved[d] && Object.values(saved[d]).some(v => v && String(v).trim()));
+
+    if (!hasPersonalData && teacher && teacher.id) {
+        try {
+            const ttRes = await apiFetch(`/api/timetable/teacher/${teacher.id}`);
+            if (ttRes.ok) {
+                const entries = await ttRes.json();
+                if (Array.isArray(entries) && entries.length > 0) {
+                    entries.forEach(entry => {
+                        if (!entry.day || !entry.slotNumber) return;
+                        if (!saved[entry.day]) saved[entry.day] = {};
+                        const sub = entry.subjectName || entry.subjectCode || '';
+                        const sec = entry.sectionName || '';
+                        const room = entry.roomNumber || entry.labName || '';
+                        saved[entry.day]['P' + entry.slotNumber] = [sub, sec, room].filter(Boolean).join(', ');
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load teacher schedule entries:', e);
+        }
+    }
+
+    if (Array.isArray(saved._columns) && saved._columns.length > 0) {
+        _adminFacTtColumns = JSON.parse(JSON.stringify(saved._columns));
+    } else {
+        const savedCols = _parseJsonSafe(localStorage.getItem('faculty_tt_cols_faculty_personal_tt_' + uname) || 'null', null);
+        _adminFacTtColumns = (Array.isArray(savedCols) && savedCols.length > 0) ? savedCols : _defaultFacultyTtColumnsList();
+    }
+
+    _adminFacTtSnapshot = {};
+    days.forEach(day => {
+        _adminFacTtSnapshot[day] = { ...(saved[day] || {}) };
+    });
+
+    _renderAdminFacTtGrid(saved);
+};
+
+window.addAdminFacultyPeriodCol = function () {
+    const current = _collectAdminFacTtData();
+    const newIdx = _adminFacTtColumns.length + 1;
+    _adminFacTtColumns.push({
+        key: 'P' + newIdx + '_' + Date.now().toString().slice(-4),
+        label: 'Period ' + newIdx,
+        isBreak: false,
+        defTime: '00.00 - 00.00'
+    });
+    _renderAdminFacTtGrid(current);
+};
+
+window.swapAdminFacultyCol = function (idx, dir) {
+    if (idx + dir < 0 || idx + dir >= _adminFacTtColumns.length) return;
+    const current = _collectAdminFacTtData();
+    const tmp = _adminFacTtColumns[idx];
+    _adminFacTtColumns[idx] = _adminFacTtColumns[idx + dir];
+    _adminFacTtColumns[idx + dir] = tmp;
+    _renderAdminFacTtGrid(current);
+};
+
+window.removeAdminFacultyCol = function (idx) {
+    if (!confirm('Remove this period column?')) return;
+    const current = _collectAdminFacTtData();
+    _adminFacTtColumns.splice(idx, 1);
+    _renderAdminFacTtGrid(current);
+};
+
+window.updateAdminFacultyColLabel = function (idx, val) {
+    if (_adminFacTtColumns[idx]) _adminFacTtColumns[idx].label = val;
+};
+
+window.saveAdminFacultyTimetable = async function () {
+    const sel = document.getElementById('adminFacTtSelect');
+    const alertBox = document.getElementById('adminFacTtAlert');
+    const noteEl = document.getElementById('adminFacTtNote');
+    const notifyDayEl = document.getElementById('adminFacTtNotifyDay');
+    if (!sel || !sel.value) {
+        alert('Please select a faculty member first.');
+        return;
+    }
+
+    const uname = sel.value.toLowerCase();
+    const teacher = _adminFacTtTeachers.find(t => ((t.user && t.user.username) || t.username || t.employeeId || '').toLowerCase() === uname);
+    const dispName = teacher ? (teacher.displayName || teacher.name || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim()) : uname;
+    const customNote = noteEl ? noteEl.value.trim() : '';
+    const manualNotifyDay = notifyDayEl ? notifyDayEl.value : 'AUTO';
+
+    const data = _collectAdminFacTtData();
+    const jsonStr = JSON.stringify(data);
+    localStorage.setItem('faculty_personal_tt_' + uname, jsonStr);
+    localStorage.setItem('faculty_tt_cols_faculty_personal_tt_' + uname, JSON.stringify(_adminFacTtColumns));
+
+    try {
+        const res = await apiFetch(`/api/operations/faculty-timetables/${encodeURIComponent(uname)}`, {
+            method: 'POST',
+            body: JSON.stringify({ dataJson: jsonStr })
+        });
+        if (!res.ok) throw new Error('Failed to save timetable on server.');
+    } catch (err) {
+        if (alertBox) {
+            alertBox.className = 'alert alert-danger small py-2 mb-2';
+            alertBox.innerText = 'Error saving timetable: ' + err.message;
+        }
+        return;
+    }
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const changedDays = [];
+    days.forEach(day => {
+        const before = _adminFacTtSnapshot[day] || {};
+        const after = data[day] || {};
+        const periodChanges = [];
+        _adminFacTtColumns.forEach(col => {
+            if (col.isBreak && col.key !== 'ACT') return;
+            const prevVal = String(before[col.key] || '').trim();
+            const nextVal = String(after[col.key] || '').trim();
+            if (prevVal !== nextVal) {
+                periodChanges.push(`${col.label}: ${nextVal || 'FREE'}`);
+            }
+        });
+        if (periodChanges.length > 0) {
+            changedDays.push({ day, summary: periodChanges.join('; ') });
+        }
+    });
+
+    if (manualNotifyDay && manualNotifyDay !== 'AUTO' && !changedDays.some(c => c.day === manualNotifyDay)) {
+        changedDays.push({ day: manualNotifyDay, summary: customNote || 'Schedule updated by Admin' });
+    } else if (changedDays.length === 0 && customNote) {
+        const fallbackDay = getTodayDayName() === 'Sunday' ? 'Monday' : getTodayDayName();
+        changedDays.push({ day: fallbackDay, summary: customNote });
+    }
+
+    for (const ch of changedDays) {
+        const reason = `Timetable changed by Admin for ${ch.day}${customNote ? ` (${customNote})` : ''}: ${ch.summary}`;
+        await savePeriodNotificationToAPI({
+            date: getDateForDayName(ch.day),
+            day: ch.day,
+            period: 0,
+            section: ch.summary,
+            originalFaculty: uname,
+            staff: dispName,
+            subject: reason,
+            reason: reason,
+            source: 'admin_faculty_tt_change'
+        });
+    }
+
+    days.forEach(day => {
+        _adminFacTtSnapshot[day] = { ...(data[day] || {}) };
+    });
+    if (noteEl) noteEl.value = '';
+    if (notifyDayEl) notifyDayEl.value = 'AUTO';
+
+    const notifiedText = changedDays.length > 0
+        ? `Saved timetable for ${dispName} and notified for: ${changedDays.map(c => c.day).join(', ')}.`
+        : `Saved timetable for ${dispName}. (No day changes detected to notify.)`;
+
+    if (alertBox) {
+        alertBox.className = 'alert alert-success small py-2 mb-2';
+        alertBox.innerText = notifiedText;
+    }
+    showToast('Faculty Timetable Updated', notifiedText);
+};
+
+function getFacultyAdminTtNotifications() {
+    if (currentUserRole !== 'FACULTY') return [];
+    const uname = String(localStorage.getItem('sece_logged_in_user') || '').trim().toLowerCase();
+    let userNameAlt = '';
+    try {
+        const ui = JSON.parse(localStorage.getItem('user_info') || '{}');
+        if (ui && ui.name) userNameAlt = String(ui.name).trim().toLowerCase();
+    } catch (_) { }
+
+    const all = loadPeriodNotifications();
+    return all.filter(n => {
+        if (n.source !== 'admin_faculty_tt_change') return false;
+        const targetUser = String(n.originalFaculty || '').trim().toLowerCase();
+        const targetName = String(n.staff || '').trim().toLowerCase();
+        return (uname && targetUser === uname) || (userNameAlt && targetName === userNameAlt);
+    });
+}
+
+window.renderFacultyAdminTtBanner = function () {
+    const banner = document.getElementById('facultyAdminTtChangeBanner');
+    if (!banner) return;
+    const notifs = getFacultyAdminTtNotifications();
+    if (currentUserRole !== 'FACULTY' || notifs.length === 0) {
+        banner.classList.add('d-none');
+        banner.innerHTML = '';
+        return;
+    }
+
+    banner.classList.remove('d-none');
+    banner.innerHTML = notifs.map(n => `
+        <div class="alert alert-warning d-flex align-items-center justify-content-between gap-3 shadow-sm mb-2" role="alert" style="border-left: 4px solid #f59e0b;">
+            <div>
+                <h6 class="alert-heading mb-1 fw-bold">
+                    <i class="fa-solid fa-bell me-2"></i>Timetable Changed by Admin (${n.day || ''}${n.date ? ' - ' + n.date : ''})
+                </h6>
+                <p class="mb-0 small text-dark">${n.reason || n.section || 'Your timetable was updated by Admin.'}</p>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-dark flex-shrink-0" onclick="window.dismissFacultyAdminTtNotif?.('${n._id || ''}')">
+                <i class="fa-solid fa-check me-1"></i>Dismiss
+            </button>
+        </div>
+    `).join('');
+};
+
+window.dismissFacultyAdminTtNotif = async function (id) {
+    const all = loadPeriodNotifications();
+    const target = all.find(n => String(n._id || '') === String(id || '') && n.source === 'admin_faculty_tt_change');
+    if (target) {
+        await deletePeriodNotificationFromAPI(target);
+    }
+    window.renderFacultyAdminTtBanner();
+    if (typeof renderAdminLeaveNotifications === 'function') renderAdminLeaveNotifications();
+    if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
+};
+
+if (window.__facultyAdminTtPollInterval) clearInterval(window.__facultyAdminTtPollInterval);
+window.__facultyAdminTtPollInterval = setInterval(() => {
+    if (localStorage.getItem('sece_logged_in_role') === 'FACULTY' && localStorage.getItem('jwt_token')) {
+        if (typeof fetchPeriodNotificationsFromAPI === 'function') {
+            fetchPeriodNotificationsFromAPI().then(() => {
+                if (typeof window.renderFacultyAdminTtBanner === 'function') window.renderFacultyAdminTtBanner();
+                if (typeof updateAnnouncementTicker === 'function') updateAnnouncementTicker();
+            });
+        }
+    }
+}, 30000);
+
+// =========================
+// ADMIN: UPLOAD PDF/IMAGE & ASSIGN TO CLASS
+// =========================
+function _detectDayFromOcrText(text) {
+    const lower = String(text || '').trim().toLowerCase();
+    if (/^mon/.test(lower)) return 'Monday';
+    if (/^tue/.test(lower)) return 'Tuesday';
+    if (/^wed/.test(lower)) return 'Wednesday';
+    if (/^thu/.test(lower)) return 'Thursday';
+    if (/^fri/.test(lower)) return 'Friday';
+    if (/^sat/.test(lower)) return 'Saturday';
+    return null;
+}
+
+async function _extractGridViaClientOcr(imageSrc) {
+    if (typeof Tesseract === 'undefined') {
+        return null;
+    }
+    const result = await Tesseract.recognize(imageSrc, 'eng');
+    const words = (result && result.data && Array.isArray(result.data.words)) ? result.data.words : [];
+    if (words.length === 0) return null;
+
+    const sorted = words
+        .filter(w => w.text && w.text.trim())
+        .map(w => ({
+            text: w.text.trim(),
+            x: w.bbox ? w.bbox.x0 : 0,
+            endX: w.bbox ? w.bbox.x1 : 0,
+            y: w.bbox ? (w.bbox.y0 + w.bbox.y1) / 2 : 0
+        }))
+        .sort((a, b) => a.y - b.y || a.x - b.x);
+
+    const rows = [];
+    for (const w of sorted) {
+        if (rows.length === 0 || Math.abs(rows[rows.length - 1][0].y - w.y) > 22) {
+            rows.push([w]);
+        } else {
+            rows[rows.length - 1].push(w);
+        }
+    }
+
+    const dayRows = {};
+    let minX = Infinity, maxX = 0;
+    for (const row of rows) {
+        row.sort((a, b) => a.x - b.x);
+        const day = _detectDayFromOcrText(row[0].text) || _detectDayFromOcrText(row.slice(0, 2).map(w => w.text).join(' '));
+        if (day && !dayRows[day]) {
+            dayRows[day] = row;
+            for (let i = 1; i < row.length; i++) {
+                minX = Math.min(minX, row[i].x);
+                maxX = Math.max(maxX, row[i].endX);
+            }
+        }
+    }
+
+    if (Object.keys(dayRows).length === 0) return null;
+
+    const firstDayY = Math.min(...Object.values(dayRows).map(r => r[0].y));
+    const centers = [];
+    if (minX < maxX) {
+        const step = (maxX - minX) / 7;
+        for (let p = 0; p < 7; p++) centers.push(minX + step * (p + 0.5));
+    } else {
+        for (let p = 0; p < 7; p++) centers.push(150 + p * 100);
+    }
+
+    // Refine period column centers from header row above Monday containing 1..7
+    const hdrCandidates = rows
+        .filter(r => r[0].y < firstDayY - 10 && r[0].y >= firstDayY - 180)
+        .sort((a, b) => b[0].y - a[0].y);
+    for (const row of hdrCandidates) {
+        const found = {};
+        for (const w of row) {
+            const clean = w.text.toUpperCase().replace(/^P/, '');
+            if (/^[1-7]$/.test(clean) && w.x > (minX === Infinity ? 80 : minX - 60)) {
+                found[parseInt(clean, 10)] = (w.x + w.endX) / 2;
+            }
+        }
+        if (Object.keys(found).length >= 5) {
+            for (let p = 1; p <= 7; p++) {
+                if (found[p] !== undefined) centers[p - 1] = found[p];
+            }
+            break;
+        }
+    }
+
+    // Compute approximate period column intervals [left, right] excluding Tea/Lunch gaps
+    const halfW = [];
+    for (let p = 0; p < 7; p++) {
+        const dL = p > 0 ? (centers[p] - centers[p - 1]) : (centers[1] - centers[0]);
+        const dR = p < 6 ? (centers[p + 1] - centers[p]) : (centers[6] - centers[5]);
+        halfW.push(Math.min(dL, dR) * 0.48);
+    }
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const grid = {};
+    days.forEach(day => {
+        grid[day] = Array.from({ length: 7 }, () => ({ sub: 'FREE', code: '', faculty: '', venue: '' }));
+        const row = dayRows[day];
+        if (!row || row.length < 2) return;
+        const buckets = Array.from({ length: 7 }, () => []);
+        for (let i = 1; i < row.length; i++) {
+            const w = row[i];
+            const up = w.text.toUpperCase().replace(/\s+/g, '');
+            if (up === 'TEA' || up === 'LUNCH' || up === 'BREAK' || up === 'TEABREAK' || up === 'LUNCHBREAK') continue;
+            if (/^\d{1,2}\.\d{2}$/.test(up) || up === 'AM' || up === 'PM' || up === 'TO') continue;
+            // Assign to every period overlapping bbox, or nearest period if none
+            let assigned = false;
+            for (let p = 0; p < 7; p++) {
+                const cL = centers[p] - halfW[p];
+                const cR = centers[p] + halfW[p];
+                if (w.endX >= cL + 2 && w.x <= cR - 2) {
+                    buckets[p].push(w.text);
+                    assigned = true;
+                }
+            }
+            if (!assigned) {
+                const center = (w.x + w.endX) / 2;
+                let bestIdx = 0, bestDist = Infinity;
+                for (let p = 0; p < 7; p++) {
+                    const d = Math.abs(center - centers[p]);
+                    if (d < bestDist) { bestDist = d; bestIdx = p; }
+                }
+                buckets[bestIdx].push(w.text);
+            }
+        }
+        for (let p = 0; p < 7; p++) {
+            const raw = buckets[p].join(' ').trim();
+            if (raw && raw !== '-' && raw.toUpperCase() !== 'FREE') {
+                const parts = raw.split(/[,|/]+/).map(s => s.trim());
+                grid[day][p] = {
+                    sub: parts[0] || raw,
+                    code: '',
+                    faculty: parts[1] || '',
+                    venue: parts[2] || ''
+                };
+            }
+        }
+    });
+    return grid;
+}
+
+function _renderUploadAssignGrid(ttData) {
+    const tbody = document.getElementById('uatGridBody');
+    if (!tbody) return;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const esc = v => String(v || '').replace(/"/g, '&quot;');
+
+    tbody.innerHTML = days.map(day => {
+        const periods = (ttData && ttData[day]) ? ttData[day] : [];
+        let cells = '';
+        for (let p = 1; p <= 7; p++) {
+            const item = periods[p - 1];
+            let val = '';
+            if (item && item.sub && item.sub.toUpperCase() !== 'FREE' && item.sub.toUpperCase() !== 'BREAK') {
+                val = [item.sub, item.faculty, item.venue].filter(Boolean).join(', ');
+            }
+            cells += `<td><input type="text" id="uat_${day}_P${p}" class="form-control form-control-sm bg-dark text-white border-secondary text-center" value="${esc(val)}" placeholder="FREE" /></td>`;
+        }
+        return `<tr><td class="fw-bold text-white">${day}</td>${cells}</tr>`;
+    }).join('');
+}
+
+window.updateUploadAssignSectionBadge = function () {
+    const dept = (document.getElementById('uatDeptSelect')?.value || 'CSE').trim();
+    const year = (document.getElementById('uatYearSelect')?.value || 'II').trim();
+    const sec = (document.getElementById('uatSecInput')?.value || 'C').trim().toUpperCase();
+    const sem = (document.getElementById('uatSemSelect')?.value || '3').trim();
+    const fullName = `${year} ${dept} ${sec}`;
+    const badge = document.getElementById('uatTargetSectionBadge');
+    if (badge) badge.innerText = `${fullName} • Sem ${sem}`;
+
+    // Auto-select existing advisor for that section if known
+    const advisorSel = document.getElementById('uatAdvisorSelect');
+    if (advisorSel && Array.isArray(window._uatTeachersCache)) {
+        const match = window._uatTeachersCache.find(t =>
+            t.classAdvisorFor && t.classAdvisorFor.trim().toLowerCase() === fullName.toLowerCase()
+        );
+        if (match) {
+            const val = (match.user && match.user.username) || match.employeeId || match.name;
+            if (val) advisorSel.value = val;
+        }
+    }
+};
+
+window.openUploadAssignTtModal = async function () {
+    const fileInput = document.getElementById('uatFileInput');
+    const statusEl = document.getElementById('uatExtractStatus');
+    const detailsEl = document.getElementById('uatDetailsSection');
+    const previewWrap = document.getElementById('uatPreviewImgWrap');
+    const alertEl = document.getElementById('uatAssignAlert');
+    const advisorSel = document.getElementById('uatAdvisorSelect');
+
+    if (fileInput) fileInput.value = '';
+    if (statusEl) { statusEl.classList.add('d-none'); statusEl.innerHTML = ''; }
+    if (detailsEl) detailsEl.classList.add('d-none');
+    if (previewWrap) previewWrap.classList.add('d-none');
+    if (alertEl) alertEl.classList.add('d-none');
+
+    if (advisorSel) {
+        advisorSel.innerHTML = '<option value="">-- Select Class Advisor --</option>';
+        let teachers = [];
+        try {
+            const token = localStorage.getItem('jwt_token') || '';
+            const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+            const res = await fetch('/api/teachers', { headers });
+            if (res.ok) teachers = await res.json();
+        } catch (e) {
+            console.warn('Could not load teachers for advisor dropdown:', e);
+        }
+        if (!Array.isArray(teachers) || teachers.length === 0) {
+            teachers = (window.staffDirectory || []).map(s => ({
+                name: s.displayName || s.name,
+                displayName: s.displayName || s.name,
+                classAdvisorFor: s.classAdvisorFor || '',
+                department: { code: s.dept || '' },
+                user: { username: buildGeneratedUsername('FACULTY', s.name) }
+            }));
+        }
+        window._uatTeachersCache = teachers;
+        advisorSel.innerHTML = '<option value="">-- Select Class Advisor --</option>' + teachers.map(t => {
+            const val = (t.user && t.user.username) || t.employeeId || t.name;
+            const disp = t.displayName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() || val;
+            const dept = t.department ? (t.department.code || t.department.name || '') : '';
+            return `<option value="${val}">${disp}${dept ? ' (' + dept + ')' : ''}</option>`;
+        }).join('');
+    }
+    window.updateUploadAssignSectionBadge();
+};
+
+window.handleUploadAssignTtFile = async function (event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const statusEl = document.getElementById('uatExtractStatus');
+    const detailsEl = document.getElementById('uatDetailsSection');
+    const previewWrap = document.getElementById('uatPreviewImgWrap');
+    const previewImg = document.getElementById('uatPreviewImg');
+    const alertEl = document.getElementById('uatAssignAlert');
+    if (alertEl) alertEl.classList.add('d-none');
+
+    if (statusEl) {
+        statusEl.className = 'small mt-2 text-info';
+        statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Extracting timetable & image from uploaded file...';
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const token = localStorage.getItem('jwt_token') || '';
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+        const res = await fetch('/api/timetable/upload-image', {
+            method: 'POST',
+            headers,
+            body: formData
+        });
+        const payload = await res.json();
+        if (!res.ok) {
+            throw new Error(payload.error || 'Failed to extract uploaded file.');
+        }
+
+        const previewSrc = payload.previewImage || (file.type.startsWith('image/') ? URL.createObjectURL(file) : '');
+        if (previewSrc && previewImg && previewWrap) {
+            previewImg.src = previewSrc;
+            previewWrap.classList.remove('d-none');
+        }
+
+        let ttData = payload.data || null;
+        let modeNote = payload.extractionMode === 'PDF_TEXT'
+            ? 'Extracted from PDF text table.'
+            : (payload.extractionMode === 'GEMINI_AI' ? 'Extracted via AI vision.' : '');
+
+        if (!ttData && payload.needsClientOcr && previewSrc) {
+            if (statusEl) {
+                statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running OCR on extracted image to detect periods...';
+            }
+            try {
+                ttData = await _extractGridViaClientOcr(previewSrc);
+                modeNote = ttData
+                    ? 'Image extracted and OCR-parsed. Please verify cells & select Class, Year, Section, and Class Advisor.'
+                    : 'Image extracted. Please review/fill periods below and select Class, Year, Section, and Class Advisor.';
+            } catch (ocrErr) {
+                console.warn('Client OCR warning:', ocrErr);
+                modeNote = 'Image extracted. Enter or adjust periods below and select Class, Year, Section, and Class Advisor.';
+            }
+        }
+
+        _renderUploadAssignGrid(ttData || {});
+        if (detailsEl) detailsEl.classList.remove('d-none');
+
+        // Pre-fill Class / Department, Year, Section, and Class Advisor if extracted from PDF
+        if (payload.metadata) {
+            const m = payload.metadata;
+            const deptEl = document.getElementById('uatDeptSelect');
+            const yearEl = document.getElementById('uatYearSelect');
+            const secEl = document.getElementById('uatSecInput');
+            const advEl = document.getElementById('uatAdvisorSelect');
+            if (deptEl && m.department) {
+                const matchOpt = Array.from(deptEl.options).find(o => o.value.toUpperCase() === m.department.toUpperCase());
+                if (matchOpt) deptEl.value = matchOpt.value;
+            }
+            if (yearEl && m.year) {
+                const matchYr = Array.from(yearEl.options).find(o => o.value.toUpperCase() === m.year.toUpperCase());
+                if (matchYr) yearEl.value = matchYr.value;
+            }
+            if (secEl && m.sectionCode) {
+                secEl.value = m.sectionCode.toUpperCase();
+            }
+            if (advEl && m.classAdvisor) {
+                const normName = s => String(s || '').toLowerCase().replace(/^(dr|ms|mr|mrs)\.?\s*/i, '').replace(/[.\s]+/g, '');
+                const targetNorm = normName(m.classAdvisor);
+                const lastTok = m.classAdvisor.toLowerCase().trim().split(/[\s.]+/).pop();
+                const matchAdv = Array.from(advEl.options).find(o => {
+                    const oNorm = normName(o.text);
+                    return (targetNorm && (oNorm.includes(targetNorm) || targetNorm.includes(oNorm)))
+                        || (lastTok && lastTok.length >= 3 && o.text.toLowerCase().includes(lastTok));
+                });
+                if (matchAdv) advEl.value = matchAdv.value;
+            }
+        }
+        window.updateUploadAssignSectionBadge();
+
+        if (statusEl) {
+            statusEl.className = 'small mt-2 text-success fw-semibold';
+            statusEl.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${modeNote || 'File extracted successfully! Select Class, Year, Section, and Class Advisor below.'}`;
+        }
+    } catch (err) {
+        console.error('Upload & Extract error:', err);
+        if (statusEl) {
+            statusEl.className = 'small mt-2 text-danger';
+            statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i>${err.message}`;
+        }
+    }
+};
+
+window.assignUploadedClassTimetable = async function () {
+    const dept = (document.getElementById('uatDeptSelect')?.value || '').trim();
+    const year = (document.getElementById('uatYearSelect')?.value || '').trim();
+    const semester = parseInt(document.getElementById('uatSemSelect')?.value || '3', 10);
+    const secCode = (document.getElementById('uatSecInput')?.value || '').trim().toUpperCase();
+    const advisorSel = document.getElementById('uatAdvisorSelect');
+    const advisorVal = advisorSel ? advisorSel.value : '';
+    const advisorLabel = (advisorSel && advisorSel.selectedIndex > 0) ? advisorSel.options[advisorSel.selectedIndex].text : '';
+    const alertEl = document.getElementById('uatAssignAlert');
+
+    if (!dept || !year || !secCode) {
+        alert('Please select Class/Department, Year, and Section.');
+        return;
+    }
+
+    const fullSectionName = `${year} ${dept} ${secCode}`;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const grid = {};
+    days.forEach(day => {
+        grid[day] = {};
+        for (let p = 1; p <= 7; p++) {
+            const el = document.getElementById(`uat_${day}_P${p}`);
+            grid[day][`P${p}`] = el ? el.value.trim() : '';
+        }
+    });
+
+    try {
+        const res = await apiFetch('/api/timetable/assign-class', {
+            method: 'POST',
+            body: JSON.stringify({
+                department: dept,
+                year: year,
+                semester: semester,
+                sectionCode: secCode,
+                sectionName: fullSectionName,
+                classAdvisor: advisorVal,
+                grid: grid
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to assign timetable.');
+
+        // Sync local storage & UI state so grid reflects assigned timetable immediately
+        const builtData = {
+            advisor: data.classAdvisor || advisorLabel || '',
+            tutors: '',
+            metadata: { batch: '2024', year: year, semester: String(semester) },
+            headers: {},
+            grid: grid
+        };
+        localStorage.setItem(`sece_tt_built_${fullSectionName}`, JSON.stringify(builtData));
+        localStorage.removeItem('class_tt_' + fullSectionName);
+
+        if (typeof activeSections !== 'undefined' && Array.isArray(activeSections)) {
+            if (!activeSections.some(s => s.name === fullSectionName)) {
+                activeSections.push({ dept: dept, name: fullSectionName, classroom: 'SF 04', capacity: 60 });
+                if (typeof saveSections === 'function') saveSections();
+            }
+        }
+        if (advisorVal && Array.isArray(window.staffDirectory)) {
+            window.staffDirectory.forEach(s => {
+                if (s.classAdvisorFor === fullSectionName) s.classAdvisorFor = '';
+                const uname = buildGeneratedUsername('FACULTY', s.name);
+                if (uname === advisorVal || s.name === advisorVal) s.classAdvisorFor = fullSectionName;
+            });
+            if (typeof saveStaffDirectory === 'function') saveStaffDirectory();
+        }
+
+        timetableData = loadSavedTimetable();
+        currentDept = dept;
+        currentSection = fullSectionName;
+        if (typeof populateSectionSelects === 'function') populateSectionSelects();
+        if (typeof loadTimetableData === 'function') await loadTimetableData();
+        if (typeof renderTimetableGrid === 'function') renderTimetableGrid();
+        if (typeof renderCourseRefTable === 'function') renderCourseRefTable();
+
+        if (alertEl) {
+            alertEl.className = 'alert alert-success small py-2 mt-2 mb-0';
+            alertEl.innerText = data.message || `Timetable assigned to ${fullSectionName}!`;
+        }
+        showToast('Class Timetable Assigned', `Timetable assigned to ${fullSectionName}${data.classAdvisor ? ` (Advisor: ${data.classAdvisor})` : ''}.`);
+    } catch (err) {
+        if (alertEl) {
+            alertEl.className = 'alert alert-danger small py-2 mt-2 mb-0';
+            alertEl.innerText = 'Error: ' + err.message;
+        }
+    }
+};
+
+// =========================================================================
+// ADMIN FEATURE: VIEW UPDATED STUDENT TIMETABLE (Year / Section / Class / Dept)
+// =========================================================================
+function _parseVstSectionMeta(secObj) {
+    const name = String(secObj.sectionName || '').trim();
+    const parts = name.split(/\s+/);
+    const romanMap = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV' };
+    let year = '';
+    if (secObj.year && romanMap[String(secObj.year)]) year = romanMap[String(secObj.year)];
+    else if (parts[0] && /^(I|II|III|IV)$/i.test(parts[0])) year = parts[0].toUpperCase();
+    else if (secObj.semester) year = romanMap[String(Math.ceil(secObj.semester / 2))] || 'II';
+    else year = 'II';
+
+    const dept = (secObj.course && secObj.course.department && secObj.course.department.code)
+        || (parts.length >= 2 ? parts[1].toUpperCase() : 'CSE');
+    const classCode = (secObj.course && (secObj.course.code || secObj.course.name)) || ('BTECH-' + dept);
+    const secCode = secObj.sectionIdentifier
+        || (parts.length >= 3 ? parts.slice(2).join(' ').toUpperCase() : name);
+
+    return { id: secObj.id, name, year, dept: dept.toUpperCase(), classCode, secCode };
+}
+
+window.openAdminViewStudentTtModal = async function () {
+    const alertEl = document.getElementById('vstAlert');
+    const metaBar = document.getElementById('vstMetaBar');
+    if (alertEl) alertEl.classList.add('d-none');
+    if (metaBar) metaBar.innerHTML = '<span class="text-muted">Loading classes and sections...</span>';
+
+    let sections = [];
+    try {
+        const res = await apiFetch('/api/sections');
+        if (res && res.ok) sections = await res.json();
+    } catch (e) {
+        console.warn('Could not load sections for View Student TT:', e);
+    }
+
+    const normalized = Array.isArray(sections)
+        ? sections.map(_parseVstSectionMeta).filter(s => s.name && !/^\d+\s+CSE\s+II\s+CSE/i.test(s.name))
+        : [];
+    window._vstSectionsCache = normalized;
+
+    const deptSel = document.getElementById('vstDeptSelect');
+    if (deptSel) {
+        const depts = new Set(['CSE', 'IT', 'AI&DS', 'AI&ML', 'ECE']);
+        normalized.forEach(s => { if (s.dept) depts.add(s.dept); });
+        const prev = deptSel.value;
+        deptSel.innerHTML = Array.from(depts).sort().map(d => `<option value="${d}">${d}</option>`).join('');
+        if (prev && depts.has(prev)) deptSel.value = prev;
+        else if (depts.has('CSE')) deptSel.value = 'CSE';
+    }
+
+    window.onVstFilterChange('init');
+};
+
+window.onVstFilterChange = function () {
+    const dept = (document.getElementById('vstDeptSelect')?.value || 'CSE').toUpperCase();
+    const year = (document.getElementById('vstYearSelect')?.value || 'II').toUpperCase();
+    const classSel = document.getElementById('vstClassSelect');
+    const secSel = document.getElementById('vstSectionSelect');
+    const allSecs = Array.isArray(window._vstSectionsCache) ? window._vstSectionsCache : [];
+
+    const byDeptYear = allSecs.filter(s => s.dept === dept && s.year === year);
+
+    if (classSel) {
+        const prevClass = classSel.value;
+        const classes = new Set(byDeptYear.map(s => s.classCode).filter(Boolean));
+        if (classes.size === 0) classes.add('BTECH-' + dept);
+        classSel.innerHTML = '<option value="">All Classes</option>' +
+            Array.from(classes).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+        if (prevClass && classes.has(prevClass)) classSel.value = prevClass;
+    }
+
+    const selectedClass = classSel ? classSel.value : '';
+    const matching = byDeptYear.filter(s => !selectedClass || s.classCode === selectedClass);
+
+    if (secSel) {
+        const prevSec = secSel.value;
+        const secMap = new Map();
+        matching.forEach(s => secMap.set(s.secCode, s));
+        if (secMap.size === 0) {
+            ['A', 'B', 'C'].forEach(l => secMap.set(l, { id: null, name: `${year} ${dept} ${l}`, year, dept, classCode: selectedClass || `BTECH-${dept}`, secCode: l }));
+        }
+        secSel.innerHTML = Array.from(secMap.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([code, obj]) => `<option value="${code}" data-sec-id="${obj.id || ''}" data-sec-name="${obj.name}">${code} (${obj.name})</option>`)
+            .join('');
+        if (prevSec && secMap.has(prevSec)) secSel.value = prevSec;
+    }
+
+    window.loadAdminViewStudentTt();
+};
+
+window.loadAdminViewStudentTt = async function () {
+    const dept = (document.getElementById('vstDeptSelect')?.value || 'CSE').toUpperCase();
+    const year = (document.getElementById('vstYearSelect')?.value || 'II').toUpperCase();
+    const secSel = document.getElementById('vstSectionSelect');
+    const opt = secSel && secSel.selectedIndex >= 0 ? secSel.options[secSel.selectedIndex] : null;
+    const secCode = secSel ? secSel.value : 'A';
+    const secId = opt?.dataset?.secId || '';
+    const targetName = opt?.dataset?.secName || `${year} ${dept} ${secCode}`;
+
+    const tbody = document.getElementById('vstGridBody');
+    const refBody = document.getElementById('vstRefBody');
+    const metaBar = document.getElementById('vstMetaBar');
+    const alertEl = document.getElementById('vstAlert');
+    if (!tbody) return;
+    if (alertEl) alertEl.classList.add('d-none');
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading updated timetable...</td></tr>';
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const grid = {};
+    days.forEach(d => { grid[d] = Array.from({ length: 7 }, () => ({ sub: 'FREE', code: '', faculty: '', venue: '', cat: 'cat-theory' })); });
+
+    const selectedSem = document.getElementById('vstSemSelect')?.value || '';
+    const semQuery = selectedSem ? `?semester=${encodeURIComponent(selectedSem)}` : '';
+
+    let loadedCount = 0;
+    let sourceLabel = 'Database';
+
+    if (secId) {
+        try {
+            const res = await apiFetch(`/api/timetable/section/${secId}${semQuery}`);
+            if (res && res.ok) {
+                const entries = await res.json();
+                if (Array.isArray(entries) && entries.length > 0) {
+                    entries.forEach(e => {
+                        const day = e.day;
+                        const pIdx = (e.slotNumber || 1) - 1;
+                        if (grid[day] && pIdx >= 0 && pIdx < 7) {
+                            const sub = e.subjectName || e.subjectCode || 'FREE';
+                            const low = sub.toLowerCase();
+                            const cat = (e.subjectType === 'LAB' || e.subjectType === 'PROJECT' || low.includes('lab') || low.includes('practical') || low.includes('project'))
+                                ? 'cat-lab' : (low === 'alt' ? 'cat-alt' : 'cat-theory');
+                            grid[day][pIdx] = {
+                                sub,
+                                code: e.subjectCode || '',
+                                faculty: e.teacherName || '-',
+                                venue: e.roomNumber || e.labName || 'TBA',
+                                cat
+                            };
+                            loadedCount++;
+                        }
+                    });
+                }
+            }
+        } catch (err) {
+            console.warn('Error loading section timetable for Admin view:', err);
+        }
+    }
+
+    if (loadedCount === 0 && !selectedSem) {
+        const localBuilt = localStorage.getItem(`sece_tt_built_${targetName}`);
+        if (localBuilt) {
+            try {
+                const parsed = JSON.parse(localBuilt);
+                if (parsed && parsed.grid) {
+                    days.forEach(day => {
+                        for (let p = 1; p <= 7; p++) {
+                            const val = (parsed.grid[day] && parsed.grid[day][`P${p}`]) || '';
+                            if (val && val.toUpperCase() !== 'FREE') {
+                                const parts = val.split(',').map(s => s.trim());
+                                const sub = parts[0] || 'FREE';
+                                const low = sub.toLowerCase();
+                                const cat = (low.includes('lab') || low.includes('practical') || low.includes('project')) ? 'cat-lab' : (low === 'alt' ? 'cat-alt' : 'cat-theory');
+                                grid[day][p - 1] = { sub, code: '', faculty: parts[1] || '-', venue: parts[2] || 'TBA', cat };
+                                loadedCount++;
+                            }
+                        }
+                    });
+                    sourceLabel = 'Local Builder';
+                }
+            } catch (_) { }
+        }
+    }
+
+    const semLabel = selectedSem ? `Sem ${selectedSem}` : 'Active Sem';
+    if (metaBar) {
+        metaBar.innerHTML = `<span><i class="fa-solid fa-graduation-cap me-1"></i>Section: <strong class="text-white">${targetName}</strong> <span class="badge bg-info text-dark ms-1">${semLabel}</span></span>
+            <span><span class="badge ${loadedCount > 0 ? 'bg-success' : 'bg-secondary'}">${loadedCount} periods loaded (${sourceLabel})</span></span>`;
+    }
+    if (loadedCount === 0 && alertEl) {
+        alertEl.className = 'alert alert-warning small py-2 mb-2';
+        alertEl.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i>No timetable has been saved yet for <strong>${targetName} (${semLabel})</strong>. Upload or build one using <strong>Upload &amp; Assign Class TT</strong>.`;
+    }
+
+    const esc = v => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const renderVstCell = c => {
+        if (!c || !c.sub || c.sub.toUpperCase() === 'FREE') {
+            return `<td class="cat-theory text-muted"><span class="slot-badge text-secondary">FREE</span></td>`;
+        }
+        return `<td class="${c.cat || 'cat-theory'}">
+            <span class="slot-badge">${esc(c.sub)}</span>
+            <span class="slot-subtext">${esc(c.faculty)}</span>
+            <span class="slot-venue">${esc(c.venue)}</span>
+        </td>`;
+    };
+
+    tbody.innerHTML = days.map(day => {
+        const p = grid[day];
+        const tea = day === 'Monday'
+            ? `<td class="tt-break-cell align-middle" rowspan="6">T<br/>E<br/>A<br/><br/>B<br/>R<br/>E<br/>A<br/>K<br/><div style="font-size:0.55rem;line-height:1.1;margin-top:8px;">10.40<br/>-<br/>11.00</div></td>`
+            : '';
+        const lunch = day === 'Monday'
+            ? `<td class="tt-break-cell align-middle" rowspan="6">L<br/>U<br/>N<br/>C<br/>H<br/><br/>B<br/>R<br/>E<br/>A<br/>K<br/><div style="font-size:0.55rem;line-height:1.1;margin-top:8px;">01.00<br/>-<br/>01.40</div></td>`
+            : '';
+        return `<tr>
+            <td class="fw-bold bg-dark text-info text-center align-middle" style="font-size:0.8rem">${day}</td>
+            ${renderVstCell(p[0])}
+            ${renderVstCell(p[1])}
+            ${tea}
+            ${renderVstCell(p[2])}
+            ${renderVstCell(p[3])}
+            ${lunch}
+            ${renderVstCell(p[4])}
+            <td class="align-middle cat-theory"><div class="text-secondary" style="font-size:0.7rem">-</div></td>
+            ${renderVstCell(p[5])}
+            ${renderVstCell(p[6])}
+        </tr>`;
+    }).join('');
+
+    if (refBody) {
+        const refMap = new Map();
+        days.forEach(day => grid[day].forEach(c => {
+            if (!c.sub || c.sub.toUpperCase() === 'FREE') return;
+            const key = `${c.sub.toLowerCase()}|${(c.venue || '').toLowerCase()}`;
+            if (!refMap.has(key)) refMap.set(key, { ...c, count: 1 });
+            else refMap.get(key).count++;
+        }));
+        refBody.innerHTML = refMap.size > 0
+            ? Array.from(refMap.values()).map(r => `<tr>
+                <td class="fw-bold text-info">${esc(r.sub)}</td>
+                <td>${esc(r.code || '-')}</td>
+                <td>${esc(r.faculty || '-')}</td>
+                <td><span class="badge bg-secondary">${esc(r.venue || '-')}</span></td>
+                <td>${r.count}</td>
+            </tr>`).join('')
+            : '<tr><td colspan="5" class="text-center text-muted py-2">No courses assigned.</td></tr>';
+    }
+};
+
+// =========================================================================
+// CLASS ADVISOR: SEMESTER CHANGES & CLASS-ISOLATED PDF / IMAGE PUBLISHING
+// =========================================================================
+window.toggleCaSelectAllStudents = function (checked) {
+    document.querySelectorAll('.ca-student-chk').forEach(chk => { chk.checked = !!checked; });
+    window.updateCaSelectedCount();
+};
+
+window.updateCaSelectedCount = function () {
+    const chks = Array.from(document.querySelectorAll('.ca-student-chk'));
+    const selected = chks.filter(c => c.checked).length;
+    const badge = document.getElementById('caSelectedCountBadge');
+    if (badge) badge.innerText = `${selected} selected`;
+    const allChk = document.getElementById('caSelectAllChk');
+    if (allChk && chks.length > 0) allChk.checked = selected === chks.length;
+};
+
+window.applyClassAdvisorSemChanges = async function () {
+    const section = window._caCurrentSection;
+    const faculty = window._caCurrentFaculty;
+    const alertBox = document.getElementById('caSemChangeAlert');
+    const selectedIds = Array.from(document.querySelectorAll('.ca-student-chk:checked'))
+        .map(c => Number(c.value))
+        .filter(Boolean);
+
+    if (selectedIds.length === 0) {
+        if (alertBox) {
+            alertBox.className = 'alert alert-warning small py-2 mt-2 mb-0';
+            alertBox.innerText = 'Please select at least one enrolled student using the checkboxes below.';
+        }
+        return;
+    }
+
+    const newSemester = Number(document.getElementById('caTargetSemSelect')?.value || 4);
+    const note = String(document.getElementById('caSemChangeNote')?.value || '').trim();
+
+    try {
+        const res = await apiFetch('/api/students/bulk-semester', {
+            method: 'POST',
+            body: JSON.stringify({ studentIds: selectedIds, newSemester, note })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed to update semester.');
+
+        showToast('Semester Changes Marked', `Updated ${data.updatedCount || selectedIds.length} student(s) to Semester ${newSemester}.`);
+        if (section && faculty) {
+            await window.renderClassAdvisorStudents(section, faculty);
+            const postAlert = document.getElementById('caSemChangeAlert');
+            if (postAlert) {
+                postAlert.className = 'alert alert-success small py-2 mt-2 mb-0';
+                postAlert.innerText = `Marked Semester ${newSemester} for ${data.updatedCount || selectedIds.length} selected student(s).`;
+            }
+        }
+    } catch (err) {
+        if (alertBox) {
+            alertBox.className = 'alert alert-danger small py-2 mt-2 mb-0';
+            alertBox.innerText = 'Error: ' + err.message;
+        }
+    }
+};
+
+function _renderClassDocsList(docs, canDelete, sectionLabel) {
+    if (!Array.isArray(docs) || docs.length === 0) {
+        return `<div class="text-muted small py-2">No PDF or image files published for ${sectionLabel || 'this class'} yet.</div>`;
+    }
+    const esc = v => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const escJs = v => String(v || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `<div class="list-group list-group-flush">${docs.map(d => {
+        const isPdf = String(d.contentType || '').includes('pdf') || String(d.fileName || '').toLowerCase().endsWith('.pdf');
+        const icon = isPdf ? '<i class="fa-solid fa-file-pdf text-danger me-2 fs-5"></i>' : '<i class="fa-solid fa-file-image text-info me-2 fs-5"></i>';
+        const dateStr = d.createdAt ? String(d.createdAt).replace('T', ' ').slice(0, 16) : '';
+        return `<div class="list-group-item bg-dark text-white border-secondary d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <div class="d-flex align-items-center">${icon}<strong>${esc(d.title)}</strong> <span class="badge bg-secondary ms-2">${esc(d.sectionName)}</span></div>
+                <div class="small text-muted">${esc(d.fileName)}${d.note ? ' &bull; ' + esc(d.note) : ''}${d.publishedBy ? ' &bull; By ' + esc(d.publishedBy) : ''}${dateStr ? ' &bull; ' + dateStr : ''}</div>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <button type="button" class="btn btn-sm btn-outline-info py-0 px-2" onclick="window.previewClassDocument(${d.id}, '${escJs(d.title)}', '${escJs(d.contentType)}', '${escJs(d.fileName)}')">
+                    <i class="fa-solid fa-eye me-1"></i> View
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-success py-0 px-2" onclick="window.downloadClassDocument(${d.id}, '${escJs(d.fileName)}')">
+                    <i class="fa-solid fa-download"></i>
+                </button>
+                ${canDelete ? `<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="window.deleteClassAdvisorDocument(${d.id}, '${escJs(d.sectionName)}')" title="Delete file"><i class="fa-solid fa-trash"></i></button>` : ''}
+            </div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+window.publishClassAdvisorDocument = async function (e) {
+    e.preventDefault();
+    const section = window._caCurrentSection;
+    const faculty = window._caCurrentFaculty;
+    const alertBox = document.getElementById('caDocAlert');
+    const title = String(document.getElementById('caDocTitle')?.value || '').trim();
+    const note = String(document.getElementById('caDocNote')?.value || '').trim();
+    const fileInput = document.getElementById('caDocFile');
+    const file = fileInput?.files?.[0];
+
+    if (!section || !file) {
+        alert('Please select a PDF or image file to publish.');
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('sectionName', section);
+    fd.append('title', title || file.name);
+    fd.append('note', note);
+    fd.append('publishedBy', (faculty && (faculty.displayName || faculty.name)) || 'Class Advisor');
+
+    try {
+        const token = localStorage.getItem('jwt_token') || '';
+        const res = await fetch('/api/class-documents/publish', {
+            method: 'POST',
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+            body: fd
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed to publish file.');
+
+        if (alertBox) {
+            alertBox.className = 'alert alert-success small py-2 mt-2 mb-0';
+            alertBox.innerText = `Published "${data.title || file.name}" to ${section} students only.`;
+        }
+        if (document.getElementById('caDocTitle')) document.getElementById('caDocTitle').value = '';
+        if (document.getElementById('caDocNote')) document.getElementById('caDocNote').value = '';
+        if (fileInput) fileInput.value = '';
+
+        await window.loadCaPublishedDocuments(section);
+        showToast('File Published to Class', `${file.name} is now visible to ${section} students only.`);
+    } catch (err) {
+        if (alertBox) {
+            alertBox.className = 'alert alert-danger small py-2 mt-2 mb-0';
+            alertBox.innerText = 'Error: ' + err.message;
+        }
+    }
+};
+
+window.loadCaPublishedDocuments = async function (section) {
+    const listEl = document.getElementById('caPublishedDocsList');
+    if (!listEl || !section) return;
+    try {
+        const res = await apiFetch('/api/class-documents?section=' + encodeURIComponent(section));
+        if (!res || !res.ok) throw new Error('Load failed');
+        const docs = await res.json();
+        listEl.innerHTML = _renderClassDocsList(docs, true, section);
+    } catch (_) {
+        listEl.innerHTML = '<div class="text-danger small">Could not load published files.</div>';
+    }
+};
+
+window.deleteClassAdvisorDocument = async function (docId, section) {
+    if (!confirm('Delete this published class file?')) return;
+    try {
+        const res = await apiFetch('/api/class-documents/' + docId, { method: 'DELETE' });
+        if (res && res.ok) {
+            await window.loadCaPublishedDocuments(section || window._caCurrentSection);
+            showToast('File Deleted', 'Removed published class file.');
+        }
+    } catch (err) {
+        alert('Delete failed: ' + err.message);
+    }
+};
+
+window.loadStudentClassDocuments = async function () {
+    const bodyEl = document.getElementById('studentClassDocsBody');
+    if (!bodyEl) return;
+    try {
+        const res = await apiFetch('/api/class-documents');
+        if (!res || !res.ok) throw new Error('Could not fetch');
+        const docs = await res.json();
+        bodyEl.innerHTML = _renderClassDocsList(docs, false, currentSection || 'your class');
+    } catch (_) {
+        bodyEl.innerHTML = '<div class="text-muted small">No published files available.</div>';
+    }
+};
+
+window.previewClassDocument = async function (docId, title, contentType, fileName) {
+    const modalEl = document.getElementById('classDocPreviewModal');
+    const titleEl = document.getElementById('classDocPreviewTitle');
+    const bodyEl = document.getElementById('classDocPreviewBody');
+    const dlBtn = document.getElementById('classDocPreviewDownloadBtn');
+    if (!modalEl || !bodyEl) return;
+
+    if (titleEl) titleEl.innerHTML = `<i class="fa-solid fa-file-lines me-2"></i>${String(title || fileName || 'Class File')}`;
+    bodyEl.innerHTML = '<div class="py-5"><div class="spinner-border text-info"></div><div class="small text-muted mt-2">Loading file...</div></div>';
+    if (dlBtn) dlBtn.onclick = () => window.downloadClassDocument(docId, fileName);
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+
+    try {
+        const res = await apiFetch('/api/class-documents/' + docId + '/file');
+        if (!res || !res.ok) throw new Error('You do not have permission to view this file.');
+        const blob = await res.blob();
+        if (window._activeClassDocBlobUrl) URL.revokeObjectURL(window._activeClassDocBlobUrl);
+        const blobUrl = URL.createObjectURL(blob);
+        window._activeClassDocBlobUrl = blobUrl;
+
+        const isPdf = String(contentType || '').includes('pdf') || String(fileName || '').toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+            bodyEl.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:72vh; border:none; border-radius:6px; background:#fff;"></iframe>`;
+        } else {
+            bodyEl.innerHTML = `<img src="${blobUrl}" alt="${String(title || fileName)}" style="max-width:100%; max-height:72vh; object-fit:contain; border-radius:6px;" />`;
+        }
+    } catch (err) {
+        bodyEl.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+};
+
+window.downloadClassDocument = async function (docId, fileName) {
+    try {
+        const res = await apiFetch('/api/class-documents/' + docId + '/file');
+        if (!res || !res.ok) throw new Error('Download failed.');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'class-document';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+        alert(err.message);
+    }
+};
+
+// =========================================================================
+// SMART STORED TIMETABLE SUGGESTION ENGINE (CLASS TT & FACULTY TT)
+// =========================================================================
+window._ttSuggestionCatalog = window._ttSuggestionCatalog || {
+    subjects: [],
+    staff: [],
+    venues: [],
+    departments: [],
+    sections: [],
+    loadedAt: 0,
+    dirty: true
+};
+
+window.invalidateTtSuggestionCatalog = function (refreshNow) {
+    window._ttSuggestionCatalog.dirty = true;
+    if (refreshNow && typeof window.refreshTtSuggestionCatalog === 'function') {
+        window.refreshTtSuggestionCatalog(true);
+    }
+};
+
+function _buildMergedTtCatalog(apiData) {
+    const subjMap = new Map();
+    const staffMap = new Map();
+    const venueMap = new Map();
+    const deptMap = new Map();
+    const secMap = new Map();
+
+    const addSubject = (label, code, title, faculty, venue, dept) => {
+        const clean = String(label || '').trim();
+        if (!clean || clean.toUpperCase() === 'FREE') return;
+        const k = clean.toUpperCase();
+        const prev = subjMap.get(k) || { label: clean, code: '', title: '', faculty: '', venue: '', dept: '' };
+        subjMap.set(k, {
+            label: prev.label || clean,
+            code: prev.code || String(code || '').trim(),
+            title: prev.title || String(title || '').trim(),
+            faculty: prev.faculty || String(faculty || '').trim(),
+            venue: prev.venue || String(venue || '').trim(),
+            dept: prev.dept || String(dept || '').trim().toUpperCase()
+        });
+    };
+
+    const addStaff = (name, empId, dept, handling) => {
+        const clean = String(name || '').trim();
+        if (!clean || clean === '-' || clean.toUpperCase() === 'TBA') return;
+        const k = clean.toUpperCase();
+        const prev = staffMap.get(k) || { label: clean, employeeId: '', dept: '', subjectHandling: '' };
+        staffMap.set(k, {
+            label: prev.label || clean,
+            employeeId: prev.employeeId || String(empId || '').trim(),
+            dept: prev.dept || String(dept || '').trim().toUpperCase(),
+            subjectHandling: prev.subjectHandling || String(handling || '').trim()
+        });
+    };
+
+    const addVenue = (name, building, type) => {
+        const clean = String(name || '').trim();
+        if (!clean || clean === '-' || clean.toUpperCase() === 'TBA' || clean.toUpperCase() === 'FREE') return;
+        const k = clean.toUpperCase();
+        const prev = venueMap.get(k) || { label: clean, building: '', type: '' };
+        venueMap.set(k, {
+            label: prev.label || clean,
+            building: prev.building || String(building || '').trim(),
+            type: prev.type || String(type || '').trim()
+        });
+    };
+
+    const addDept = (code, name) => {
+        const c = String(code || '').trim().toUpperCase();
+        if (!c) return;
+        if (!deptMap.has(c)) deptMap.set(c, { code: c, name: String(name || c).trim() });
+    };
+
+    const addSection = (secObj) => {
+        if (!secObj) return;
+        const name = String(secObj.sectionName || secObj.name || '').trim();
+        if (!name || /^\d+\s+CSE\s+II\s+CSE/i.test(name)) return;
+        const parts = name.split(/\s+/);
+        const year = String(secObj.year || (parts[0] && /^(I|II|III|IV)$/i.test(parts[0]) ? parts[0] : 'II')).toUpperCase();
+        const dept = String(secObj.dept || (parts.length >= 2 ? parts[1] : 'CSE')).toUpperCase();
+        const sectionCode = String(secObj.sectionCode || (parts.length >= 3 ? parts.slice(2).join(' ') : name)).toUpperCase();
+        addDept(dept, dept);
+        secMap.set(name.toUpperCase(), { sectionName: name, dept, year, sectionCode, semester: secObj.semester || null });
+    };
+
+    // 1. Live DB API data first
+    if (apiData && typeof apiData === 'object') {
+        (apiData.subjects || []).forEach(s => addSubject(s.label, s.code, s.title, s.faculty, s.venue, s.dept));
+        (apiData.staff || []).forEach(t => addStaff(t.label, t.employeeId, t.dept, t.subjectHandling));
+        (apiData.venues || []).forEach(v => addVenue(v.label, v.building, v.type));
+        (apiData.departments || []).forEach(d => addDept(d.code, d.name));
+        (apiData.sections || []).forEach(addSection);
+    }
+
+    // 2. Local / in-memory resources (respecting newly added custom subjects/venues/staff/sections)
+    if (typeof adminResources !== 'undefined' && adminResources) {
+        (adminResources.subjects || []).forEach(s => addSubject(s.short || s.code, s.code, s.title, s.faculty, s.venue, ''));
+        (adminResources.venues || []).forEach(v => {
+            if (typeof v === 'string') addVenue(v, '', 'Custom');
+            else if (v && v.name) addVenue(v.name, v.block, v.type || 'Custom');
+        });
+    }
+    if (typeof courseReferenceList !== 'undefined' && Array.isArray(courseReferenceList)) {
+        courseReferenceList.forEach(c => {
+            addSubject(c.short || (c.code || '').split(' ')[0], c.code, c.code, c.faculty, c.venue, '');
+            addStaff(c.faculty, '', '', c.short || '');
+            addVenue(c.venue, '', '');
+        });
+    }
+    if (typeof staffDirectory !== 'undefined' && Array.isArray(staffDirectory)) {
+        staffDirectory.forEach(s => addStaff(s.name, s.empId, s.dept, s.subjectHandling));
+    }
+    if (typeof window.staffDirectory !== 'undefined' && Array.isArray(window.staffDirectory)) {
+        window.staffDirectory.forEach(s => addStaff(s.name, s.empId, s.dept, s.subjectHandling));
+    }
+    if (typeof activeSections !== 'undefined' && Array.isArray(activeSections)) {
+        activeSections.forEach(s => {
+            addSection(s);
+            addVenue(s.classroom, s.block, 'Classroom');
+        });
+    }
+    if (Array.isArray(window.currentTimetableEntries)) {
+        window.currentTimetableEntries.forEach(e => {
+            addSubject(e.subjectName || e.subjectCode, e.subjectCode, e.subjectName, e.teacherName, e.roomNumber || e.labName, '');
+            addStaff(e.teacherName, '', '', '');
+            addVenue(e.roomNumber || e.labName, '', '');
+        });
+    }
+    ['SF 04', 'SF 05', 'Library', 'Intel AI Lab', 'Full Stack Lab', 'Cloud & DevOps Lab', 'COE Lab', '1CloudHub'].forEach(v => addVenue(v, '', 'Campus'));
+
+    return {
+        subjects: Array.from(subjMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
+        staff: Array.from(staffMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
+        venues: Array.from(venueMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
+        departments: Array.from(deptMap.values()).sort((a, b) => a.code.localeCompare(b.code)),
+        sections: Array.from(secMap.values()).sort((a, b) => a.sectionName.localeCompare(b.sectionName)),
+        loadedAt: Date.now(),
+        dirty: false
+    };
+}
+
+window.refreshTtSuggestionCatalog = async function (force = false) {
+    const cat = window._ttSuggestionCatalog;
+    const isFresh = !cat.dirty && cat.loadedAt && (Date.now() - cat.loadedAt < 4000);
+    if (!force && isFresh) return cat;
+
+    if (window._ttCatalogPromise) return window._ttCatalogPromise;
+
+    window._ttCatalogPromise = (async () => {
+        let apiData = null;
+        try {
+            if (typeof apiFetch === 'function' && localStorage.getItem('jwt_token')) {
+                const res = await apiFetch('/api/operations/tt-suggestions');
+                if (res && res.ok) apiData = await res.json();
+            }
+        } catch (err) {
+            console.warn('Could not load live TT suggestions from backend:', err);
+        }
+        window._ttSuggestionCatalog = _buildMergedTtCatalog(apiData);
+        if (typeof populateEditSubjectSelect === 'function') populateEditSubjectSelect();
+        if (typeof populateEditVenueSelect === 'function') populateEditVenueSelect();
+        if (window._smartTtState && window._smartTtState.activeInput) {
+            window._renderSmartTtPopover();
+        }
+        return window._ttSuggestionCatalog;
+    })();
+
+    try {
+        return await window._ttCatalogPromise;
+    } finally {
+        window._ttCatalogPromise = null;
+    }
+};
+
+window._smartTtState = {
+    activeInput: null,
+    mode: 'CLASS',
+    step: 'subject',
+    subject: '',
+    staff: '',
+    dept: '',
+    year: '',
+    section: '',
+    classStr: '',
+    venue: '',
+    filterText: ''
+};
+
+function _handleSmartTtPopoverClick(e) {
+    e.stopPropagation();
+    const st = window._smartTtState;
+    const stepBtn = e.target.closest('[data-tt-step]');
+    if (stepBtn) {
+        st.step = stepBtn.getAttribute('data-tt-step');
+        st.filterText = '';
+        window._renderSmartTtPopover();
+        return;
+    }
+    const quickBtn = e.target.closest('[data-tt-quick]');
+    if (quickBtn) {
+        const raw = quickBtn.getAttribute('data-tt-quick') || '';
+        const segs = raw.split(',').map(x => x.trim());
+        st.subject = segs[0] || st.subject;
+        st.staff = segs[1] || '';
+        st.venue = segs[2] || '';
+        _commitSmartTtStateToInput(true);
+        return;
+    }
+    const pickBtn = e.target.closest('[data-tt-pick]');
+    if (pickBtn) {
+        const kind = pickBtn.getAttribute('data-tt-pick');
+        const val = pickBtn.getAttribute('data-val') || '';
+        st.filterText = '';
+        if (kind === 'subject') {
+            st.subject = val;
+            st.step = st.mode === 'CLASS' ? 'staff' : 'dept';
+            _commitSmartTtStateToInput(false);
+        } else if (kind === 'staff') {
+            st.staff = val;
+            st.step = 'venue';
+            _commitSmartTtStateToInput(false);
+        } else if (kind === 'dept') {
+            st.dept = val;
+            st.year = '';
+            st.section = '';
+            st.classStr = '';
+            st.step = 'year';
+            _commitSmartTtStateToInput(false);
+        } else if (kind === 'year') {
+            st.year = val;
+            st.section = '';
+            st.classStr = '';
+            st.step = 'section';
+            _commitSmartTtStateToInput(false);
+        } else if (kind === 'section') {
+            st.section = val;
+            st.classStr = pickBtn.getAttribute('data-full-sec') || [st.year, st.dept, st.section].filter(Boolean).join(' ');
+            st.step = 'venue';
+            _commitSmartTtStateToInput(false);
+        } else if (kind === 'venue') {
+            st.venue = val;
+            _commitSmartTtStateToInput(true);
+        }
+        return;
+    }
+    const actionBtn = e.target.closest('[data-tt-action]');
+    if (actionBtn) {
+        const action = actionBtn.getAttribute('data-tt-action');
+        if (action === 'free' && st.activeInput) {
+            window._smartTtInternalSync = true;
+            try {
+                st.activeInput.value = '';
+                st.activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+                st.activeInput.dispatchEvent(new Event('change', { bubbles: true }));
+            } finally {
+                window._smartTtInternalSync = false;
+            }
+        }
+        window.closeSmartTtPopover();
+    }
+}
+
+function _getSmartTtPopover(targetInput) {
+    let pop = document.getElementById('smartTtSuggestionPopover');
+    if (!pop) {
+        pop = document.createElement('div');
+        pop.id = 'smartTtSuggestionPopover';
+        pop.setAttribute('tabindex', '-1');
+        pop.style.cssText = [
+            'position:fixed',
+            'z-index:2055',
+            'width:360px',
+            'max-width:94vw',
+            'background:#111827',
+            'border:1px solid #38bdf8',
+            'border-radius:10px',
+            'box-shadow:0 14px 36px rgba(0,0,0,0.65)',
+            'padding:10px',
+            'display:none',
+            'color:#f8fafc',
+            'font-size:0.82rem'
+        ].join(';');
+        pop.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            // Keep input focus cleanly so clicking inside popover never steals/loses cell state
+            if (e.target && e.target.tagName !== 'INPUT') e.preventDefault();
+        });
+        pop.addEventListener('click', _handleSmartTtPopoverClick);
+    }
+    const host = (targetInput && targetInput.closest('.modal')) || document.body;
+    if (pop.parentNode !== host) host.appendChild(pop);
+    return pop;
+}
+
+function _parseSmartTtInputIntoState(input, mode) {
+    const raw = String(input.value || '').trim();
+    const parts = raw ? raw.split(',').map(s => s.trim()) : [];
+    const st = window._smartTtState;
+    st.mode = mode;
+    st.filterText = '';
+    if (mode === 'CLASS') {
+        st.subject = parts[0] || '';
+        st.staff = parts[1] || '';
+        st.venue = parts[2] || '';
+        st.dept = '';
+        st.year = '';
+        st.section = '';
+        st.classStr = '';
+        st.step = !st.subject ? 'subject' : (!st.staff ? 'staff' : (!st.venue ? 'venue' : 'subject'));
+    } else {
+        st.subject = '';
+        st.staff = '';
+        const classRegex = /^(I|II|III|IV)\s+(\S+)\s+(.+)$/i;
+        let clsMatch = parts[0] ? parts[0].match(classRegex) : null;
+        if (clsMatch) {
+            st.classStr = parts[0];
+            st.venue = parts[1] || '';
+        } else if (parts[1] && (clsMatch = parts[1].match(classRegex))) {
+            st.classStr = parts[1];
+            st.venue = parts[2] || '';
+        } else {
+            st.classStr = '';
+            st.venue = '';
+        }
+        if (clsMatch) {
+            st.year = clsMatch[1].toUpperCase();
+            st.dept = clsMatch[2].toUpperCase();
+            st.section = clsMatch[3].toUpperCase();
+        } else {
+            st.year = '';
+            st.dept = '';
+            st.section = '';
+        }
+        st.step = !st.classStr ? 'dept' : (!st.venue ? 'venue' : 'dept');
+    }
+}
+
+function _commitSmartTtStateToInput(closeAfter = false) {
+    const st = window._smartTtState;
+    const input = st.activeInput;
+    if (!input) return;
+
+    const pieces = [];
+    if (st.mode === 'CLASS') {
+        if (st.subject) pieces.push(st.subject);
+        if (st.staff || st.venue) pieces.push(st.staff || '');
+        if (st.venue) pieces.push(st.venue);
+    } else {
+        const cls = st.classStr || ((st.year && st.dept && st.section) ? `${st.year} ${st.dept} ${st.section}` : '');
+        st.classStr = cls;
+        if (cls) pieces.push(cls);
+        if (st.venue) pieces.push(st.venue);
+    }
+
+    const formatted = pieces.join(', ').replace(/,\s*$/, '');
+    window._smartTtInternalSync = true;
+    try {
+        input.value = formatted;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    } finally {
+        window._smartTtInternalSync = false;
+    }
+
+    if (closeAfter) {
+        window.closeSmartTtPopover();
+    } else {
+        window._renderSmartTtPopover();
+    }
+}
+
+window.closeSmartTtPopover = function () {
+    const pop = document.getElementById('smartTtSuggestionPopover');
+    if (pop) pop.style.display = 'none';
+    window._smartTtState.activeInput = null;
+};
+
+function _positionSmartTtPopover(pop, input) {
+    if (!pop || !input) return;
+    const rect = input.getBoundingClientRect();
+    const popW = Math.min(360, window.innerWidth - 16);
+    pop.style.width = popW + 'px';
+    const popH = Math.min(pop.offsetHeight || 280, 340);
+
+    let top = rect.bottom + 6;
+    if (top + popH > window.innerHeight - 10 && rect.top - popH - 6 > 10) {
+        top = rect.top - popH - 6;
+    }
+    let left = rect.left;
+    if (left + popW > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - popW - 8);
+    }
+    pop.style.top = `${Math.max(8, top)}px`;
+    pop.style.left = `${Math.max(8, left)}px`;
+}
+
+window._renderSmartTtPopover = function () {
+    const st = window._smartTtState;
+    const input = st.activeInput;
+    if (!input || !document.body.contains(input)) {
+        window.closeSmartTtPopover();
+        return;
+    }
+
+    const pop = _getSmartTtPopover(input);
+    const cat = window._ttSuggestionCatalog || { subjects: [], staff: [], venues: [], departments: [], sections: [] };
+    const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const q = String(st.filterText || '').trim().toLowerCase();
+
+    const steps = st.mode === 'CLASS'
+        ? [
+            { id: 'subject', label: '1. Subject', val: st.subject },
+            { id: 'staff', label: '2. Staff', val: st.staff },
+            { id: 'venue', label: '3. Venue', val: st.venue }
+        ]
+        : [
+            { id: 'dept', label: '1. Dept', val: st.dept },
+            { id: 'year', label: '2. Year', val: st.year },
+            { id: 'section', label: '3. Sec', val: st.section },
+            { id: 'venue', label: '4. Venue', val: st.venue }
+        ];
+
+    const tabsHtml = steps.map(s => {
+        const active = st.step === s.id;
+        const done = Boolean(s.val);
+        const cls = active
+            ? 'btn-info text-dark fw-bold'
+            : (done ? 'btn-outline-success text-success' : 'btn-outline-secondary text-light');
+        return `<button type="button" class="btn btn-sm ${cls} py-0 px-2" style="font-size:0.72rem;" data-tt-step="${s.id}">${s.label}${s.val ? `: ${esc(s.val)}` : ''}</button>`;
+    }).join('');
+
+    let quickHtml = '';
+    let itemsHtml = '';
+    let hintText = '';
+
+    if (st.step === 'subject') {
+        hintText = 'Pick a stored Subject (auto-advances to next step):';
+        const list = (cat.subjects || []).filter(s =>
+            !q || s.label.toLowerCase().includes(q) || (s.title || '').toLowerCase().includes(q) || (s.code || '').toLowerCase().includes(q)
+        );
+        itemsHtml = list.length ? list.map(s => {
+            const meta = [s.code && s.code !== s.label ? s.code : '', s.faculty, s.venue].filter(Boolean).join(' • ');
+            return `<button type="button" class="btn btn-sm btn-outline-info text-start d-flex flex-column py-1 px-2" style="max-width:100%;" data-tt-pick="subject" data-val="${esc(s.label)}">
+                <span class="fw-bold text-white" style="font-size:0.78rem;">${esc(s.label)}</span>
+                ${meta ? `<span class="text-muted text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}
+            </button>`;
+        }).join('') : '<div class="text-muted small py-2">No matching subjects. Type any custom subject or add in Manage Resources.</div>';
+    } else if (st.step === 'staff') {
+        hintText = 'Pick Staff / Faculty (auto-advances to Venue):';
+        const subMatch = (cat.subjects || []).find(s => s.label.toUpperCase() === st.subject.toUpperCase());
+        if (subMatch && subMatch.faculty) {
+            const defFull = [st.subject, subMatch.faculty, subMatch.venue || ''].filter(Boolean).join(', ');
+            quickHtml = `<div class="mb-2">
+                <button type="button" class="btn btn-sm btn-success w-100 text-start py-1 px-2" style="font-size:0.74rem;" data-tt-quick="${esc(defFull)}">
+                    <i class="fa-solid fa-bolt me-1"></i>Use Stored Mapping: <strong>${esc(subMatch.faculty)}</strong>${subMatch.venue ? ` (${esc(subMatch.venue)})` : ''}
+                </button>
+            </div>`;
+        }
+        const list = (cat.staff || []).filter(t =>
+            !q || t.label.toLowerCase().includes(q) || (t.dept || '').toLowerCase().includes(q) || (t.employeeId || '').toLowerCase().includes(q)
+        );
+        itemsHtml = list.length ? list.map(t => {
+            const meta = [t.dept, t.subjectHandling].filter(Boolean).join(' • ');
+            return `<button type="button" class="btn btn-sm btn-outline-warning text-start d-flex flex-column py-1 px-2" data-tt-pick="staff" data-val="${esc(t.label)}">
+                <span class="fw-semibold text-white" style="font-size:0.76rem;">${esc(t.label)}</span>
+                ${meta ? `<span class="text-muted text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}
+            </button>`;
+        }).join('') : '<div class="text-muted small py-2">No matching staff found. Add faculty in Manage Faculty Details to see them here.</div>';
+    } else if (st.step === 'venue') {
+        hintText = 'Pick Venue / Room / Lab to finish:';
+        const list = (cat.venues || []).filter(v =>
+            !q || v.label.toLowerCase().includes(q) || (v.building || '').toLowerCase().includes(q) || (v.type || '').toLowerCase().includes(q)
+        );
+        itemsHtml = list.length ? list.map(v => {
+            const meta = [v.type, v.building].filter(Boolean).join(' • ');
+            return `<button type="button" class="btn btn-sm btn-outline-success text-start d-flex flex-column py-1 px-2" data-tt-pick="venue" data-val="${esc(v.label)}">
+                <span class="fw-bold text-white" style="font-size:0.76rem;">${esc(v.label)}</span>
+                ${meta ? `<span class="text-muted" style="font-size:0.65rem;">${esc(meta)}</span>` : ''}
+            </button>`;
+        }).join('') : '<div class="text-muted small py-2">No matching venues found. Add venues in Manage Venues / Resources.</div>';
+    } else if (st.step === 'dept') {
+        hintText = 'Select Department (next: Year → Section):';
+        const list = (cat.departments || []).filter(d =>
+            !q || d.code.toLowerCase().includes(q) || (d.name || '').toLowerCase().includes(q)
+        );
+        itemsHtml = list.length ? list.map(d =>
+            `<button type="button" class="btn btn-sm ${st.dept === d.code ? 'btn-info text-dark fw-bold' : 'btn-outline-info text-white'} py-1 px-2" data-tt-pick="dept" data-val="${esc(d.code)}">
+                ${esc(d.code)}${d.name && d.name !== d.code ? ` <small class="opacity-75">(${esc(d.name)})</small>` : ''}
+            </button>`
+        ).join('') : '<div class="text-muted small py-2">No departments found.</div>';
+    } else if (st.step === 'year') {
+        hintText = `Select Year${st.dept ? ` for ${esc(st.dept)}` : ''} (next: Section):`;
+        const yrs = new Set(['I', 'II', 'III', 'IV']);
+        (cat.sections || []).forEach(s => {
+            if (!st.dept || s.dept === st.dept) yrs.add(s.year || 'II');
+        });
+        const order = ['I', 'II', 'III', 'IV'];
+        const list = Array.from(yrs).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+        itemsHtml = list.map(y => {
+            const count = (cat.sections || []).filter(s => (!st.dept || s.dept === st.dept) && s.year === y).length;
+            return `<button type="button" class="btn btn-sm ${st.year === y ? 'btn-info text-dark fw-bold' : 'btn-outline-info text-white'} py-1 px-3" data-tt-pick="year" data-val="${esc(y)}">
+                ${esc(y)} Year ${count ? `<span class="badge bg-secondary ms-1">${count}</span>` : ''}
+            </button>`;
+        }).join('');
+    } else if (st.step === 'section') {
+        const ctxLabel = [st.year, st.dept].filter(Boolean).join(' ') || 'Class';
+        hintText = `Select Section for ${esc(ctxLabel)} (next: Venue):`;
+        const matching = (cat.sections || []).filter(s =>
+            (!st.dept || s.dept === st.dept) &&
+            (!st.year || s.year === st.year) &&
+            (!q || s.sectionCode.toLowerCase().includes(q) || s.sectionName.toLowerCase().includes(q))
+        );
+        const shownCodes = new Set();
+        const buttons = [];
+        matching.forEach(s => {
+            shownCodes.add(s.sectionCode);
+            buttons.push(`<button type="button" class="btn btn-sm btn-outline-warning text-white fw-semibold py-1 px-2" data-tt-pick="section" data-val="${esc(s.sectionCode)}" data-full-sec="${esc(s.sectionName)}">
+                ${esc(s.sectionCode)} <small class="text-muted">(${esc(s.sectionName)})</small>
+            </button>`);
+        });
+        itemsHtml = buttons.length ? buttons.join('') : '<div class="text-muted small py-2">No sections stored for this Dept & Year yet. Create a section in Manage Sections to see it here.</div>';
+    }
+
+    pop.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom border-secondary">
+            <span class="fw-bold text-info" style="font-size:0.75rem;">
+                <i class="fa-solid fa-wand-magic-sparkles me-1"></i>${st.mode === 'FACULTY' ? 'Faculty TT Quick Assign' : 'Period Quick Assign'}
+            </span>
+            <div class="d-flex gap-1">
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" style="font-size:0.68rem;" data-tt-action="free">Set FREE</button>
+                <button type="button" class="btn btn-xs btn-outline-light py-0 px-2" style="font-size:0.68rem;" data-tt-action="close">Done</button>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-1 mb-2">${tabsHtml}</div>
+        ${quickHtml}
+        <div class="text-muted mb-1" style="font-size:0.7rem;">${hintText}</div>
+        <div class="d-flex flex-wrap gap-1" style="max-height:190px; overflow-y:auto;">${itemsHtml}</div>
+    `;
+
+    pop.style.display = 'block';
+    _positionSmartTtPopover(pop, input);
+};
+
+function _detectTtCellMode(el) {
+    if (!el || el.tagName !== 'INPUT' || el.type !== 'text') return null;
+    if (el.closest('#ttBuilderGrid') || el.closest('#uatGridBody')) return 'CLASS';
+    if (el.closest('#myTimetableBody') || el.closest('#adminFacTtBody')) return 'FACULTY';
+    return null;
+}
+
+(function _initSmartTtSuggestionDelegation() {
+    if (window._smartTtDelegationBound) return;
+    window._smartTtDelegationBound = true;
+
+    const openForInput = (el) => {
+        const mode = _detectTtCellMode(el);
+        if (!mode) return;
+        const alreadyOpen = window._smartTtState.activeInput === el;
+        window._smartTtState.activeInput = el;
+        if (!alreadyOpen) _parseSmartTtInputIntoState(el, mode);
+        window.refreshTtSuggestionCatalog(false);
+        window._renderSmartTtPopover();
+    };
+
+    document.addEventListener('focusin', (e) => {
+        const el = e.target;
+        if (_detectTtCellMode(el)) openForInput(el);
+    });
+
+    document.addEventListener('click', (e) => {
+        const el = e.target;
+        const mode = _detectTtCellMode(el);
+        if (mode) {
+            openForInput(el);
+            return;
+        }
+        const pop = document.getElementById('smartTtSuggestionPopover');
+        if (pop && pop.style.display === 'block' && !pop.contains(el)) {
+            window.closeSmartTtPopover();
+        }
+    });
+
+    document.addEventListener('input', (e) => {
+        if (window._smartTtInternalSync) return;
+        const el = e.target;
+        const mode = _detectTtCellMode(el);
+        if (!mode || window._smartTtState.activeInput !== el) return;
+        const val = String(el.value || '');
+        const segs = val.split(',');
+        const segIdx = Math.min(segs.length - 1, mode === 'CLASS' ? 2 : 1);
+        window._smartTtState.filterText = (segs[segIdx] || '').trim();
+        if (mode === 'CLASS') {
+            window._smartTtState.subject = (segs[0] || '').trim();
+            window._smartTtState.staff = (segs[1] || '').trim();
+            window._smartTtState.venue = (segs[2] || '').trim();
+        } else {
+            window._smartTtState.classStr = (segs[0] || '').trim();
+            window._smartTtState.venue = (segs[1] || '').trim();
+        }
+        window._renderSmartTtPopover();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') window.closeSmartTtPopover();
+    });
+
+    document.addEventListener('hidden.bs.modal', () => {
+        window.closeSmartTtPopover();
+    });
+
+    window.addEventListener('resize', () => {
+        const pop = document.getElementById('smartTtSuggestionPopover');
+        if (pop && pop.style.display === 'block' && window._smartTtState.activeInput) {
+            _positionSmartTtPopover(pop, window._smartTtState.activeInput);
+        }
+    });
+
+    document.addEventListener('scroll', () => {
+        const pop = document.getElementById('smartTtSuggestionPopover');
+        if (pop && pop.style.display === 'block' && window._smartTtState.activeInput) {
+            _positionSmartTtPopover(pop, window._smartTtState.activeInput);
+        }
+    }, true);
+})();

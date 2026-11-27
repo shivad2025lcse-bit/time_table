@@ -2,6 +2,7 @@ package com.smarttimetable.controller;
 
 import com.smarttimetable.entity.*;
 import com.smarttimetable.repository.*;
+import com.smarttimetable.service.TemporaryTimetableService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,6 +32,9 @@ public class StudentDashboardController {
     @Autowired
     private TimeSlotRepository timeSlotRepository;
 
+    @Autowired
+    private TemporaryTimetableService temporaryTimetableService;
+
     @GetMapping("/current")
     public ResponseEntity<?> getCurrentTimetable(Authentication authentication) {
         if (authentication == null) {
@@ -53,11 +57,11 @@ public class StudentDashboardController {
 
         Section section = student.getSection();
         
-        LocalDate today = LocalDate.now();
+        LocalDate today = temporaryTimetableService.collegeToday();
         String currentDay = today.getDayOfWeek().name();
         String dayFormatted = currentDay.substring(0, 1).toUpperCase() + currentDay.substring(1).toLowerCase(); // e.g., "Monday"
         
-        LocalTime currentTime = LocalTime.now();
+        LocalTime currentTime = LocalTime.now(temporaryTimetableService.getCollegeZone());
 
         List<TimeSlot> allSlots = timeSlotRepository.findAll();
         // Sort by parsed start time
@@ -92,6 +96,19 @@ public class StudentDashboardController {
         response.put("date", today.toString());
         response.put("day", dayFormatted);
 
+        Map<String, Object> effectiveToday = temporaryTimetableService.getEffectiveSectionTimetable(section.getId(), today, targetSem);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> effectiveSlots = (List<Map<String, Object>>) effectiveToday.getOrDefault("slots", List.of());
+        Map<Integer, Map<String, Object>> effByPeriod = new HashMap<>();
+        for (Map<String, Object> slotMap : effectiveSlots) {
+            if (slotMap.get("periodNumber") != null) {
+                effByPeriod.put(Integer.valueOf(slotMap.get("periodNumber").toString()), slotMap);
+            }
+        }
+        response.put("effectiveSlots", effectiveSlots);
+        response.put("upcomingTemporaryChanges", effectiveToday.getOrDefault("upcomingChanges", List.of()));
+        response.put("overrideCount", effectiveToday.getOrDefault("overrideCount", 0));
+
         if (today.getDayOfWeek().name().equals("SUNDAY")) {
             response.put("status", "HOLIDAY");
             response.put("message", "HOLIDAY. No classes scheduled today.");
@@ -113,7 +130,7 @@ public class StudentDashboardController {
 
         if (currentTime.isBefore(firstStart)) {
             status = "BEFORE_COLLEGE";
-            nextPeriod = extractPeriodDetails(allSlots.get(0), todayEntries);
+            nextPeriod = extractPeriodDetails(allSlots.get(0), todayEntries, effByPeriod);
         } else if (currentTime.isAfter(lastEnd) || currentTime.equals(lastEnd)) {
             status = "AFTER_COLLEGE";
         } else {
@@ -124,13 +141,13 @@ public class StudentDashboardController {
                 LocalTime end = parseTime(slot.getEndTime());
 
                 if ((currentTime.isAfter(start) || currentTime.equals(start)) && currentTime.isBefore(end)) {
-                    currentPeriod = extractPeriodDetails(slot, todayEntries);
+                    currentPeriod = extractPeriodDetails(slot, todayEntries, effByPeriod);
                     status = currentPeriod.get("subject") == null || currentPeriod.get("subject").equals("FREE") 
                         ? "NO_CLASS" 
                         : "CURRENT_PERIOD";
                     
                     if (i + 1 < allSlots.size()) {
-                        nextPeriod = extractPeriodDetails(allSlots.get(i + 1), todayEntries);
+                        nextPeriod = extractPeriodDetails(allSlots.get(i + 1), todayEntries, effByPeriod);
                     }
                     break;
                 } else if (currentTime.isAfter(end) && i + 1 < allSlots.size()) {
@@ -144,7 +161,7 @@ public class StudentDashboardController {
                         currentPeriod.put("startTime", slot.getEndTime());
                         currentPeriod.put("endTime", nextSlot.getStartTime());
                         currentPeriod.put("subject", status);
-                        nextPeriod = extractPeriodDetails(nextSlot, todayEntries);
+                        nextPeriod = extractPeriodDetails(nextSlot, todayEntries, effByPeriod);
                         break;
                     }
                 }
@@ -158,7 +175,7 @@ public class StudentDashboardController {
         // Populate today's timetable
         List<Map<String, Object>> todaySchedule = new ArrayList<>();
         for (TimeSlot slot : allSlots) {
-            todaySchedule.add(extractPeriodDetails(slot, todayEntries));
+            todaySchedule.add(extractPeriodDetails(slot, todayEntries, effByPeriod));
         }
         response.put("todayTimetable", todaySchedule);
 
@@ -190,7 +207,20 @@ public class StudentDashboardController {
         }
     }
 
-    private Map<String, Object> extractPeriodDetails(TimeSlot slot, List<TimetableEntry> entries) {
+    private Map<String, Object> extractPeriodDetails(TimeSlot slot, List<TimetableEntry> entries, Map<Integer, Map<String, Object>> effByPeriod) {
+        Map<String, Object> eff = effByPeriod != null ? effByPeriod.get(slot.getSlotNumber()) : null;
+        if (eff != null && Boolean.TRUE.equals(eff.get("isTemporaryOverride"))) {
+            Map<String, Object> period = new HashMap<>();
+            period.put("name", "Period " + slot.getSlotNumber());
+            period.put("startTime", eff.getOrDefault("startTime", slot.getStartTime()));
+            period.put("endTime", eff.getOrDefault("endTime", slot.getEndTime()));
+            period.put("subject", eff.getOrDefault("effectiveSubject", "FREE"));
+            period.put("faculty", eff.getOrDefault("effectiveFaculty", "-"));
+            period.put("room", eff.getOrDefault("effectiveVenue", "-"));
+            period.put("badgeType", eff.getOrDefault("badgeType", "TEMPORARY CHANGE"));
+            period.put("isTemporaryOverride", true);
+            return period;
+        }
         Map<String, Object> period = new HashMap<>();
         period.put("name", "Period " + slot.getSlotNumber());
         period.put("startTime", slot.getStartTime());

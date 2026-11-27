@@ -99,21 +99,119 @@ function injectQuizModals() {
             border-radius: 10px;
             padding: 1rem;
             margin-bottom: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .cc-q-card:hover {
+            border-color: #8b5cf6 !important;
+        }
+        .cc-voice-bar {
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.12), rgba(139, 92, 246, 0.16));
+            border: 1px solid rgba(139, 92, 246, 0.45);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+        }
+        .cc-mic-pulse {
+            animation: ccMicPulse 1.2s infinite;
+        }
+        @keyframes ccMicPulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .sq-challenge-card {
+            background: linear-gradient(135deg, #101b3b, #1d0c3f);
+            border: 1px solid #4c1d95;
+            border-radius: 12px;
+            padding: 1rem 1.2rem;
+            margin-bottom: 0.85rem;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+        .sq-challenge-card:hover {
+            transform: translateY(-2px);
+            border-color: #38bdf8;
+            box-shadow: 0 8px 20px rgba(56, 189, 248, 0.18);
+        }
+        .sq-opt-tile {
+            background: #0a1628;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 11px 16px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .sq-opt-tile:hover {
+            border-color: #60a5fa;
+            background: #0f2140;
+        }
+        .sq-opt-tile.selected {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.14);
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+        }
+        .sq-q-pill {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 1px solid #4c1d95;
+            background: #0a041f;
+            color: #cbd5e1;
+            font-weight: 700;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .sq-q-pill.active {
+            border-color: #38bdf8;
+            background: #0284c7;
+            color: #fff;
+        }
+        .sq-q-pill.answered {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.25);
+            color: #6ee7b7;
+        }
+        .sq-confetti-piece {
+            position: fixed;
+            top: -10px;
+            width: 9px;
+            height: 14px;
+            z-index: 10060;
+            pointer-events: none;
+            animation: sqConfettiFall 2.4s linear forwards;
+        }
+        @keyframes sqConfettiFall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(540deg); opacity: 0; }
         }
     </style>
     <div class="modal fade" id="facultyQuizModal" tabindex="-1"
          data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content cc-modal-content">
-                <div class="modal-header cc-modal-header border-0 d-flex justify-content-between align-items-center">
+                <div class="modal-header cc-modal-header border-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div>
                         <h4 class="modal-title fw-bold mb-1 d-flex align-items-center">
                             <i class="fa-solid fa-brain cc-title-brain"></i>
-                            Capacity Connect – Quiz Management
+                            Interactive Quiz Studio – Faculty Hub
                         </h4>
-                        <small style="color: #94a3b8; font-size: 0.85rem; margin-left: 36px;">SIH26075 – Knowledge Assessment Module</small>
+                        <small style="color: #94a3b8; font-size: 0.85rem; margin-left: 36px;">Create, AI-Generate, Use Voice Commands (Tamil / English / Tanglish) &amp; Publish to Class</small>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="form-check form-switch m-0 px-3 py-1 rounded d-flex align-items-center gap-2" style="background: rgba(139,92,246,0.18); border: 1px solid #6d28d9;">
+                            <input class="form-check-input m-0" type="checkbox" role="switch" id="fqVoiceEnableSwitch" onchange="quizToggleVoiceFeature(this.checked)">
+                            <label class="form-check-label small fw-bold text-info m-0" for="fqVoiceEnableSwitch" style="cursor:pointer;">
+                                <i class="fa-solid fa-microphone-lines me-1"></i> Voice Commands
+                            </label>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
                 </div>
                 
                 <ul class="nav cc-nav-tabs mt-0" role="tablist">
@@ -135,9 +233,64 @@ function injectQuizModals() {
                 </ul>
 
                 <div class="modal-body p-4" style="background-color: #120326;">
+                    <!-- VOICE ASSISTANT BAR (Toggled by Enable/Disable switch) -->
+                    <div id="fqVoiceBar" class="cc-voice-bar" style="display:none;">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="badge bg-info text-dark fw-bold"><i class="fa-solid fa-ear-listen me-1"></i>Voice Studio</span>
+                                <select id="fqVoiceLang" class="form-select form-select-sm cc-form-control" style="width:auto;" onchange="quizChangeVoiceLanguage(this.value)">
+                                    <option value="en-US">English</option>
+                                    <option value="ta-IN">தமிழ் (Tamil)</option>
+                                    <option value="tanglish">Tanglish (Tamil + English)</option>
+                                </select>
+                                <button type="button" id="fqVoiceMicBtn" class="btn btn-sm btn-danger fw-bold px-3" onclick="quizToggleVoiceListening()">
+                                    <i class="fa-solid fa-microphone me-1"></i> Start Listening
+                                </button>
+                                <button type="button" id="fqVoiceExplainBtn" class="btn btn-sm btn-outline-warning fw-semibold" onclick="quizSpeakSystemGuide()">
+                                    <i class="fa-solid fa-volume-high me-1"></i> Explain Quiz System
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-light" onclick="document.getElementById('fqVoiceHelpBox').classList.toggle('d-none')">
+                                    <i class="fa-solid fa-circle-question me-1"></i> Commands
+                                </button>
+                            </div>
+                            <div id="fqVoiceStatusText" class="small text-warning fw-semibold">
+                                Ready — choose English, Tamil, or Tanglish and click Start Listening.
+                            </div>
+                        </div>
+                        <div id="fqVoiceHelpBox" class="d-none mt-2 pt-2 border-top small" style="border-color: rgba(139,92,246,0.35) !important; color:#e2e8f0;">
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <strong class="text-info">English Commands:</strong><br/>
+                                    <code>"Explain"</code> &bull; <code>"Title Java Quiz"</code> &bull; <code>"Section II CSE A"</code> &bull; <code>"Subject Java"</code> &bull; <code>"Add question"</code> &bull; <code>"Question What is JVM"</code> &bull; <code>"Option A Virtual Machine"</code> &bull; <code>"Answer Virtual Machine"</code> &bull; <code>"Publish quiz"</code>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong class="text-warning">Tamil Commands (தமிழ்):</strong><br/>
+                                    <code>"விளக்கு" / "உதவி"</code> &bull; <code>"தலைப்பு ஜாவா தேர்வு"</code> &bull; <code>"வகுப்பு 2 CSE A"</code> &bull; <code>"பாடம் ஜாவா"</code> &bull; <code>"புதிய கேள்வி"</code> &bull; <code>"கேள்வி ..."</code> &bull; <code>"விடை அ/ஆ/இ/ஈ ..."</code> &bull; <code>"சரியான விடை ..."</code> &bull; <code>"வெளியிடு"</code>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong class="text-success">Tanglish Commands:</strong><br/>
+                                    <code>"Explain pannu"</code> &bull; <code>"Title podu Java Test"</code> &bull; <code>"Class II CSE A"</code> &bull; <code>"Question sollunga ..."</code> &bull; <code>"Option A podu ..."</code> &bull; <code>"Badhil ..."</code> &bull; <code>"Pudhu question"</code> &bull; <code>"Publish pannu"</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="fqVoiceDisabledHint" class="small text-muted mb-2">
+                        <i class="fa-solid fa-microphone-slash me-1"></i> Voice recognition is disabled. Toggle <strong>Voice Commands</strong> in the header to enable Tamil / English / Tanglish speech control.
+                    </div>
+
                     <div class="tab-content">
                         <!-- CREATE TAB -->
                         <div class="tab-pane fade show active" id="fqCreateTab" role="tabpanel">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-2 px-3 rounded mb-3" style="background:#0a041f; border:1px solid #3b0764;">
+                                <div class="small">
+                                    <i class="fa-solid fa-bullhorn text-info me-1"></i>
+                                    Target Class: <strong id="fqTargetSectionPreview" class="text-warning">Not selected</strong>
+                                </div>
+                                <div class="d-flex gap-2 align-items-center small">
+                                    <span class="badge bg-primary" id="fqSummaryQCount">1 Question</span>
+                                    <span class="badge bg-success" id="fqSummaryMarks">10 Marks</span>
+                                </div>
+                            </div>
                             <form id="quizCreateForm" onsubmit="quizHandleCreate(event)">
                                 <div class="row g-3 mb-3">
                                     <div class="col-md-5">
@@ -201,11 +354,16 @@ function injectQuizModals() {
                                     <!-- Dynamic question cards -->
                                 </div>
 
-                                <div class="mt-4 d-flex justify-content-end gap-2">
-                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="submit" class="btn btn-success fw-bold" style="background:#10b981; border:none;">
-                                        <i class="fa-solid fa-check me-1"></i> Save Quiz
+                                <div class="mt-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-info" onclick="quizLoadSampleTemplate()">
+                                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Load Sample Questions
                                     </button>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <button type="submit" class="btn btn-success fw-bold px-4" style="background:#10b981; border:none;">
+                                            <i class="fa-solid fa-paper-plane me-1"></i> Save &amp; Publish Quiz to Students
+                                        </button>
+                                    </div>
                                 </div>
                             </form>
                         </div>
@@ -296,19 +454,46 @@ function injectQuizModals() {
 
                     <!-- Active quiz view -->
                     <div id="sqActiveContainer" style="display:none;">
-                        <div class="d-flex align-items-center justify-content-between mb-3">
-                            <h5 id="sqQuizTitle" class="fw-bold text-info mb-0"></h5>
-                            <span class="badge bg-warning text-dark"><i class="fa-solid fa-lock me-1"></i> Quiz in progress</span>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                            <div>
+                                <h5 id="sqQuizTitle" class="fw-bold text-info mb-0"></h5>
+                                <small id="sqQuizMetaLine" class="text-muted"></small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span id="sqTimerBadge" class="badge bg-info text-dark fs-6 px-3 py-2">
+                                    <i class="fa-solid fa-stopwatch me-1"></i><span id="sqTimerText">15:00</span>
+                                </span>
+                                <span class="badge bg-warning text-dark py-2"><i class="fa-solid fa-lock me-1"></i> Quiz Active</span>
+                            </div>
                         </div>
-                        <div class="alert" style="background:#1c1000;border:1px solid #f59e0b;color:#fbbf24;">
-                            <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                            <strong>Firewall Active:</strong> You cannot logout or leave this page until you submit the quiz!
+
+                        <!-- Progress & Navigation Strip -->
+                        <div class="p-3 rounded mb-3" style="background:#0a041f;border:1px solid #4c1d95;">
+                            <div class="d-flex justify-content-between align-items-center small mb-2">
+                                <span id="sqProgressLabel" class="fw-bold text-info">Question 1 of 1 &bull; 0 Answered</span>
+                                <button type="button" id="sqViewModeBtn" class="btn btn-xs btn-outline-light py-0 px-2" onclick="quizToggleStudentViewMode()">
+                                    <i class="fa-solid fa-list me-1"></i> Show All
+                                </button>
+                            </div>
+                            <div class="progress mb-2" style="height:8px; background:#1e1b4b;">
+                                <div id="sqProgressBar" class="progress-bar bg-success" role="progressbar" style="width:0%;"></div>
+                            </div>
+                            <div id="sqQuestionPills" class="d-flex flex-wrap gap-2 mt-2"></div>
                         </div>
+
                         <form id="sqForm" onsubmit="quizStudentSubmit(event)">
                             <div id="sqQuestionsBody"></div>
-                            <div class="mt-4 d-flex justify-content-end">
-                                <button type="submit" class="btn fw-bold px-5" style="background:linear-gradient(135deg,#10b981,#3b82f6);color:#fff;">
-                                    <i class="fa-solid fa-check-circle me-1"></i> Submit Answers
+                            <div class="mt-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div class="d-flex gap-2" id="sqStepNavBtns">
+                                    <button type="button" id="sqPrevQBtn" class="btn btn-outline-light btn-sm px-3" onclick="quizStudentGoStep(-1)">
+                                        <i class="fa-solid fa-arrow-left me-1"></i> Previous
+                                    </button>
+                                    <button type="button" id="sqNextQBtn" class="btn btn-info text-dark btn-sm fw-bold px-3" onclick="quizStudentGoStep(1)">
+                                        Next <i class="fa-solid fa-arrow-right ms-1"></i>
+                                    </button>
+                                </div>
+                                <button type="submit" class="btn fw-bold px-5 ms-auto" style="background:linear-gradient(135deg,#10b981,#3b82f6);color:#fff;">
+                                    <i class="fa-solid fa-paper-plane me-1"></i> Submit Quiz
                                 </button>
                             </div>
                         </form>
@@ -366,7 +551,13 @@ let _resolvedSectionId = null;     // resolved DB id of student's section
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function _loggedInUsername() {
-    return localStorage.getItem('sece_logged_in_user') || '';
+    return (localStorage.getItem('sece_logged_in_user') || '').toLowerCase();
+}
+function _authHeaders(extra = {}) {
+    const token = localStorage.getItem('jwt_token') || '';
+    const headers = { ...extra };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    return headers;
 }
 function _teacherId() {
     // Try to get from session storage set by faculty login flow
@@ -392,8 +583,8 @@ async function _resolveStudentInfo() {
         if (!res.ok) return null;
         const students = await res.json();
         const me = students.find(s =>
-            (s.user && s.user.username === username) ||
-            s.username === username ||
+            (s.user && String(s.user.username || '').toLowerCase() === username) ||
+            String(s.username || '').toLowerCase() === username ||
             String(s.registerNumber || '').toLowerCase() === username
         );
         if (!me) return null;
@@ -423,8 +614,8 @@ async function _resolveTeacherInfo() {
         if (!res.ok) return null;
         const teachers = await res.json();
         const me = teachers.find(t =>
-            (t.user && t.user.username === username) ||
-            t.username === username ||
+            (t.user && String(t.user.username || '').toLowerCase() === username) ||
+            String(t.username || '').toLowerCase() === username ||
             String(t.collegeEmail || '').toLowerCase().startsWith(username)
         );
         if (!me) return null;
@@ -439,7 +630,18 @@ async function _resolveTeacherInfo() {
 
 // ── Faculty: Open Modal ──────────────────────────────────────────────────────
 window.openFacultyQuizModal = async () => {
-    new bootstrap.Modal(document.getElementById('facultyQuizModal')).show();
+    const modalEl = document.getElementById('facultyQuizModal');
+    if (modalEl && !modalEl.dataset.voiceCleanupBound) {
+        modalEl.dataset.voiceCleanupBound = 'true';
+        modalEl.addEventListener('hidden.bs.modal', () => { quizStopVoiceListening(); });
+    }
+    new bootstrap.Modal(modalEl).show();
+
+    // Sync Voice Assistant Enable/Disable preference
+    const voiceEnabled = localStorage.getItem('sece_quiz_voice_enabled') !== 'false';
+    const voiceSwitch = document.getElementById('fqVoiceEnableSwitch');
+    if (voiceSwitch) voiceSwitch.checked = voiceEnabled;
+    quizToggleVoiceFeature(voiceEnabled, true);
 
     // Reset form state
     document.getElementById('quizCreateForm').reset();
@@ -450,14 +652,19 @@ window.openFacultyQuizModal = async () => {
     // Load sections dropdown
     const secSel = document.getElementById('fqSectionId');
     secSel.innerHTML = '<option value="">Loading sections...</option>';
+    secSel.onchange = () => {
+        const preview = document.getElementById('fqTargetSectionPreview');
+        if (preview) preview.innerText = secSel.selectedIndex > 0 ? secSel.options[secSel.selectedIndex].text : 'Not selected';
+    };
     try {
         const token = localStorage.getItem('jwt_token') || '';
         const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
         const secRes = await fetch('/api/sections', { headers });
         if (secRes.ok) {
             const sections = await secRes.json();
+            const cleanSections = sections.filter(s => s.sectionName && !/^\d+\s+CSE\s+II\s+CSE/i.test(s.sectionName));
             secSel.innerHTML = '<option value="">-- Select Section --</option>' +
-                sections.map(s => {
+                cleanSections.map(s => {
                     const label = s.sectionName || ('Section ' + s.id);
                     return `<option value="${s.id}">${label}</option>`;
                 }).join('');
@@ -475,6 +682,7 @@ window.openFacultyQuizModal = async () => {
 
     document.getElementById('fqTeacherId').value = tchId;
     document.getElementById('fqTeacherDisplay').value = tchName;
+    quizRefreshSummaryBadge();
 };
 
 window.quizShowAiPrompt = () => {
@@ -550,7 +758,30 @@ window.quizGenerateAI = async (e) => {
     }
 };
 
-// ── Faculty: Add Question Card ───────────────────────────────────────────────
+// ── Faculty: Add Question Card & Live Summary ───────────────────────────────
+window.quizRefreshSummaryBadge = () => {
+    const cards = document.querySelectorAll('[id^="qcard_"]');
+    let totalMarks = 0;
+    cards.forEach(c => {
+        totalMarks += parseInt(c.querySelector('.q-marks')?.value || '0', 10) || 0;
+    });
+    const qEl = document.getElementById('fqSummaryQCount');
+    const mEl = document.getElementById('fqSummaryMarks');
+    if (qEl) qEl.innerText = `${cards.length} Question${cards.length === 1 ? '' : 's'}`;
+    if (mEl) mEl.innerText = `${totalMarks} Marks`;
+};
+
+window.quizPickOptionAsAnswer = (qid, optIdx) => {
+    const card = document.getElementById('qcard_' + qid);
+    if (!card) return;
+    const optVal = card.querySelector(`.q-opt[data-opt="${optIdx}"]`)?.value.trim() || '';
+    const ansInput = card.querySelector('.q-answer');
+    if (ansInput) {
+        ansInput.value = optVal;
+        ansInput.focus();
+    }
+};
+
 window.quizAddQuestion = () => {
     _questionCount++;
     const n = _questionCount;
@@ -561,10 +792,10 @@ window.quizAddQuestion = () => {
     card.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="fw-bold" style="color: #eab308;">Q${n}</span>
-            <button type="button" class="btn btn-sm" style="color: #ef4444; border: 1px solid #ef4444;" onclick="document.getElementById('qcard_${n}').remove()"><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" class="btn btn-sm" style="color: #ef4444; border: 1px solid #ef4444;" onclick="document.getElementById('qcard_${n}').remove(); quizRefreshSummaryBadge();"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="mb-2">
-            <input type="text" class="form-control cc-form-control q-text" data-qid="${n}" placeholder="Type your question here..." required>
+            <input type="text" class="form-control cc-form-control q-text" data-qid="${n}" placeholder="Type your question here (or dictate by Voice)..." required>
         </div>
         <div class="row g-2 mb-2">
             <div class="col-md-6">
@@ -574,7 +805,7 @@ window.quizAddQuestion = () => {
                 </select>
             </div>
             <div class="col-md-6">
-                <input type="number" class="form-control cc-form-control q-marks" data-qid="${n}" value="10" min="1" required placeholder="Marks">
+                <input type="number" class="form-control cc-form-control q-marks" data-qid="${n}" value="10" min="1" required placeholder="Marks" oninput="quizRefreshSummaryBadge()">
             </div>
         </div>
 
@@ -585,29 +816,33 @@ window.quizAddQuestion = () => {
                     <div class="input-group input-group-sm">
                         <span class="input-group-text" style="background:#1a0536;color:#a78bfa;border-color:#4c1d95;">A</span>
                         <input type="text" class="form-control cc-form-control q-opt" data-qid="${n}" data-opt="0" placeholder="Option A" required>
+                        <button type="button" class="btn btn-outline-success" title="Set as Correct Answer" onclick="quizPickOptionAsAnswer(${n}, 0)"><i class="fa-solid fa-check"></i></button>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text" style="background:#1a0536;color:#a78bfa;border-color:#4c1d95;">B</span>
                         <input type="text" class="form-control cc-form-control q-opt" data-qid="${n}" data-opt="1" placeholder="Option B" required>
+                        <button type="button" class="btn btn-outline-success" title="Set as Correct Answer" onclick="quizPickOptionAsAnswer(${n}, 1)"><i class="fa-solid fa-check"></i></button>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text" style="background:#1a0536;color:#a78bfa;border-color:#4c1d95;">C</span>
                         <input type="text" class="form-control cc-form-control q-opt" data-qid="${n}" data-opt="2" placeholder="Option C">
+                        <button type="button" class="btn btn-outline-success" title="Set as Correct Answer" onclick="quizPickOptionAsAnswer(${n}, 2)"><i class="fa-solid fa-check"></i></button>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text" style="background:#1a0536;color:#a78bfa;border-color:#4c1d95;">D</span>
                         <input type="text" class="form-control cc-form-control q-opt" data-qid="${n}" data-opt="3" placeholder="Option D">
+                        <button type="button" class="btn btn-outline-success" title="Set as Correct Answer" onclick="quizPickOptionAsAnswer(${n}, 3)"><i class="fa-solid fa-check"></i></button>
                     </div>
                 </div>
             </div>
             <div class="mb-2">
-                <input type="text" class="form-control cc-form-control q-answer" data-qid="${n}" style="border-color:#10b981 !important;" placeholder="Correct Answer (type exactly as option)" required>
+                <input type="text" class="form-control cc-form-control q-answer" data-qid="${n}" style="border-color:#10b981 !important;" placeholder="Correct Answer (type exact text or click ✓ beside an option)" required>
             </div>
         </div>
 
@@ -619,35 +854,72 @@ window.quizAddQuestion = () => {
         </div>
     `;
     wrap.appendChild(card);
+    quizRefreshSummaryBadge();
+};
+
+window.quizLoadSampleTemplate = () => {
+    const titleEl = document.getElementById('fqTitle');
+    const subEl = document.getElementById('fqSubject');
+    const topEl = document.getElementById('fqTopic');
+    if (titleEl && !titleEl.value.trim()) titleEl.value = 'Quick Concept Challenge';
+    if (subEl && !subEl.value.trim()) subEl.value = 'Computer Science';
+    if (topEl && !topEl.value.trim()) topEl.value = 'Core Fundamentals';
+
+    const wrap = document.getElementById('fqQuestionsWrap');
+    const existingEmpty = wrap.querySelectorAll('.cc-q-card').length === 1 && !wrap.querySelector('.q-text')?.value.trim();
+    if (existingEmpty) { wrap.innerHTML = ''; _questionCount = 0; }
+
+    const samples = [
+        { text: 'Which data structure follows LIFO (Last In First Out) order?', opts: ['Queue', 'Stack', 'Linked List', 'Graph'], ans: 'Stack' },
+        { text: 'What is the worst-case time complexity of Binary Search on a sorted array?', opts: ['O(1)', 'O(log n)', 'O(n)', 'O(n log n)'], ans: 'O(log n)' }
+    ];
+    samples.forEach(s => {
+        quizAddQuestion();
+        const cards = document.querySelectorAll('#fqQuestionsWrap .cc-q-card');
+        const card = cards[cards.length - 1];
+        card.querySelector('.q-text').value = s.text;
+        card.querySelectorAll('.q-opt').forEach((inp, idx) => { inp.value = s.opts[idx] || ''; });
+        card.querySelector('.q-answer').value = s.ans;
+    });
+    quizRefreshSummaryBadge();
+    _showSuccess('Loaded sample interactive quiz questions!');
 };
 
 window.quizToggleType = (sel, n) => {
     const mcqSec = document.querySelector('.mcq-section-' + n);
     const descSec = document.querySelector('.desc-section-' + n);
-    if (sel.value === 'MCQ') {
-        mcqSec.style.display = 'block';
-        descSec.style.display = 'none';
-    } else {
-        mcqSec.style.display = 'none';
-        descSec.style.display = 'block';
+    const card = document.getElementById('qcard_' + n);
+    const isMcq = sel.value === 'MCQ';
+    if (mcqSec) mcqSec.style.display = isMcq ? 'block' : 'none';
+    if (descSec) descSec.style.display = isMcq ? 'none' : 'block';
+    if (card) {
+        card.querySelectorAll('.q-opt[data-opt="0"], .q-opt[data-opt="1"], .q-answer').forEach(el => {
+            el.required = isMcq;
+        });
     }
 };
 
-// ── Faculty: Create Quiz ─────────────────────────────────────────────────────
+// ── Faculty: Create & Publish Quiz ───────────────────────────────────────────
 window.quizHandleCreate = async (e) => {
     e.preventDefault();
 
-    const title    = document.getElementById('fqTitle').value.trim();
-    const sectionId = parseInt(document.getElementById('fqSectionId').value) || 0;
+    const title = document.getElementById('fqTitle').value.trim();
+    const secSel = document.getElementById('fqSectionId');
+    const sectionId = parseInt(secSel?.value) || 0;
+    const sectionLabel = (secSel && secSel.selectedIndex > 0) ? secSel.options[secSel.selectedIndex].text : 'selected section';
     if (!sectionId) {
-        alert('Please select a section.');
+        alert('Please select a target class section before publishing.');
         return;
     }
     const teacherId = parseInt(document.getElementById('fqTeacherId').value) || 1;
+    const subjectName = document.getElementById('fqSubject')?.value.trim() || '';
+    const topic = document.getElementById('fqTopic')?.value.trim() || '';
+    const difficulty = document.getElementById('fqDifficulty')?.value || 'Medium';
+    const durationMinutes = parseInt(document.getElementById('fqDuration')?.value) || 15;
+    const passingPercentage = parseFloat(document.getElementById('fqPassPercent')?.value) || 50;
 
     const questions = [];
     document.querySelectorAll('[id^="qcard_"]').forEach(card => {
-        const qid  = card.querySelector('.q-text').dataset.qid;
         const type = card.querySelector('.q-type').value;
         const text = card.querySelector('.q-text').value.trim();
         const marks = parseInt(card.querySelector('.q-marks').value) || 10;
@@ -665,7 +937,7 @@ window.quizHandleCreate = async (e) => {
         }
 
         if (text) {
-            questions.push({ questionText: text, type, options, correctAnswer: correct, marks });
+            questions.push({ questionText: text, type, options, correctAnswer: correct, marks, topicConcept: topic, difficulty });
         }
     });
 
@@ -674,20 +946,24 @@ window.quizHandleCreate = async (e) => {
         return;
     }
 
-    const payload = { sectionId, teacherId, title, questions };
+    const payload = { sectionId, teacherId, title, subjectName, topic, difficulty, durationMinutes, passingPercentage, questions };
 
     try {
         const res = await fetch('/api/quizzes', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: _authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(payload)
         });
         if (res.ok) {
-            _showSuccess('Quiz "' + title + '" created successfully! Students can now take it.');
+            const msg = `Quiz "${title}" published to ${sectionLabel} students!`;
+            _showSuccess(msg);
+            if (_voiceEnabled) quizSpeakFeedback(msg);
             document.getElementById('quizCreateForm').reset();
             document.getElementById('fqQuestionsWrap').innerHTML = '';
             _questionCount = 0;
             quizAddQuestion();
+            const preview = document.getElementById('fqTargetSectionPreview');
+            if (preview) preview.innerText = 'Not selected';
         } else {
             const errText = await res.text();
             alert('Failed to create quiz:\n' + errText);
@@ -702,7 +978,7 @@ window.quizHandleCreate = async (e) => {
 window.quizLoadFacultyList = async () => {
     const tchId = document.getElementById('fqTeacherId').value || _teacherId();
     try {
-        const res = await fetch('/api/quizzes/teacher/' + tchId);
+        const res = await fetch('/api/quizzes/teacher/' + tchId, { headers: _authHeaders() });
         const list = await res.json();
         const sel = document.getElementById('fqQuizSelect');
         sel.innerHTML = '<option value="">-- Choose a Quiz --</option>' +
@@ -731,8 +1007,8 @@ window.quizLoadResults = async (quizId) => {
     body.innerHTML = '<div class="text-muted">Loading...</div>';
 
     const [allRes, weakRes] = await Promise.all([
-        fetch('/api/quizzes/' + quizId + '/results'),
-        fetch('/api/quizzes/' + quizId + '/results/weak')
+        fetch('/api/quizzes/' + quizId + '/results', { headers: _authHeaders() }),
+        fetch('/api/quizzes/' + quizId + '/results/weak', { headers: _authHeaders() })
     ]);
     const all  = await allRes.json();
     const weak = await weakRes.json();
@@ -944,9 +1220,107 @@ window.quizLoadResults = async (quizId) => {
     }
 };
 
+// ── Student Quiz Interactive State ───────────────────────────────────────────
+let _sqTimerInterval = null;
+let _sqSecondsLeft = 0;
+let _sqCurrentStep = 0;
+let _sqShowAllMode = false;
+
+function _clearStudentQuizTimer() {
+    if (_sqTimerInterval) {
+        clearInterval(_sqTimerInterval);
+        _sqTimerInterval = null;
+    }
+}
+
+function _launchStudentConfetti() {
+    const colors = ['#10b981', '#38bdf8', '#fbbf24', '#a78bfa', '#f43f5e'];
+    for (let i = 0; i < 42; i++) {
+        const p = document.createElement('div');
+        p.className = 'sq-confetti-piece';
+        p.style.left = Math.random() * 100 + 'vw';
+        p.style.background = colors[i % colors.length];
+        p.style.animationDelay = (Math.random() * 0.7) + 's';
+        p.style.borderRadius = i % 2 === 0 ? '50%' : '2px';
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 3200);
+    }
+}
+
+function _updateStudentQuizProgress() {
+    if (!_currentQuizData || !Array.isArray(_currentQuizData.questions)) return;
+    const qs = _currentQuizData.questions;
+    let answered = 0;
+    const pillsWrap = document.getElementById('sqQuestionPills');
+    let pillsHtml = '';
+
+    qs.forEach((q, idx) => {
+        let isAns = false;
+        if (q.type === 'MCQ') {
+            isAns = !!document.querySelector(`[name="sq_q_${q.id}"]:checked`);
+        } else {
+            isAns = !!document.getElementById(`sq_desc_${q.id}`)?.value.trim();
+        }
+        if (isAns) answered++;
+        const cls = (!_sqShowAllMode && idx === _sqCurrentStep) ? 'active' : (isAns ? 'answered' : '');
+        pillsHtml += `<button type="button" class="sq-q-pill ${cls}" onclick="quizStudentJumpTo(${idx})">${idx + 1}</button>`;
+    });
+
+    if (pillsWrap) pillsWrap.innerHTML = pillsHtml;
+    const labelEl = document.getElementById('sqProgressLabel');
+    if (labelEl) labelEl.innerText = _sqShowAllMode
+        ? `Showing all ${qs.length} questions • ${answered}/${qs.length} Answered`
+        : `Question ${_sqCurrentStep + 1} of ${qs.length} • ${answered}/${qs.length} Answered`;
+    const barEl = document.getElementById('sqProgressBar');
+    if (barEl) barEl.style.width = `${qs.length ? Math.round((answered / qs.length) * 100) : 0}%`;
+
+    qs.forEach((_, idx) => {
+        const card = document.getElementById(`sq_qcard_${idx}`);
+        if (card) card.style.display = (_sqShowAllMode || idx === _sqCurrentStep) ? 'block' : 'none';
+    });
+
+    const stepBtns = document.getElementById('sqStepNavBtns');
+    if (stepBtns) stepBtns.style.display = _sqShowAllMode ? 'none' : 'flex';
+    const prevBtn = document.getElementById('sqPrevQBtn');
+    const nextBtn = document.getElementById('sqNextQBtn');
+    if (prevBtn) prevBtn.disabled = _sqCurrentStep <= 0;
+    if (nextBtn) nextBtn.disabled = _sqCurrentStep >= qs.length - 1;
+}
+
+window.quizSelectOptionTile = (qId, optIdx) => {
+    const radio = document.getElementById(`sq_${qId}_${optIdx}`);
+    if (!radio) return;
+    radio.checked = true;
+    document.querySelectorAll(`[data-q-tile="${qId}"]`).forEach(el => el.classList.remove('selected'));
+    document.getElementById(`sq_tile_${qId}_${optIdx}`)?.classList.add('selected');
+    _updateStudentQuizProgress();
+};
+
+window.quizStudentJumpTo = (idx) => {
+    if (!_currentQuizData || !_currentQuizData.questions.length) return;
+    _sqShowAllMode = false;
+    const btn = document.getElementById('sqViewModeBtn');
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-list me-1"></i> Show All';
+    _sqCurrentStep = Math.max(0, Math.min(_currentQuizData.questions.length - 1, idx));
+    _updateStudentQuizProgress();
+};
+
+window.quizStudentGoStep = (delta) => {
+    quizStudentJumpTo(_sqCurrentStep + delta);
+};
+
+window.quizToggleStudentViewMode = () => {
+    _sqShowAllMode = !_sqShowAllMode;
+    const btn = document.getElementById('sqViewModeBtn');
+    if (btn) btn.innerHTML = _sqShowAllMode
+        ? '<i class="fa-solid fa-bullseye me-1"></i> Focus Mode'
+        : '<i class="fa-solid fa-list me-1"></i> Show All';
+    _updateStudentQuizProgress();
+};
+
 // ── Student: Open Modal ──────────────────────────────────────────────────────
 window.openStudentQuizModal = async () => {
-    // Reset view
+    _clearStudentQuizTimer();
     document.getElementById('sqListContainer').style.display = 'block';
     document.getElementById('sqActiveContainer').style.display = 'none';
     document.getElementById('sqResultContainer').style.display = 'none';
@@ -954,14 +1328,13 @@ window.openStudentQuizModal = async () => {
 
     const listEl = document.getElementById('sqQuizList');
     const noEl   = document.getElementById('sqNoQuiz');
-    listEl.innerHTML = '<p class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading...</p>';
+    listEl.innerHTML = '<p class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading quiz challenges...</p>';
 
     try {
-        // Resolve real student + section IDs
         const info = await _resolveStudentInfo();
         const secId = (info && info.sectionId) ? info.sectionId : 1;
 
-        const res  = await fetch('/api/quizzes/section/' + secId);
+        const res  = await fetch('/api/quizzes/section/' + secId, { headers: _authHeaders() });
         const list = await res.json();
 
         if (!list || list.length === 0) {
@@ -969,42 +1342,94 @@ window.openStudentQuizModal = async () => {
             noEl.style.display = 'block';
         } else {
             noEl.style.display = 'none';
-            listEl.innerHTML = list.map(q => `
-                <button type="button" class="list-group-item list-group-item-action fw-bold"
-                    style="background:#0d1f3c;color:#93c5fd;border-color:#3b82f6;"
-                    onclick="quizStudentStart(${q.id})">
-                    <i class="fa-solid fa-play-circle me-2 text-info"></i>${q.title}
-                </button>`).join('');
+            listEl.innerHTML = list.map(q => {
+                const qCount = Array.isArray(q.questions) ? q.questions.length : 0;
+                const totalM = Array.isArray(q.questions) ? q.questions.reduce((s, item) => s + (item.marks || 10), 0) : 0;
+                const diff = q.difficulty || 'Medium';
+                const diffCls = diff === 'Easy' ? 'bg-success' : (diff === 'Hard' ? 'bg-danger' : 'bg-warning text-dark');
+                const dur = q.durationMinutes || 15;
+                const passPct = q.passingPercentage || 50;
+                return `
+                <div class="sq-challenge-card d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                            <span class="badge ${diffCls}">${diff}</span>
+                            ${q.subjectName ? `<span class="badge bg-info text-dark">${q.subjectName}</span>` : ''}
+                            ${q.topic ? `<span class="badge bg-secondary">${q.topic}</span>` : ''}
+                        </div>
+                        <h6 class="fw-bold text-white mb-1"><i class="fa-solid fa-bolt text-warning me-2"></i>${q.title}</h6>
+                        <div class="small text-muted">
+                            <span><i class="fa-solid fa-list-check me-1 text-info"></i>${qCount} Questions</span> &bull;
+                            <span><i class="fa-solid fa-trophy me-1 text-warning"></i>${totalM} Marks</span> &bull;
+                            <span><i class="fa-solid fa-stopwatch me-1 text-success"></i>${dur} mins</span> &bull;
+                            <span>Pass: ${passPct}%</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-info text-dark fw-bold px-3 py-2" onclick="quizStudentStart(${q.id})">
+                        <i class="fa-solid fa-rocket me-1"></i> Start Challenge
+                    </button>
+                </div>`;
+            }).join('');
         }
     } catch (err) {
         console.error(err);
-        listEl.innerHTML = '<p class="text-danger">Error loading quizzes. Check backend is running on port 8081.</p>';
+        listEl.innerHTML = '<p class="text-danger">Failed to load quizzes. Please try again.</p>';
     }
 
     new bootstrap.Modal(document.getElementById('studentQuizModal')).show();
 };
 
-// ── Student: Start Quiz (Firewall) ───────────────────────────────────────────
+// ── Student: Start Quiz (Interactive Runner + Timer + Firewall) ───────────────
 window.quizStudentStart = async (quizId) => {
     try {
         const info  = await _resolveStudentInfo();
         const secId = (info && info.sectionId) ? info.sectionId : 1;
-        const res   = await fetch('/api/quizzes/section/' + secId);
+        const res   = await fetch('/api/quizzes/section/' + secId, { headers: _authHeaders() });
         const list  = await res.json();
         const quiz  = list.find(q => q.id === quizId);
         if (!quiz) { alert('Quiz not found.'); return; }
 
         _currentQuizData = quiz;
         _quizActive = true;
+        _sqCurrentStep = 0;
+        _sqShowAllMode = false;
 
-        // ▸ Activate firewall
         document.getElementById('sqCloseBtn').style.display = 'none';
         document.getElementById('sqListContainer').style.display = 'none';
         document.getElementById('sqResultContainer').style.display = 'none';
         document.getElementById('sqActiveContainer').style.display = 'block';
         document.getElementById('sqQuizTitle').innerText = quiz.title;
+        const metaEl = document.getElementById('sqQuizMetaLine');
+        if (metaEl) {
+            metaEl.innerText = [quiz.subjectName, quiz.topic, quiz.difficulty || 'Medium'].filter(Boolean).join(' • ');
+        }
+        const viewBtn = document.getElementById('sqViewModeBtn');
+        if (viewBtn) viewBtn.innerHTML = '<i class="fa-solid fa-list me-1"></i> Show All';
 
-        // Render questions
+        // Start Countdown Timer
+        _clearStudentQuizTimer();
+        _sqSecondsLeft = Math.max(1, Number(quiz.durationMinutes || 15)) * 60;
+        const renderTimer = () => {
+            const m = Math.floor(_sqSecondsLeft / 60);
+            const s = _sqSecondsLeft % 60;
+            const tEl = document.getElementById('sqTimerText');
+            const bEl = document.getElementById('sqTimerBadge');
+            if (tEl) tEl.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            if (bEl && _sqSecondsLeft <= 60) {
+                bEl.className = 'badge bg-danger text-white fs-6 px-3 py-2';
+            }
+        };
+        renderTimer();
+        _sqTimerInterval = setInterval(() => {
+            if (_sqSecondsLeft > 0) {
+                _sqSecondsLeft--;
+                renderTimer();
+            } else {
+                _clearStudentQuizTimer();
+            }
+        }, 1000);
+
+        // Render interactive question tiles
         const qBody = document.getElementById('sqQuestionsBody');
         qBody.innerHTML = quiz.questions.map((q, idx) => {
             const opts = q.type === 'MCQ'
@@ -1014,29 +1439,32 @@ window.quizStudentStart = async (quizId) => {
 
             const inputHtml = q.type === 'MCQ'
                 ? opts.map((opt, i) => `
-                    <div class="form-check" style="background:#0a1628;border:1px solid #3b82f6;border-radius:8px;padding:10px 16px;margin-bottom:6px;">
-                        <input class="form-check-input" type="radio" name="sq_q_${q.id}" id="sq_${q.id}_${i}" value="${opt}" required>
-                        <label class="form-check-label" for="sq_${q.id}_${i}">
-                            <span class="badge me-2" style="background:#1d4ed8;">${letters[i] || i+1}</span>${opt}
-                        </label>
+                    <div class="sq-opt-tile" id="sq_tile_${q.id}_${i}" data-q-tile="${q.id}" onclick="quizSelectOptionTile(${q.id}, ${i})">
+                        <input class="form-check-input m-0" type="radio" name="sq_q_${q.id}" id="sq_${q.id}_${i}" value="${opt}" style="pointer-events:none;">
+                        <span class="badge" style="background:#1d4ed8;">${letters[i] || i + 1}</span>
+                        <span class="text-white fw-semibold">${opt}</span>
                     </div>`).join('')
-                : `<textarea name="sq_q_${q.id}" id="sq_desc_${q.id}" rows="5" required
+                : `<textarea name="sq_q_${q.id}" id="sq_desc_${q.id}" rows="5"
                         class="form-control mt-2"
                         style="background:#0a1628;color:#e0f0ff;border-color:#3b82f6;font-size:0.95rem;"
-                        placeholder="Write your detailed answer here..."></textarea>`;
+                        oninput="_updateStudentQuizProgress()"
+                        placeholder="Write your clear answer here..."></textarea>`;
 
             return `
-            <div class="mb-4 p-3" style="background:#0d1a30;border-radius:12px;border-left:4px solid #7c3aed;">
-                <p class="fw-bold mb-2" style="color:#a78bfa;">
-                    <span style="background:#7c3aed;color:#fff;border-radius:6px;padding:2px 10px;margin-right:8px;">${idx+1}</span>
-                    ${q.questionText}
-                    <span class="badge ms-2" style="background:#0f172a;border:1px solid #7c3aed;color:#c4b5fd;">${q.marks} Marks</span>
-                </p>
+            <div id="sq_qcard_${idx}" class="mb-3 p-3" style="background:#0d1a30;border-radius:12px;border-left:4px solid #7c3aed;">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                    <p class="fw-bold mb-0" style="color:#e2e8f0; font-size:1.05rem;">
+                        <span style="background:#7c3aed;color:#fff;border-radius:6px;padding:2px 10px;margin-right:8px;">Q${idx + 1}</span>
+                        ${q.questionText}
+                    </p>
+                    <span class="badge text-nowrap" style="background:#0f172a;border:1px solid #7c3aed;color:#c4b5fd;">${q.marks} Marks</span>
+                </div>
                 ${inputHtml}
             </div>`;
         }).join('');
 
         document.getElementById('sqForm').dataset.quizId = quizId;
+        _updateStudentQuizProgress();
 
     } catch (err) {
         console.error(err);
@@ -1049,9 +1477,15 @@ window.quizStudentSubmit = async (e) => {
     e.preventDefault();
     if (!_currentQuizData) return;
 
-    const quizId = document.getElementById('sqForm').dataset.quizId;
+    const unanswered = _currentQuizData.questions.filter(q => {
+        if (q.type === 'MCQ') return !document.querySelector(`[name="sq_q_${q.id}"]:checked`);
+        return !document.getElementById(`sq_desc_${q.id}`)?.value.trim();
+    });
+    if (unanswered.length > 0 && !confirm(`You still have ${unanswered.length} unanswered question(s). Submit anyway?`)) {
+        return;
+    }
 
-    // Resolve real student DB id
+    const quizId = document.getElementById('sqForm').dataset.quizId;
     const info = await _resolveStudentInfo();
     if (!info || !info.studentId) {
         alert('Could not identify your student account. Make sure you are logged in as a student.');
@@ -1074,70 +1508,81 @@ window.quizStudentSubmit = async (e) => {
     try {
         const res = await fetch('/api/quizzes/' + quizId + '/submit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: _authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ studentId, answers })
         });
 
         if (res.ok) {
             const sub = await res.json();
-            _quizActive = false;  // ▸ Deactivate firewall
+            _quizActive = false;
+            _clearStudentQuizTimer();
 
-            // Show result card
             document.getElementById('sqActiveContainer').style.display = 'none';
             document.getElementById('sqCloseBtn').style.display = 'block';
 
             const pct = sub.percentage != null ? sub.percentage.toFixed(1) : '0.0';
-            const isPassed = parseFloat(pct) >= 50;
+            const passPct = Number(_currentQuizData.passingPercentage || 50);
+            const isPassed = parseFloat(pct) >= passPct;
+            if (isPassed) _launchStudentConfetti();
 
-            // Compute accuracy from answers
             let correct = 0, totalQ = 0;
             if (sub.answers && sub.answers.length > 0) {
                 totalQ = sub.answers.length;
                 correct = sub.answers.filter(a => a.isCorrect).length;
             }
             const accuracy = totalQ > 0 ? ((correct / totalQ) * 100).toFixed(1) : '0.0';
-            const level = parseFloat(pct) >= 75 ? {label:'Excellent 🌟',color:'#10b981'} :
-                          parseFloat(pct) >= 50 ? {label:'Proficient ✅',color:'#3b82f6'} :
-                          parseFloat(pct) >= 35 ? {label:'Developing 📈',color:'#eab308'} :
-                          {label:'Needs Improvement 📚',color:'#ef4444'};
+            const level = parseFloat(pct) >= 75 ? { label: 'Quiz Champion 🏆', color: '#10b981' } :
+                          parseFloat(pct) >= 50 ? { label: 'Sharp Mind ⚡', color: '#3b82f6' } :
+                          parseFloat(pct) >= 35 ? { label: 'Rising Scholar 📈', color: '#eab308' } :
+                          { label: 'Keep Practicing 📚', color: '#ef4444' };
             const donutId = 'sq_donut_' + sub.id;
+
+            const reviewHtml = (sub.answers || []).map((a, idx) => {
+                const q = a.question || {};
+                return `<div class="p-2 px-3 rounded mb-2 small" style="background:#0a041f; border:1px solid ${a.isCorrect ? '#10b981' : '#ef4444'};">
+                    <div class="fw-bold text-white">Q${idx + 1}. ${q.questionText || ''}</div>
+                    <div class="mt-1">Your answer: <span class="${a.isCorrect ? 'text-success' : 'text-danger'} fw-bold">${a.answerText || '(Blank)'}</span>
+                    ${!a.isCorrect && q.correctAnswer ? ` &bull; Correct: <span class="text-success fw-bold">${q.correctAnswer}</span>` : ''}</div>
+                </div>`;
+            }).join('');
 
             document.getElementById('sqResultContainer').style.display = 'block';
             document.getElementById('sqResultContainer').innerHTML = `
                 <div class="text-center mb-4">
                     <div style="font-size:3rem;">${isPassed ? '🎉' : '📚'}</div>
                     <h4 class="fw-bold mt-2" style="color:${level.color}">${level.label}</h4>
+                    <span class="badge bg-purple border border-info px-3 py-1">+${sub.totalScore ?? 0} XP Earned</span>
                 </div>
                 <div class="row g-3 mb-4">
-                    <div class="col-6">
+                    <div class="col-6 col-md-3">
                         <div class="p-3 rounded text-center" style="background:#0d1f12;border:1px solid #10b981;">
-                            <div class="fs-2 fw-bold" style="color:${level.color}">${pct}%</div>
-                            <div class="small text-muted mt-1">Overall Score</div>
+                            <div class="fs-3 fw-bold" style="color:${level.color}">${pct}%</div>
+                            <div class="small text-muted mt-1">Score</div>
                         </div>
                     </div>
-                    <div class="col-6">
+                    <div class="col-6 col-md-3">
                         <div class="p-3 rounded text-center" style="background:#0d1a3a;border:1px solid #3b82f6;">
-                            <div class="fs-2 fw-bold text-info">${accuracy}%</div>
+                            <div class="fs-3 fw-bold text-info">${accuracy}%</div>
                             <div class="small text-muted mt-1">Accuracy</div>
                         </div>
                     </div>
-                    <div class="col-6">
+                    <div class="col-6 col-md-3">
                         <div class="p-3 rounded text-center" style="background:#1a1200;border:1px solid #eab308;">
-                            <div class="fs-2 fw-bold text-warning">${correct}/${totalQ}</div>
-                            <div class="small text-muted mt-1">Correct / Total</div>
+                            <div class="fs-3 fw-bold text-warning">${correct}/${totalQ}</div>
+                            <div class="small text-muted mt-1">Correct</div>
                         </div>
                     </div>
-                    <div class="col-6">
+                    <div class="col-6 col-md-3">
                         <div class="p-3 rounded text-center" style="background:#0a041f;border:1px solid #8b5cf6;">
-                            <div class="fs-4 fw-bold text-purple">${sub.totalScore ?? 0}</div>
-                            <div class="small text-muted mt-1">Marks Scored</div>
+                            <div class="fs-3 fw-bold text-info">${sub.totalScore ?? 0}</div>
+                            <div class="small text-muted mt-1">Marks</div>
                         </div>
                     </div>
                 </div>
-                <!-- Donut chart -->
-                <div class="d-flex justify-content-center mb-4">
-                    <div style="width:200px;height:200px;"><canvas id="${donutId}"></canvas></div>
+                <div class="d-flex justify-content-center mb-3">
+                    <div style="width:180px;height:180px;"><canvas id="${donutId}"></canvas></div>
                 </div>
+                ${reviewHtml ? `<div class="mb-3"><h6 class="fw-bold text-info mb-2"><i class="fa-solid fa-magnifying-glass-chart me-1"></i>Answer Review</h6>${reviewHtml}</div>` : ''}
                 ${!isPassed && sub.aiWeaknessAnalysis ? `
                 <div class="p-3 rounded mb-3" style="background:#1a0000;border:1px solid #dc2626;">
                     <h6 class="text-warning fw-bold"><i class="fa-solid fa-robot me-1"></i>AI Study Recommendations</h6>
@@ -1147,7 +1592,6 @@ window.quizStudentSubmit = async (e) => {
                     <button class="btn btn-outline-info" data-bs-dismiss="modal">Close</button>
                 </div>
             `;
-            // Render donut chart
             _ensureChartJs(() => {
                 const ctx = document.getElementById(donutId);
                 if (!ctx) return;
@@ -1303,7 +1747,9 @@ window.openStudentQuizHistoryModal = async () => {
             </div>
         `;
 
+        document.getElementById('sqHistoryPerfSummary')?.remove();
         const summaryEl = document.createElement('div');
+        summaryEl.id = 'sqHistoryPerfSummary';
         summaryEl.innerHTML = summaryHtml;
         listEl.parentNode.insertBefore(summaryEl, listEl);
 
@@ -1568,7 +2014,7 @@ window.quizDeleteSelected = async () => {
     }
 
     try {
-        const res = await fetch('/api/quizzes/' + quizId, { method: 'DELETE' });
+        const res = await fetch('/api/quizzes/' + quizId, { method: 'DELETE', headers: _authHeaders() });
         if (res.ok) {
             showToast('Success', 'Quiz deleted successfully.');
             // Refresh the faculty list
@@ -1582,4 +2028,381 @@ window.quizDeleteSelected = async () => {
         console.error('Delete quiz error:', e);
         showToast('Error', 'Network error while deleting quiz.');
     }
+};
+
+// ============================================================================
+// FACULTY QUIZ VOICE ASSISTANT (English, Tamil, Tanglish + Enable / Disable)
+// ============================================================================
+let _voiceEnabled = localStorage.getItem('sece_quiz_voice_enabled') !== 'false';
+let _voiceMode = localStorage.getItem('sece_quiz_voice_lang') || 'en-US';
+let _voiceRecognition = null;
+let _voiceListening = false;
+
+window.quizToggleVoiceFeature = (enabled, silent = false) => {
+    _voiceEnabled = !!enabled;
+    localStorage.setItem('sece_quiz_voice_enabled', String(_voiceEnabled));
+    const bar = document.getElementById('fqVoiceBar');
+    const hint = document.getElementById('fqVoiceDisabledHint');
+    const langSel = document.getElementById('fqVoiceLang');
+
+    if (bar) bar.style.display = _voiceEnabled ? 'block' : 'none';
+    if (hint) hint.style.display = _voiceEnabled ? 'none' : 'block';
+    if (langSel) langSel.value = _voiceMode;
+
+    if (!_voiceEnabled) {
+        quizStopVoiceListening();
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+    } else if (!silent) {
+        quizSpeakFeedback(_getVoiceLangMsg(
+            'Voice commands enabled. Say Explain for a walkthrough, or speak your quiz title and questions.',
+            'குரல் கட்டளைகள் இயக்கப்பட்டது. விளக்கு என்று கூறினால் விவரம் கேட்கலாம், அல்லது வினாடி வினா தலைப்பைக் கூறவும்.',
+            'Voice commands enable aagiduchu. Help venum na Explain pannu sollunga, illa na Title podu nu sollunga.'
+        ));
+    }
+};
+
+window.quizChangeVoiceLanguage = (mode) => {
+    _voiceMode = mode || 'en-US';
+    localStorage.setItem('sece_quiz_voice_lang', _voiceMode);
+    if (_voiceListening) {
+        quizStopVoiceListening();
+        setTimeout(() => quizToggleVoiceListening(), 200);
+    }
+    const label = _voiceMode === 'ta-IN' ? 'தமிழ் (Tamil)' : (_voiceMode === 'tanglish' ? 'Tanglish (Tamil + English)' : 'English');
+    _setVoiceStatus(`Speech recognition medium switched to ${label}.`);
+};
+
+function _getSpeechLocale() {
+    if (_voiceMode === 'ta-IN') return 'ta-IN';
+    if (_voiceMode === 'tanglish') return 'en-IN';
+    return 'en-US';
+}
+
+function _getVoiceLangMsg(enText, taText, tanglishText) {
+    if (_voiceMode === 'ta-IN') return taText;
+    if (_voiceMode === 'tanglish') return tanglishText || enText;
+    return enText;
+}
+
+function _setVoiceStatus(text) {
+    const el = document.getElementById('fqVoiceStatusText');
+    if (el) el.innerText = text;
+}
+
+window.quizSpeakFeedback = (text) => {
+    if (!_voiceEnabled || !window.speechSynthesis || !text) return;
+    try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = _voiceMode === 'ta-IN' ? 'ta-IN' : 'en-IN';
+        utter.rate = 0.98;
+        window.speechSynthesis.speak(utter);
+    } catch (_) {}
+};
+
+window.quizSpeakSystemGuide = () => {
+    const helpBox = document.getElementById('fqVoiceHelpBox');
+    if (helpBox) helpBox.classList.remove('d-none');
+
+    const guideText = _getVoiceLangMsg(
+        'Welcome to Quiz Studio. Step 1: Say Title followed by your quiz name, then say Section followed by class name like II CSE A. Step 2: Say Add Question, Question text, Option A to D, and Correct Answer, or switch to the AI Generator tab. Step 3: Say Publish Quiz to send the quiz directly to students in that class.',
+        'வணக்கம். படி 1: தலைப்பு என்று கூறி தேர்வு பெயரையும், வகுப்பு என்று கூறி வகுப்பையும் தேர்வு செய்யவும். படி 2: புதிய கேள்வி, கேள்வி, விடை அ முதல் ஈ வரை, மற்றும் சரியான விடை கூறவும், அல்லது ஏஐ தாவலைப் பயன்படுத்தவும். படி 3: வெளியிடு என்று கூறினால் மாணவர்களுக்கு தேர்வு உடனே வெளியிடப்படும்.',
+        'Vanakkam! Step 1: Title podu nu quiz name sollunga, appuram Class II CSE A maadhiri section select pannunga. Step 2: Pudhu question, Kelvi, Option A B C D, Correct answer sollunga, illa AI Generator use pannunga. Step 3: Publish pannu nu sonna udane students ku quiz publish aagidum.'
+    );
+    _setVoiceStatus('Playing step-by-step Quiz System guide...');
+    quizSpeakFeedback(guideText);
+};
+
+window.quizStopVoiceListening = () => {
+    _voiceListening = false;
+    if (_voiceRecognition) {
+        try { _voiceRecognition.onend = null; _voiceRecognition.stop(); } catch (_) {}
+        _voiceRecognition = null;
+    }
+    const btn = document.getElementById('fqVoiceMicBtn');
+    if (btn) {
+        btn.className = 'btn btn-sm btn-danger fw-bold px-3';
+        btn.innerHTML = '<i class="fa-solid fa-microphone me-1"></i> Start Listening';
+    }
+};
+
+window.quizToggleVoiceListening = () => {
+    if (!_voiceEnabled) {
+        alert('Please enable Voice Commands using the switch in the header first.');
+        return;
+    }
+    if (_voiceListening) {
+        quizStopVoiceListening();
+        _setVoiceStatus('Microphone paused.');
+        return;
+    }
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+        alert('Speech Recognition is not supported in this browser. Please use Chrome or Edge.');
+        return;
+    }
+
+    const rec = new SpeechRec();
+    rec.lang = _getSpeechLocale();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    _voiceRecognition = rec;
+    _voiceListening = true;
+
+    const btn = document.getElementById('fqVoiceMicBtn');
+    if (btn) {
+        btn.className = 'btn btn-sm btn-success fw-bold px-3 cc-mic-pulse';
+        btn.innerHTML = '<i class="fa-solid fa-microphone-lines me-1"></i> Listening (Click to Stop)';
+    }
+    _setVoiceStatus(`Listening (${_voiceMode === 'ta-IN' ? 'Tamil' : (_voiceMode === 'tanglish' ? 'Tanglish' : 'English')})... Speak a command!`);
+
+    rec.onresult = (event) => {
+        const res = event.results[event.results.length - 1];
+        const transcript = (res[0] && res[0].transcript ? res[0].transcript : '').trim();
+        if (!transcript) return;
+        if (!res.isFinal) {
+            _setVoiceStatus(`Hearing: "${transcript}"...`);
+        } else {
+            _setVoiceStatus(`Heard: "${transcript}"`);
+            _processFacultyVoiceCommand(transcript);
+        }
+    };
+
+    rec.onerror = (ev) => {
+        if (ev.error === 'not-allowed') {
+            _setVoiceStatus('Microphone permission blocked. Allow mic access in browser settings.');
+            quizStopVoiceListening();
+        } else if (ev.error !== 'no-speech') {
+            _setVoiceStatus(`Speech error (${ev.error}). Click Start Listening to retry.`);
+        }
+    };
+
+    rec.onend = () => {
+        if (_voiceListening && _voiceEnabled) {
+            try { rec.start(); } catch (_) { quizStopVoiceListening(); }
+        }
+    };
+
+    try {
+        rec.start();
+    } catch (err) {
+        quizStopVoiceListening();
+        _setVoiceStatus('Could not start microphone: ' + err.message);
+    }
+};
+
+function _getLastQuestionCard() {
+    const cards = document.querySelectorAll('#fqQuestionsWrap .cc-q-card');
+    if (cards.length === 0) {
+        quizAddQuestion();
+        return document.querySelector('#fqQuestionsWrap .cc-q-card');
+    }
+    return cards[cards.length - 1];
+}
+
+function _matchVoiceSectionOption(spoken) {
+    const sel = document.getElementById('fqSectionId');
+    if (!sel) return false;
+    const norm = String(spoken || '').toLowerCase()
+        .replace(/\b(two|second|2nd)\b/g, 'ii')
+        .replace(/\b(one|first|1st)\b/g, 'i')
+        .replace(/\b(three|third|3rd)\b/g, 'iii')
+        .replace(/\b(four|fourth|4th)\b/g, 'iv')
+        .replace(/\b(see|sea)\b/g, 'c')
+        .replace(/\b(bee|be)\b/g, 'b')
+        .replace(/\b(eh|hey)\b/g, 'a')
+        .replace(/[^a-z0-9]/g, '');
+
+    let bestOpt = null;
+    for (const opt of sel.options) {
+        if (!opt.value) continue;
+        const optNorm = opt.text.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (optNorm === norm || optNorm.includes(norm) || norm.includes(optNorm)) {
+            bestOpt = opt;
+            break;
+        }
+    }
+    if (bestOpt) {
+        sel.value = bestOpt.value;
+        sel.dispatchEvent(new Event('change'));
+        return bestOpt.text;
+    }
+    return null;
+}
+
+window._processFacultyVoiceCommand = (rawTranscript) => {
+    const raw = String(rawTranscript || '').trim();
+    const low = raw.toLowerCase();
+
+    // 1. Stop microphone
+    if (/(stop listening|mic off|stop mic|நிறுத்து|stop pannu|voice stop)/i.test(low)) {
+        quizStopVoiceListening();
+        _setVoiceStatus('Stopped listening.');
+        return;
+    }
+
+    // 2. Help / Explain Quiz System
+    if (/(explain|how to|understand|help|விளக்கு|உதவி|எப்படி|புரியவில்லை|epdi|sollunga|puriyala)/i.test(low)) {
+        quizSpeakSystemGuide();
+        return;
+    }
+
+    // 3. Switch Tabs
+    if (/(open ai|ai tab|ai generator|ஏஐ|ai open)/i.test(low)) {
+        quizShowAiPrompt();
+        _setVoiceStatus('Switched to AI Generator tab.');
+        quizSpeakFeedback(_getVoiceLangMsg('Switched to AI Generator.', 'ஏஐ பகுதி திறக்கப்பட்டது.', 'AI Generator tab open aachu.'));
+        return;
+    }
+    if (/(analytics|results|class result|முடிவு|மதிப்பெண்|result kaatu)/i.test(low)) {
+        const resTab = document.querySelector('button[data-bs-target="#fqResultsTab"]');
+        if (resTab) new bootstrap.Tab(resTab).show();
+        quizLoadFacultyList();
+        _setVoiceStatus('Switched to Class Analytics tab.');
+        quizSpeakFeedback(_getVoiceLangMsg('Opened Class Analytics.', 'வகுப்பு முடிவுகள் திறக்கப்பட்டது.', 'Class Analytics open aachu.'));
+        return;
+    }
+    if (/(create tab|manual tab|உருவாக்கு|create quiz tab)/i.test(low)) {
+        const cTab = document.querySelector('button[data-bs-target="#fqCreateTab"]');
+        if (cTab) new bootstrap.Tab(cTab).show();
+        _setVoiceStatus('Switched to Create Quiz tab.');
+        return;
+    }
+
+    // 4. Generate AI Questions via voice
+    const aiMatch = raw.match(/(?:generate|ai generate|create)\s*(?:(\d+)\s*)?(?:questions?\s*(?:on|about|for)?\s*)?(.+)/i);
+    if (/(generate|create pannu)/i.test(low) && !/(question\b)/i.test(low) && aiMatch && aiMatch[2]) {
+        const count = aiMatch[1] ? parseInt(aiMatch[1], 10) : 5;
+        const topic = aiMatch[2].replace(/(questions?|pannu)$/i, '').trim();
+        if (topic) {
+            quizShowAiPrompt();
+            document.getElementById('aiTopic').value = topic;
+            document.getElementById('aiNumQ').value = Math.min(15, Math.max(1, count));
+            _setVoiceStatus(`Generating ${count} AI questions on "${topic}"...`);
+            quizSpeakFeedback(_getVoiceLangMsg(`Generating ${count} questions on ${topic}.`, `${topic} தலைப்பில் ${count} கேள்விகள் உருவாக்கப்படுகிறது.`, `${topic} topic la ${count} questions generate panren.`));
+            document.getElementById('aiGenForm').dispatchEvent(new Event('submit', { cancelable: true }));
+            return;
+        }
+    }
+
+    // 5. Publish / Save Quiz
+    if (/^(publish|publish quiz|save quiz|submit quiz|வெளியிடு|சேமி|publish pannu|save pannu|quiz publish)/i.test(low)) {
+        const form = document.getElementById('quizCreateForm');
+        if (form) {
+            _setVoiceStatus('Publishing quiz to selected section...');
+            form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+        return;
+    }
+
+    // 6. Add New Question Card
+    if (/(add question|new question|next question|புதிய கேள்வி|கேள்வி சேர்|pudhu question|question add|next kelvi)/i.test(low)) {
+        quizAddQuestion();
+        _setVoiceStatus(`Added Question Q${_questionCount}. Speak the question text.`);
+        quizSpeakFeedback(_getVoiceLangMsg(`Added question ${_questionCount}.`, `கேள்வி ${_questionCount} சேர்க்கப்பட்டது.`, `Question ${_questionCount} add aachu.`));
+        return;
+    }
+
+    // 7. Quiz Title (English, Tamil, Tanglish)
+    const titleM = raw.match(/(?:quiz title|title podu|title is|title set|title|தலைப்பு)\s*[:\-]?\s*(.+)/i);
+    if (titleM && titleM[1]) {
+        const val = titleM[1].trim();
+        document.getElementById('fqTitle').value = val;
+        _setVoiceStatus(`Quiz title set: "${val}"`);
+        quizSpeakFeedback(_getVoiceLangMsg(`Title set to ${val}.`, `தலைப்பு ${val} என அமைக்கப்பட்டது.`, `Title ${val} nu set panniyachu.`));
+        return;
+    }
+
+    // 8. Select Class Section
+    const secM = raw.match(/(?:select section|section select pannu|section|class|வகுப்பு)\s*[:\-]?\s*(.+)/i);
+    if (secM && secM[1]) {
+        const matched = _matchVoiceSectionOption(secM[1]);
+        if (matched) {
+            _setVoiceStatus(`Selected section: ${matched}`);
+            quizSpeakFeedback(_getVoiceLangMsg(`Selected ${matched}.`, `${matched} வகுப்பு தேர்வு செய்யப்பட்டது.`, `${matched} select panniyachu.`));
+        } else {
+            _setVoiceStatus(`Could not match section "${secM[1]}". Please pick from dropdown.`);
+        }
+        return;
+    }
+
+    // 9. Subject & Topic
+    const subM = raw.match(/(?:subject podu|subject is|subject|பாடம்)\s*[:\-]?\s*(.+)/i);
+    if (subM && subM[1]) {
+        document.getElementById('fqSubject').value = subM[1].trim();
+        _setVoiceStatus(`Subject set: "${subM[1].trim()}"`);
+        return;
+    }
+    const topM = raw.match(/(?:topic podu|topic is|topic|பாடப்பொருள்)\s*[:\-]?\s*(.+)/i);
+    if (topM && topM[1]) {
+        document.getElementById('fqTopic').value = topM[1].trim();
+        _setVoiceStatus(`Topic set: "${topM[1].trim()}"`);
+        return;
+    }
+
+    // 10. Duration / Pass %
+    const durM = raw.match(/(?:duration|time|minutes|நேரம்)\s*(\d+)/i);
+    if (durM && durM[1]) {
+        document.getElementById('fqDuration').value = durM[1];
+        _setVoiceStatus(`Duration set to ${durM[1]} minutes.`);
+        return;
+    }
+    const passM = raw.match(/(?:pass mark|pass percent|pass|தேர்ச்சி)\s*(\d+)/i);
+    if (passM && passM[1]) {
+        document.getElementById('fqPassPercent').value = passM[1];
+        _setVoiceStatus(`Pass percentage set to ${passM[1]}%.`);
+        return;
+    }
+
+    // 11. MCQ Options A / B / C / D (English, Tamil அ/ஆ/இ/ஈ, Tanglish)
+    const optM = raw.match(/(?:option|choice|விடை)\s*(a|b|c|d|1|2|3|4|அ|ஆ|இ|ஈ)\s*(?:podu|is|:)?\s*(.+)/i);
+    if (optM && optM[2]) {
+        const keyMap = { 'a': 0, '1': 0, 'அ': 0, 'b': 1, '2': 1, 'ஆ': 1, 'c': 2, '3': 2, 'இ': 2, 'd': 3, '4': 3, 'ஈ': 3 };
+        const idx = keyMap[optM[1].toLowerCase()];
+        if (idx !== undefined) {
+            const card = _getLastQuestionCard();
+            const inp = card?.querySelector(`.q-opt[data-opt="${idx}"]`);
+            if (inp) {
+                inp.value = optM[2].trim();
+                _setVoiceStatus(`Filled Option ${['A', 'B', 'C', 'D'][idx]}: "${optM[2].trim()}"`);
+            }
+            return;
+        }
+    }
+
+    // 12. Correct Answer
+    const ansM = raw.match(/(?:correct answer|answer podu|answer is|answer|சரியான விடை|பதில்|badhil)\s*[:\-]?\s*(.+)/i);
+    if (ansM && ansM[1]) {
+        const card = _getLastQuestionCard();
+        let val = ansM[1].trim();
+        const optRef = val.match(/^(?:option\s*)?(a|b|c|d|அ|ஆ|இ|ஈ)$/i);
+        if (optRef) {
+            const idx = { 'a': 0, 'அ': 0, 'b': 1, 'ஆ': 1, 'c': 2, 'இ': 2, 'd': 3, 'ஈ': 3 }[optRef[1].toLowerCase()];
+            const optText = card?.querySelector(`.q-opt[data-opt="${idx}"]`)?.value.trim();
+            if (optText) val = optText;
+        }
+        const ansInp = card?.querySelector('.q-answer');
+        if (ansInp) {
+            ansInp.value = val;
+            _setVoiceStatus(`Correct answer set: "${val}"`);
+        }
+        return;
+    }
+
+    // 13. Question Text
+    const qM = raw.match(/(?:question text|question podu|question sollunga|question|kelvi|கேள்வி)\s*[:\-]?\s*(.+)/i);
+    if (qM && qM[1]) {
+        const card = _getLastQuestionCard();
+        const qInp = card?.querySelector('.q-text');
+        if (qInp) {
+            qInp.value = qM[1].trim();
+            _setVoiceStatus(`Question filled: "${qM[1].trim()}"`);
+        }
+        return;
+    }
+
+    _setVoiceStatus(`Heard "${raw}" — try saying "Title ...", "Question ...", "Option A ...", or "Explain".`);
 };

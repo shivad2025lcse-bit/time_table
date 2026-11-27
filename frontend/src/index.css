@@ -421,15 +421,145 @@
             backdrop-filter: blur(10px);
         }
 
-        /* Print Styles */
+        /* Print Styles: print ONLY the timetable (no navbar, sidebar, banners, or buttons) */
+        @page {
+            size: landscape;
+            margin: 8mm;
+        }
         @media print {
-            body { background: white; color: black; }
-            .no-print { display: none !important; }
-            .glass-panel { border: 1px solid #ccc; box-shadow: none; background: white; }
-            .tt-table td { background: #f8fafc !important; color: black !important; border: 1px solid #cbd5e1 !important; }
-            .tt-table th { background: #e2e8f0 !important; color: black !important; }
-            .slot-badge { color: black !important; }
-            .slot-subtext { color: #475569 !important; }
+            html, body {
+                background: #ffffff !important;
+                color: #0f172a !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                height: auto !important;
+                overflow: visible !important;
+            }
+            .no-print,
+            header.inst-header,
+            .inst-header,
+            #announcementTickerContainer,
+            aside.app-sidebar,
+            .app-sidebar.d-flex,
+            div.sidebar-overlay,
+            .sidebar-overlay.open-mobile,
+            #roleBanner,
+            #notifStatusPanel,
+            #adminTTPlaceholder,
+            #studentDynamicDashboard,
+            #studentUpcomingClassAlert,
+            #facultyNextClassAlert,
+            #facultyAdminTtChangeBanner,
+            #adminControlPanelContainer,
+            #studentClassDocsArea,
+            #studentFacultyAvailabilityArea,
+            #referenceTableArea,
+            #closeTtPopupBtn,
+            #ttEffectiveDateBadge,
+            #ttTitleEditIcon,
+            .toast-container,
+            .modal-backdrop,
+            .dropdown-menu,
+            .modal:not(.print-modal-active),
+            #timetableCaptureArea .panel-header .d-flex.flex-wrap.align-items-center,
+            #facultyPersonalTTArea .panel-header button {
+                display: none !important;
+            }
+            .app-layout {
+                display: block !important;
+                min-height: auto !important;
+            }
+            .app-main {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .tt-popup-wrapper {
+                position: static !important;
+                inset: auto !important;
+                width: 100% !important;
+                height: auto !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: #ffffff !important;
+                overflow: visible !important;
+            }
+            .glass-panel,
+            #timetableCaptureArea,
+            #facultyPersonalTTArea {
+                border: 1px solid #94a3b8 !important;
+                box-shadow: none !important;
+                background: #ffffff !important;
+                color: #0f172a !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+            .panel-header {
+                background: #f1f5f9 !important;
+                color: #0f172a !important;
+                border-bottom: 1px solid #94a3b8 !important;
+                padding: 8px 12px !important;
+            }
+            .panel-title,
+            .panel-title span {
+                color: #0f172a !important;
+            }
+            .table-responsive,
+            .tt-table-wrapper {
+                overflow: visible !important;
+            }
+            .tt-table,
+            #facultyPersonalTTPanel table {
+                width: 100% !important;
+                background: #ffffff !important;
+                color: #0f172a !important;
+                border-color: #94a3b8 !important;
+                font-size: 11px !important;
+            }
+            .tt-table th,
+            #facultyPersonalTTPanel table th {
+                background: #e2e8f0 !important;
+                color: #0f172a !important;
+                border: 1px solid #94a3b8 !important;
+            }
+            .tt-table td,
+            #facultyPersonalTTPanel table td {
+                background: #ffffff !important;
+                color: #0f172a !important;
+                border: 1px solid #cbd5e1 !important;
+            }
+            #facultyPersonalTTPanel td *,
+            #timetableCaptureArea td *,
+            .slot-badge {
+                color: #0f172a !important;
+            }
+            .slot-subtext { color: #334155 !important; }
+            body.printing-modal-tt #applicationShell {
+                display: none !important;
+            }
+            .modal.print-modal-active {
+                display: block !important;
+                position: static !important;
+                overflow: visible !important;
+            }
+            .modal.print-modal-active .modal-dialog {
+                max-width: 100% !important;
+                margin: 0 !important;
+            }
+            .modal.print-modal-active .modal-content {
+                background: #ffffff !important;
+                color: #0f172a !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            .modal.print-modal-active .modal-footer,
+            .modal.print-modal-active .btn-close {
+                display: none !important;
+            }
         }
 
         .admin-resource-chip { font-size: .75rem; }
@@ -480,6 +610,13 @@
         .password-wrap .toggle-password {
             position:absolute; right:10px; top:50%; transform:translateY(-50%);
             border:0; background:transparent; color:#94a3b8; cursor:pointer;
+        }
+        #loginScreen input.form-control:-webkit-autofill,
+        #loginScreen input.form-control:-webkit-autofill:hover,
+        #loginScreen input.form-control:-webkit-autofill:focus {
+            -webkit-text-fill-color: #f8fafc !important;
+            -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+            transition: background-color 5000s ease-in-out 0s;
         }
         @media(max-width:800px) {
             .login-role-grid { grid-template-columns:1fr; }

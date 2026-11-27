@@ -1,19 +1,19 @@
 package com.smarttimetable.controller;
 
 import com.smarttimetable.entity.*;
+import com.smarttimetable.repository.TeacherRepository;
+import com.smarttimetable.repository.UserRepository;
+import com.smarttimetable.service.EmailNotificationService;
 import com.smarttimetable.service.TimetableOperationsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/operations")
@@ -22,6 +22,51 @@ public class TimetableOperationsController {
 
         @Autowired
         private TimetableOperationsService service;
+
+        @Autowired
+        private UserRepository userRepository;
+
+        @Autowired
+        private TeacherRepository teacherRepository;
+
+        @Autowired
+        private EmailNotificationService emailNotificationService;
+
+        private Teacher resolveFacultyActor(Authentication authentication) {
+                if (authentication == null)
+                        return null;
+                User u = userRepository.findByUsernameIgnoreCase(authentication.getName()).orElse(null);
+                if (u == null || u.getRole() != Role.ROLE_FACULTY)
+                        return null;
+                return teacherRepository.findByUserId(u.getId()).orElse(null);
+        }
+
+        private boolean isFacultyRoleOnly(Authentication authentication) {
+                if (authentication == null)
+                        return false;
+                boolean hasFac = authentication.getAuthorities().stream()
+                                .anyMatch(a -> "ROLE_FACULTY".equals(a.getAuthority()));
+                boolean hasAdm = authentication.getAuthorities().stream()
+                                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+                return hasFac && !hasAdm;
+        }
+
+        private boolean matchesTeacher(Teacher self, String candidateName) {
+                if (self == null || candidateName == null || candidateName.isBlank())
+                        return false;
+                String normCand = candidateName.trim().toLowerCase().replaceAll("\\s+", " ");
+                String full = (((self.getFirstName() != null ? self.getFirstName() : "") + " " +
+                                (self.getLastName() != null ? self.getLastName() : "")).trim()).toLowerCase()
+                                .replaceAll("\\s+", " ");
+                String disp = (self.getDisplayName() != null
+                                ? self.getDisplayName().trim().toLowerCase().replaceAll("\\s+", " ")
+                                : "");
+                if (!full.isEmpty() && (normCand.equals(full) || normCand.contains(full) || full.contains(normCand)))
+                        return true;
+                if (!disp.isEmpty() && (normCand.equals(disp) || normCand.contains(disp) || disp.contains(normCand)))
+                        return true;
+                return self.getEmployeeId() != null && normCand.equalsIgnoreCase(self.getEmployeeId().trim());
+        }
 
         // Overrides
         @GetMapping("/overrides")
@@ -51,8 +96,16 @@ public class TimetableOperationsController {
         }
 
         @PostMapping("/substitutions")
-        public Substitution saveSubstitution(@RequestBody Substitution sub) {
-                return service.saveSubstitution(sub);
+        public ResponseEntity<?> saveSubstitution(@RequestBody Substitution sub, Authentication authentication) {
+                if (isFacultyRoleOnly(authentication)) {
+                        Teacher self = resolveFacultyActor(authentication);
+                        if (self == null || !matchesTeacher(self, sub.getOriginalFaculty())) {
+                                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                                .body(Map.of("error",
+                                                                "Faculty can only arrange substitution for their own periods."));
+                        }
+                }
+                return ResponseEntity.ok(service.saveSubstitution(sub));
         }
 
         @DeleteMapping("/substitutions/{id}")
@@ -115,8 +168,20 @@ public class TimetableOperationsController {
         }
 
         @PostMapping("/period-notifications")
-        public PeriodNotification savePeriodNotification(@RequestBody PeriodNotification notif) {
-                return service.savePeriodNotification(notif);
+        public ResponseEntity<?> savePeriodNotification(@RequestBody PeriodNotification notif,
+                        Authentication authentication) {
+                if (isFacultyRoleOnly(authentication)) {
+                        String src = notif.getSource() != null ? notif.getSource().trim().toLowerCase() : "";
+                        if ("leave".equals(src) || "substitution".equals(src)) {
+                                Teacher self = resolveFacultyActor(authentication);
+                                if (self == null || !matchesTeacher(self, notif.getOriginalFaculty())) {
+                                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                                        .body(Map.of("error",
+                                                                        "Faculty can only notify leave or substitution for their own periods."));
+                                }
+                        }
+                }
+                return ResponseEntity.ok(service.savePeriodNotification(notif));
         }
 
         @DeleteMapping("/period-notifications/{id}")
@@ -162,8 +227,51 @@ public class TimetableOperationsController {
                                 "updatedAt", saved.getUpdatedAt() != null ? saved.getUpdatedAt().toString() : ""));
         }
 
-    @GetMapping("/tt-suggestions")
-    public ResponseEntity<java.util.Map<String, Object>> getLiveSuggestions() {
-        return ResponseEntity.ok(service.getLiveSuggestions());
-    }
+        @GetMapping("/tt-suggestions")
+        public ResponseEntity<java.util.Map<String, Object>> getLiveSuggestions() {
+                return ResponseEntity.ok(service.getLiveSuggestions());
+        }
+
+        @PostMapping("/notify-class-leave-or-sub")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+        public ResponseEntity<?> notifyClassLeaveOrSub(
+                        @RequestBody Map<String, Object> payload,
+                        Authentication authentication) {
+                String eventType = payload.get("eventType") != null ? payload.get("eventType").toString().trim()
+                                : "ABSENT";
+                String sectionName = payload.get("sectionName") != null ? payload.get("sectionName").toString().trim()
+                                : "";
+                String dateStr = payload.get("date") != null ? payload.get("date").toString().trim() : "";
+                String dayName = payload.get("day") != null ? payload.get("day").toString().trim() : "";
+                Integer periodNumber = payload.get("periodNumber") != null
+                                ? Integer.valueOf(payload.get("periodNumber").toString())
+                                : null;
+                String subject = payload.get("subject") != null ? payload.get("subject").toString().trim() : "";
+                String venue = payload.get("venue") != null ? payload.get("venue").toString().trim() : "";
+                String originalFaculty = payload.get("originalFaculty") != null
+                                ? payload.get("originalFaculty").toString().trim()
+                                : "";
+                String substituteFaculty = payload.get("substituteFaculty") != null
+                                ? payload.get("substituteFaculty").toString().trim()
+                                : "";
+                String reason = payload.get("reason") != null ? payload.get("reason").toString().trim() : "";
+
+                if (isFacultyRoleOnly(authentication)) {
+                        Teacher self = resolveFacultyActor(authentication);
+                        if (self == null || !matchesTeacher(self, originalFaculty)) {
+                                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                                .body(Map.of("error",
+                                                                "Faculty can only notify leave or substitution for their own periods."));
+                        }
+                }
+                if (sectionName.isEmpty()) {
+                        return ResponseEntity.badRequest().body(Map.of("error",
+                                        "sectionName is required so only that class's students are notified."));
+                }
+
+                Map<String, Object> result = emailNotificationService.dispatchClassLeaveOrSubstitutionEmails(
+                                eventType, sectionName, dateStr, dayName, periodNumber, subject, venue, originalFaculty,
+                                substituteFaculty, reason);
+                return ResponseEntity.ok(result);
+        }
 }

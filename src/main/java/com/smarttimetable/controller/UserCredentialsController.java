@@ -70,7 +70,9 @@ public class UserCredentialsController {
             return ResponseEntity.badRequest().body(Map.of("error", "Username and new password are required"));
         }
         
-        Optional<User> userOpt = userRepository.findByUsername(username);
+        String cleanUser = username.trim();
+        Optional<User> userOpt = userRepository.findByUsername(cleanUser)
+                .or(() -> userRepository.findByUsernameIgnoreCase(cleanUser));
         if (userOpt.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
         }

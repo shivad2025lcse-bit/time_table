@@ -69,13 +69,24 @@ public class AuthService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    private User findUserByUsernameFlexible(String rawUsername) {
+        String lookup = rawUsername != null ? rawUsername.trim() : "";
+        return userRepository.findByUsername(lookup)
+                .or(() -> userRepository.findByUsernameIgnoreCase(lookup))
+                .orElse(null);
+    }
+
     public LoginResponse login(LoginRequest loginRequest) {
+        User user = findUserByUsernameFlexible(loginRequest.getUsername());
+        if (user == null) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid username or password.");
+        }
+
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
+                new UsernamePasswordAuthenticationToken(user.getUsername(), loginRequest.getPassword())
         );
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.getUsername());
-        User user = userRepository.findByUsername(loginRequest.getUsername()).orElseThrow();
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
 
         String token = jwtUtil.generateToken(userDetails, user.getRole().name());
 
@@ -94,8 +105,10 @@ public class AuthService {
     }
 
     public Map<String, Object> resetPassword(String username, String email, String newPassword) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
+        User user = findUserByUsernameFlexible(username);
+        if (user == null) {
+            throw new RuntimeException("User not found with username: " + username);
+        }
 
         if (!user.getEmail().equalsIgnoreCase(email.trim())) {
             throw new RuntimeException("Email address does not match account record.");
@@ -107,12 +120,14 @@ public class AuthService {
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "SUCCESS");
-        response.put("message", "Password reset successfully for " + username + "! You can now log in with your new password.");
+        response.put("message", "Password reset successfully for " + user.getUsername() + "! You can now log in with your new password.");
         return response;
     }
     public Map<String, Object> changePassword(String username, String currentPassword, String newPassword) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found."));
+        User user = findUserByUsernameFlexible(username);
+        if (user == null) {
+            throw new RuntimeException("User not found.");
+        }
 
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw new RuntimeException("Current password is incorrect.");

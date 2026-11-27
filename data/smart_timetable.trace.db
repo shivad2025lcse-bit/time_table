@@ -546,3 +546,59 @@ Caused by: org.h2.mvstore.MVStoreException: The file is locked: D:/Java_project/
 	at org.h2.mvstore.SingleFileStore.open(SingleFileStore.java:81)
 	at org.h2.mvstore.MVStore.<init>(MVStore.java:286)
 	... 143 more
+2026-11-26 11:40:37.940553+05:30 jdbc[23]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "SELECT * FROM academic_years class_documents [*]classrooms academic_years"; SQL statement:
+SELECT * FROM academic_years class_documents classrooms academic_years [42000-224]
+2026-11-26 11:53:26.473384+05:30 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "academic_sections" not found; SQL statement:
+UPDATE academic_sections SET semester = 3 WHERE section_name = 'II CSE C' [42102-224]
+2026-11-26 11:53:26.542899+05:30 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Column "code" not found; SQL statement:
+DELETE FROM subjects WHERE code LIKE 'SEM4_%' [42122-224]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:514)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.expression.ExpressionColumn.getColumnException(ExpressionColumn.java:244)
+	at org.h2.expression.ExpressionColumn.optimizeOther(ExpressionColumn.java:226)
+	at org.h2.expression.ExpressionColumn.optimize(ExpressionColumn.java:213)
+	at org.h2.expression.condition.CompareLike.optimize(CompareLike.java:149)
+	at org.h2.expression.Expression.optimizeCondition(Expression.java:148)
+	at org.h2.command.dml.Delete.doPrepare(Delete.java:112)
+	at org.h2.command.dml.DataChangeStatement.prepare(DataChangeStatement.java:37)
+	at org.h2.command.Parser.prepareCommand(Parser.java:489)
+	at org.h2.engine.SessionLocal.prepareLocal(SessionLocal.java:639)
+	at org.h2.engine.SessionLocal.prepareCommand(SessionLocal.java:559)
+	at org.h2.jdbc.JdbcConnection.prepareCommand(JdbcConnection.java:1166)
+	at org.h2.jdbc.JdbcStatement.executeInternal(JdbcStatement.java:245)
+	at org.h2.jdbc.JdbcStatement.execute(JdbcStatement.java:231)
+	at org.h2.tools.Shell.execute(Shell.java:474)
+	at org.h2.tools.Shell.promptLoop(Shell.java:294)
+	at org.h2.tools.Shell.runTool(Shell.java:150)
+	at org.h2.tools.Shell.main(Shell.java:80)
+2026-11-26 11:53:26.557495+05:30 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "academic_sections" not found; SQL statement:
+SELECT id, section_name, semester FROM academic_sections WHERE section_name = 'II CSE C' [42102-224]
+2026-11-26 11:53:39.148554+05:30 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Column "username" not found; SQL statement:
+SELECT id, username, semester FROM students WHERE username IN ('studenta', 'studentb') [42122-224]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:514)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.expression.ExpressionColumn.getColumnException(ExpressionColumn.java:244)
+	at org.h2.expression.ExpressionColumn.optimizeOther(ExpressionColumn.java:226)
+	at org.h2.expression.ExpressionColumn.optimize(ExpressionColumn.java:213)
+	at org.h2.command.query.Select.optimizeExpressionsAndPreserveAliases(Select.java:1285)
+	at org.h2.command.query.Select.prepareExpressions(Select.java:1167)
+	at org.h2.command.query.Query.prepare(Query.java:218)
+	at org.h2.command.Parser.prepareCommand(Parser.java:489)
+	at org.h2.engine.SessionLocal.prepareLocal(SessionLocal.java:639)
+	at org.h2.engine.SessionLocal.prepareCommand(SessionLocal.java:559)
+	at org.h2.jdbc.JdbcConnection.prepareCommand(JdbcConnection.java:1166)
+	at org.h2.jdbc.JdbcStatement.executeInternal(JdbcStatement.java:245)
+	at org.h2.jdbc.JdbcStatement.execute(JdbcStatement.java:231)
+	at org.h2.tools.Shell.execute(Shell.java:474)
+	at org.h2.tools.Shell.promptLoop(Shell.java:294)
+	at org.h2.tools.Shell.runTool(Shell.java:150)
+	at org.h2.tools.Shell.main(Shell.java:80)

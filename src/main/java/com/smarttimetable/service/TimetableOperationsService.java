@@ -12,51 +12,116 @@ import java.util.*;
 @Service
 public class TimetableOperationsService {
 
-    @Autowired private TimetableOverrideRepository overrideRepo;
-    @Autowired private SubstitutionRepository substitutionRepo;
-    @Autowired private CoverageRequestRepository coverageRepo;
-    @Autowired private CustomSubjectRepository subjectRepo;
-    @Autowired private CustomVenueRepository venueRepo;
-    @Autowired private PeriodNotificationRepository notificationRepo;
-    @Autowired private FacultyTimetableRepository facultyTimetableRepo;
-    @Autowired private SubjectRepository coreSubjectRepo;
-    @Autowired private TeacherRepository teacherRepo;
-    @Autowired private ClassroomRepository classroomRepo;
-    @Autowired private LaboratoryRepository laboratoryRepo;
-    @Autowired private DepartmentRepository departmentRepo;
-    @Autowired private SectionRepository sectionRepo;
-    @Autowired private TimetableRepository timetableRepo;
+    @Autowired
+    private TimetableOverrideRepository overrideRepo;
+    @Autowired
+    private SubstitutionRepository substitutionRepo;
+    @Autowired
+    private CoverageRequestRepository coverageRepo;
+    @Autowired
+    private CustomSubjectRepository subjectRepo;
+    @Autowired
+    private CustomVenueRepository venueRepo;
+    @Autowired
+    private PeriodNotificationRepository notificationRepo;
+    @Autowired
+    private FacultyTimetableRepository facultyTimetableRepo;
+    @Autowired
+    private SubjectRepository coreSubjectRepo;
+    @Autowired
+    private TeacherRepository teacherRepo;
+    @Autowired
+    private ClassroomRepository classroomRepo;
+    @Autowired
+    private LaboratoryRepository laboratoryRepo;
+    @Autowired
+    private DepartmentRepository departmentRepo;
+    @Autowired
+    private SectionRepository sectionRepo;
+    @Autowired
+    private TimetableRepository timetableRepo;
 
     // Overrides
-    public List<TimetableOverride> getAllOverrides() { return overrideRepo.findAll(); }
-    public TimetableOverride saveOverride(TimetableOverride override) { return overrideRepo.save(override); }
-    public void deleteOverride(Long id) { overrideRepo.deleteById(id); }
-    public void deleteAllOverrides() { overrideRepo.deleteAll(); }
+    public List<TimetableOverride> getAllOverrides() {
+        return overrideRepo.findAll();
+    }
+
+    public TimetableOverride saveOverride(TimetableOverride override) {
+        return overrideRepo.save(override);
+    }
+
+    public void deleteOverride(Long id) {
+        overrideRepo.deleteById(id);
+    }
+
+    public void deleteAllOverrides() {
+        overrideRepo.deleteAll();
+    }
 
     // Substitutions
-    public List<Substitution> getAllSubstitutions() { return substitutionRepo.findAll(); }
-    public Substitution saveSubstitution(Substitution sub) { return substitutionRepo.save(sub); }
-    public void deleteSubstitution(Long id) { substitutionRepo.deleteById(id); }
+    public List<Substitution> getAllSubstitutions() {
+        return substitutionRepo.findAll();
+    }
+
+    public Substitution saveSubstitution(Substitution sub) {
+        return substitutionRepo.save(sub);
+    }
+
+    public void deleteSubstitution(Long id) {
+        substitutionRepo.deleteById(id);
+    }
 
     // Coverage Requests
-    public List<CoverageRequest> getAllCoverageRequests() { return coverageRepo.findAll(); }
-    public CoverageRequest saveCoverageRequest(CoverageRequest req) { return coverageRepo.save(req); }
-    public void deleteCoverageRequest(Long id) { coverageRepo.deleteById(id); }
+    public List<CoverageRequest> getAllCoverageRequests() {
+        return coverageRepo.findAll();
+    }
+
+    public CoverageRequest saveCoverageRequest(CoverageRequest req) {
+        return coverageRepo.save(req);
+    }
+
+    public void deleteCoverageRequest(Long id) {
+        coverageRepo.deleteById(id);
+    }
 
     // Custom Subjects
-    public List<CustomSubject> getAllCustomSubjects() { return subjectRepo.findAll(); }
-    public CustomSubject saveCustomSubject(CustomSubject sub) { return subjectRepo.save(sub); }
-    public void deleteCustomSubject(Long id) { subjectRepo.deleteById(id); }
+    public List<CustomSubject> getAllCustomSubjects() {
+        return subjectRepo.findAll();
+    }
+
+    public CustomSubject saveCustomSubject(CustomSubject sub) {
+        return subjectRepo.save(sub);
+    }
+
+    public void deleteCustomSubject(Long id) {
+        subjectRepo.deleteById(id);
+    }
 
     // Custom Venues
-    public List<CustomVenue> getAllCustomVenues() { return venueRepo.findAll(); }
-    public CustomVenue saveCustomVenue(CustomVenue venue) { return venueRepo.save(venue); }
-    public void deleteCustomVenue(Long id) { venueRepo.deleteById(id); }
+    public List<CustomVenue> getAllCustomVenues() {
+        return venueRepo.findAll();
+    }
+
+    public CustomVenue saveCustomVenue(CustomVenue venue) {
+        return venueRepo.save(venue);
+    }
+
+    public void deleteCustomVenue(Long id) {
+        venueRepo.deleteById(id);
+    }
 
     // Period Notifications
-    public List<PeriodNotification> getAllPeriodNotifications() { return notificationRepo.findAll(); }
-    public PeriodNotification savePeriodNotification(PeriodNotification notif) { return notificationRepo.save(notif); }
-    public void deletePeriodNotification(Long id) { notificationRepo.deleteById(id); }
+    public List<PeriodNotification> getAllPeriodNotifications() {
+        return notificationRepo.findAll();
+    }
+
+    public PeriodNotification savePeriodNotification(PeriodNotification notif) {
+        return notificationRepo.save(notif);
+    }
+
+    public void deletePeriodNotification(Long id) {
+        notificationRepo.deleteById(id);
+    }
 
     // Faculty Personal Timetables
     public java.util.Optional<FacultyTimetable> getFacultyTimetable(String username) {
@@ -75,7 +140,7 @@ public class TimetableOperationsService {
     }
 
     private String toRomanYear(Section section, String[] tokens) {
-        String[] romans = {"", "I", "II", "III", "IV"};
+        String[] romans = { "", "I", "II", "III", "IV" };
         if (section.getYear() != null && section.getYear() >= 1 && section.getYear() <= 4) {
             return romans[section.getYear()];
         }
@@ -88,10 +153,13 @@ public class TimetableOperationsService {
         return "II";
     }
 
-    private void addVenueIfPresent(Map<String, Map<String, Object>> venues, String rawName, String building, String type) {
-        if (rawName == null) return;
+    private void addVenueIfPresent(Map<String, Map<String, Object>> venues, String rawName, String building,
+            String type) {
+        if (rawName == null)
+            return;
         String clean = rawName.trim();
-        if (clean.isEmpty() || clean.equals("-") || clean.equalsIgnoreCase("TBA") || clean.equalsIgnoreCase("FREE")) return;
+        if (clean.isEmpty() || clean.equals("-") || clean.equalsIgnoreCase("TBA") || clean.equalsIgnoreCase("FREE"))
+            return;
         String key = clean.toUpperCase();
         Map<String, Object> item = venues.computeIfAbsent(key, k -> {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -117,7 +185,8 @@ public class TimetableOperationsService {
         List<Map<String, Object>> sectionsList = new ArrayList<>();
 
         for (CustomSubject cs : subjectRepo.findAll()) {
-            String label = cs.getShortName() != null && !cs.getShortName().isBlank() ? cs.getShortName().trim() : (cs.getSubjectCode() != null ? cs.getSubjectCode().trim() : "");
+            String label = cs.getShortName() != null && !cs.getShortName().isBlank() ? cs.getShortName().trim()
+                    : (cs.getSubjectCode() != null ? cs.getSubjectCode().trim() : "");
             if (!label.isEmpty()) {
                 Map<String, Object> m = subjectMap.computeIfAbsent(label.toUpperCase(), k -> new LinkedHashMap<>());
                 m.put("label", label);
@@ -134,30 +203,40 @@ public class TimetableOperationsService {
             String rawLabel = (s.getSubjectName() != null && !s.getSubjectName().isBlank())
                     ? s.getSubjectName().trim()
                     : (s.getSubjectCode() != null ? s.getSubjectCode().trim() : "");
-            if (rawLabel.isEmpty() || rawLabel.equalsIgnoreCase("FREE")) continue;
-            String deptCode = (s.getDepartment() != null && s.getDepartment().getCode() != null) ? s.getDepartment().getCode().trim().toUpperCase() : "";
+            if (rawLabel.isEmpty() || rawLabel.equalsIgnoreCase("FREE"))
+                continue;
+            String deptCode = (s.getDepartment() != null && s.getDepartment().getCode() != null)
+                    ? s.getDepartment().getCode().trim().toUpperCase()
+                    : "";
             String facultyName = "";
             if (s.getAssignedTeacher() != null) {
                 Teacher t = s.getAssignedTeacher();
                 facultyName = (t.getDisplayName() != null && !t.getDisplayName().isBlank())
                         ? t.getDisplayName().trim()
-                        : ((t.getFirstName() != null ? t.getFirstName() : "") + " " + (t.getLastName() != null ? t.getLastName() : "")).trim();
+                        : ((t.getFirstName() != null ? t.getFirstName() : "") + " "
+                                + (t.getLastName() != null ? t.getLastName() : "")).trim();
             }
             Map<String, Object> m = subjectMap.computeIfAbsent(rawLabel.toUpperCase(), k -> new LinkedHashMap<>());
             m.putIfAbsent("label", rawLabel);
             m.put("code", s.getSubjectCode() != null ? s.getSubjectCode().trim() : m.getOrDefault("code", rawLabel));
             m.putIfAbsent("title", s.getSubjectName() != null ? s.getSubjectName().trim() : "");
-            if ("".equals(m.getOrDefault("faculty", "")) && !facultyName.isEmpty()) m.put("faculty", facultyName);
+            if ("".equals(m.getOrDefault("faculty", "")) && !facultyName.isEmpty())
+                m.put("faculty", facultyName);
             m.putIfAbsent("venue", "");
-            if ("".equals(m.getOrDefault("dept", "")) && !deptCode.isEmpty()) m.put("dept", deptCode);
+            if ("".equals(m.getOrDefault("dept", "")) && !deptCode.isEmpty())
+                m.put("dept", deptCode);
         }
 
         for (Teacher t : teacherRepo.findAll()) {
             String disp = (t.getDisplayName() != null && !t.getDisplayName().isBlank())
                     ? t.getDisplayName().trim()
-                    : ((t.getFirstName() != null ? t.getFirstName() : "") + " " + (t.getLastName() != null ? t.getLastName() : "")).trim();
-            if (disp.isEmpty()) continue;
-            String deptCode = (t.getDepartment() != null && t.getDepartment().getCode() != null) ? t.getDepartment().getCode().trim().toUpperCase() : "";
+                    : ((t.getFirstName() != null ? t.getFirstName() : "") + " "
+                            + (t.getLastName() != null ? t.getLastName() : "")).trim();
+            if (disp.isEmpty())
+                continue;
+            String deptCode = (t.getDepartment() != null && t.getDepartment().getCode() != null)
+                    ? t.getDepartment().getCode().trim().toUpperCase()
+                    : "";
             Map<String, Object> m = staffMap.computeIfAbsent(disp.toUpperCase(), k -> new LinkedHashMap<>());
             m.put("label", disp);
             m.put("employeeId", t.getEmployeeId() != null ? t.getEmployeeId().trim() : "");
@@ -166,10 +245,12 @@ public class TimetableOperationsService {
         }
 
         for (Classroom c : classroomRepo.findAll()) {
-            addVenueIfPresent(venueMap, c.getRoomNumber(), c.getBuilding(), c.getRoomType() != null ? c.getRoomType() : "THEORY");
+            addVenueIfPresent(venueMap, c.getRoomNumber(), c.getBuilding(),
+                    c.getRoomType() != null ? c.getRoomType() : "THEORY");
         }
         for (Laboratory l : laboratoryRepo.findAll()) {
-            addVenueIfPresent(venueMap, l.getLabName(), l.getBuilding(), l.getLabType() != null ? l.getLabType() : "LAB");
+            addVenueIfPresent(venueMap, l.getLabName(), l.getBuilding(),
+                    l.getLabType() != null ? l.getLabType() : "LAB");
         }
         for (CustomVenue cv : venueRepo.findAll()) {
             addVenueIfPresent(venueMap, cv.getName(), "", "Custom");
@@ -181,7 +262,8 @@ public class TimetableOperationsService {
                 Teacher t = entry.getTeacher();
                 fac = (t.getDisplayName() != null && !t.getDisplayName().isBlank())
                         ? t.getDisplayName().trim()
-                        : ((t.getFirstName() != null ? t.getFirstName() : "") + " " + (t.getLastName() != null ? t.getLastName() : "")).trim();
+                        : ((t.getFirstName() != null ? t.getFirstName() : "") + " "
+                                + (t.getLastName() != null ? t.getLastName() : "")).trim();
             }
             if (!fac.isEmpty() && !fac.equals("-") && !fac.equalsIgnoreCase("TBA")) {
                 final String facName = fac;
@@ -195,8 +277,10 @@ public class TimetableOperationsService {
                 });
             }
             String venue = entry.getAssignedVenue() != null ? entry.getAssignedVenue().trim() : "";
-            if (venue.isEmpty() && entry.getClassroom() != null) venue = entry.getClassroom().getRoomNumber();
-            if ((venue == null || venue.isEmpty()) && entry.getLaboratory() != null) venue = entry.getLaboratory().getLabName();
+            if (venue.isEmpty() && entry.getClassroom() != null)
+                venue = entry.getClassroom().getRoomNumber();
+            if ((venue == null || venue.isEmpty()) && entry.getLaboratory() != null)
+                venue = entry.getLaboratory().getLabName();
             addVenueIfPresent(venueMap, venue, "", "Assigned");
 
             if (entry.getSubject() != null && entry.getSubject().getSubjectName() != null) {
@@ -204,8 +288,11 @@ public class TimetableOperationsService {
                 if (!subLabel.isEmpty() && !subLabel.equalsIgnoreCase("FREE")) {
                     Map<String, Object> sm = subjectMap.get(subLabel.toUpperCase());
                     if (sm != null) {
-                        if ("".equals(sm.getOrDefault("faculty", "")) && !fac.isEmpty() && !"-".equals(fac)) sm.put("faculty", fac);
-                        if ("".equals(sm.getOrDefault("venue", "")) && venue != null && !venue.isEmpty() && !"TBA".equalsIgnoreCase(venue)) sm.put("venue", venue);
+                        if ("".equals(sm.getOrDefault("faculty", "")) && !fac.isEmpty() && !"-".equals(fac))
+                            sm.put("faculty", fac);
+                        if ("".equals(sm.getOrDefault("venue", "")) && venue != null && !venue.isEmpty()
+                                && !"TBA".equalsIgnoreCase(venue))
+                            sm.put("venue", venue);
                     }
                 }
             }
@@ -213,7 +300,8 @@ public class TimetableOperationsService {
 
         for (Department d : departmentRepo.findAll()) {
             String code = d.getCode() != null ? d.getCode().trim().toUpperCase() : "";
-            if (code.isEmpty()) continue;
+            if (code.isEmpty())
+                continue;
             Map<String, Object> m = deptMap.computeIfAbsent(code, k -> new LinkedHashMap<>());
             m.put("code", code);
             m.put("name", d.getName() != null ? d.getName().trim() : code);
@@ -222,17 +310,21 @@ public class TimetableOperationsService {
         Set<String> seenSecNames = new LinkedHashSet<>();
         for (Section s : sectionRepo.findAll()) {
             String secName = s.getSectionName() != null ? s.getSectionName().trim() : "";
-            if (secName.isEmpty() || secName.matches("^\\d+\\s+CSE\\s+II\\s+CSE.*")) continue;
-            if (!seenSecNames.add(secName.toUpperCase())) continue;
+            if (secName.isEmpty() || secName.matches("^\\d+\\s+CSE\\s+II\\s+CSE.*"))
+                continue;
+            if (!seenSecNames.add(secName.toUpperCase()))
+                continue;
 
             String[] tokens = secName.split("\\s+");
-            String dept = (s.getCourse() != null && s.getCourse().getDepartment() != null && s.getCourse().getDepartment().getCode() != null)
-                    ? s.getCourse().getDepartment().getCode().trim().toUpperCase()
-                    : (tokens.length >= 2 ? tokens[1].toUpperCase() : "CSE");
+            String dept = (s.getCourse() != null && s.getCourse().getDepartment() != null
+                    && s.getCourse().getDepartment().getCode() != null)
+                            ? s.getCourse().getDepartment().getCode().trim().toUpperCase()
+                            : (tokens.length >= 2 ? tokens[1].toUpperCase() : "CSE");
             String year = toRomanYear(s, tokens);
             String secCode = (s.getSectionIdentifier() != null && !s.getSectionIdentifier().isBlank())
                     ? s.getSectionIdentifier().trim().toUpperCase()
-                    : (tokens.length >= 3 ? String.join(" ", Arrays.copyOfRange(tokens, 2, tokens.length)).toUpperCase() : secName);
+                    : (tokens.length >= 3 ? String.join(" ", Arrays.copyOfRange(tokens, 2, tokens.length)).toUpperCase()
+                            : secName);
 
             deptMap.computeIfAbsent(dept, k -> {
                 Map<String, Object> m = new LinkedHashMap<>();
