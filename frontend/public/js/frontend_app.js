@@ -55,6 +55,22 @@ function isLowercaseAlnum(value) {
     return /^[a-z0-9]+$/.test(value);
 }
 
+async function readAuthResponse(response) {
+    const body = await response.text();
+    let result = {};
+    if (body) {
+        try {
+            result = JSON.parse(body);
+        } catch {
+            result = { message: body };
+        }
+    }
+    if (!response.ok) {
+        throw new Error(result.message || result.error || `Request failed with HTTP ${response.status}.`);
+    }
+    return result;
+}
+
 function getStoredPassword(username) {
     const clean = String(username || '').toLowerCase();
     if (clean === '25cs316') return 'shiv9293';
@@ -95,6 +111,7 @@ function usernameRuleText(role) {
     if (role === 'ADMIN') return `Admin username is fixed: "${ADMIN_USERNAME}". Initial password: "${ADMIN_INITIAL_PASSWORD}".`;
     if (role === 'FACULTY') return `Enter your generated username provided by the Administrator.`;
     if (role === 'STUDENT') return `Student username is your Register Number. Initial password is UPPERCASE First Name + last 4 digits of Mobile Number.`;
+    if (role === 'CLASS_ADVISOR') return 'Enter the Class Advisor username provided by the Administrator.';
     const config = AUTH_CONFIG[role];
     return `${role} username = "${config.prefix}" + first 4 letters of first name + last name initial + 012345. Example: ${config.example}.`;
 }
@@ -353,10 +370,54 @@ function handleAccountSettingsSubmit(e) {
 }
 
 function updateForgotPasswordHint() {
-    const role = document.getElementById('fpUserType').value;
-    const config = AUTH_CONFIG[role];
-    document.getElementById('fpIdentifier').placeholder = config.example;
-    document.getElementById('fpUsernameHint').innerText = usernameRuleText(role);
+    const role = document.getElementById('fpUserType')?.value || 'STUDENT';
+    const config = AUTH_CONFIG[role] || AUTH_CONFIG.FACULTY;
+    const identifier = document.getElementById('fpIdentifier');
+    const usernameHint = document.getElementById('fpUsernameHint');
+    const isAdmin = role === 'ADMIN';
+    const mobileGroup = document.getElementById('fpMobileGroup');
+    const adminEmailGroup = document.getElementById('fpAdminEmailGroup');
+    const mobileInput = document.getElementById('fpMobile');
+    const emailInput = document.getElementById('fpAdminEmail');
+    const verifyButton = document.getElementById('fpVerifyButton');
+    const mobileHint = document.getElementById('fpMobileHint');
+
+    if (identifier && config) identifier.placeholder = config.example;
+    if (usernameHint) usernameHint.innerText = usernameRuleText(role);
+    if (mobileGroup) mobileGroup.classList.toggle('d-none', isAdmin);
+    if (adminEmailGroup) adminEmailGroup.classList.toggle('d-none', !isAdmin);
+    if (mobileInput) mobileInput.required = !isAdmin;
+    if (emailInput) emailInput.required = isAdmin;
+    if (verifyButton) verifyButton.textContent = isAdmin ? 'Verify administrator email' : 'Verify mobile number';
+    if (mobileHint) mobileHint.textContent = 'Enter the mobile number registered to this account. The number is checked by the server.';
+    invalidateRecoveryVerification();
+}
+
+function invalidateRecoveryVerification() {
+    const form = document.getElementById('forgotPasswordForm');
+    if (!form) return;
+    form.dataset.recoveryVerified = 'false';
+    ['fpNewPassword', 'fpConfirmPassword'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.disabled = true;
+            input.value = '';
+            input.type = 'password';
+        }
+    });
+    document.querySelectorAll('#forgotPasswordForm button[aria-pressed]').forEach(button => {
+        button.setAttribute('aria-pressed', 'false');
+        button.setAttribute('aria-label', button.getAttribute('aria-label').replace(/^Hide/, 'Show'));
+        const icon = button.querySelector('i');
+        if (icon) icon.className = 'fa-solid fa-eye';
+    });
+    const submit = document.getElementById('fpSubmitButton');
+    if (submit) submit.disabled = true;
+    const status = document.getElementById('fpRecoveryStatus');
+    if (status) {
+        status.textContent = '';
+        status.className = 'small mb-3';
+    }
 }
 
 function openForgotPasswordForLogin() {
@@ -872,6 +933,31 @@ async function syncStaffDirectoryFromBackend() {
     saveStaffDirectory();
 }
 
+async function syncFacultyProfileFromBackend() {
+    const teacher = await operationsApiRequest('/api/teachers/me');
+    if (!teacher || !teacher.id) throw new Error('Your faculty profile is not linked to this account.');
+    const name = `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim();
+    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+    const profile = {
+        id: teacher.id,
+        employeeId: teacher.employeeId || '',
+        userUsername: String(userInfo.username || localStorage.getItem('sece_logged_in_user') || '').toLowerCase(),
+        name,
+        displayName: teacher.displayName || name,
+        dept: teacher.department?.code || teacher.department?.name || '',
+        status: 'Available',
+        personalEmail: teacher.personalEmail || '',
+        collegeEmail: teacher.collegeEmail || '',
+        classAdvisorFor: teacher.classAdvisorFor || ''
+    };
+    window.currentFacultyProfile = profile;
+    const index = staffDirectory.findIndex(item => String(item.id) === String(profile.id));
+    if (index >= 0) staffDirectory[index] = { ...staffDirectory[index], ...profile };
+    else staffDirectory.push(profile);
+    saveStaffDirectory();
+    return profile;
+}
+
 async function syncCoverageRequestsFromBackend() {
     const rows = await operationsApiRequest('/api/operations/coverage');
     if (!Array.isArray(rows)) throw new Error('Coverage request response was invalid.');
@@ -1035,6 +1121,10 @@ function resolveLoggedInFacultyRecord() {
     let userInfo = null;
     try { userInfo = JSON.parse(localStorage.getItem('user_info') || 'null'); } catch (_) { }
     const uname = String((userInfo && userInfo.username) || localStorage.getItem('sece_logged_in_user') || '').trim().toLowerCase();
+    const profile = window.currentFacultyProfile;
+    if (profile && (!profile.userUsername || profile.userUsername.toLowerCase() === uname)) {
+        return profile;
+    }
     const uFullName = String((userInfo && userInfo.name) || '').trim();
     if (Array.isArray(staffDirectory) && staffDirectory.length > 0) {
         const byUser = staffDirectory.find(s =>
@@ -1637,7 +1727,7 @@ function setMyStaffIdentity(name) {
 function populateStaffIdentityDropdown() {
     const select = document.getElementById('myStaffIdentitySelect');
     if (!select) return;
-    if (currentUserRole === 'FACULTY') {
+    if (getEffectiveRole() === 'FACULTY') {
         const myRec = resolveLoggedInFacultyRecord();
         if (myRec && myRec.name) {
             select.innerHTML = `<option value="${myRec.name}" selected>${myRec.name}${myRec.dept ? ' (' + myRec.dept + ')' : ''}</option>`;
@@ -1646,6 +1736,10 @@ function populateStaffIdentityDropdown() {
             setMyStaffIdentity(myRec.name);
             return;
         }
+        select.innerHTML = '<option value="">Faculty profile unavailable - refresh or contact an administrator</option>';
+        select.value = '';
+        select.disabled = true;
+        return;
     }
     select.disabled = false;
     const saved = getMyStaffIdentity();
@@ -2121,27 +2215,45 @@ async function respondToCoverageRequest(key, accept) {
     });
 
 async function initSubstitutionModal() {
-    try {
-        if (typeof window.loadTimetableData === 'function') {
-            await window.loadTimetableData();
+    const role = getEffectiveRole();
+    if (['ADMIN', 'FACULTY', 'STUDENT'].includes(role)) currentUserRole = role;
+    const loadErrors = [];
+    const load = async (label, action) => {
+        try {
+            await action();
+        } catch (error) {
+            console.error(`Unable to load ${label}:`, error);
+            loadErrors.push(`${label}: ${error.message || 'request failed'}`);
         }
-        if (currentUserRole === 'FACULTY' && typeof window.syncFacultyPersonalTtFromBackend === 'function') {
-            await window.syncFacultyPersonalTtFromBackend();
+    };
+
+    await load('timetable', async () => {
+        if (typeof window.loadTimetableData === 'function') await window.loadTimetableData();
+    });
+    await load('staff directory', syncStaffDirectoryFromBackend);
+    if (role === 'FACULTY') {
+        await load('faculty profile', syncFacultyProfileFromBackend);
+        await load('faculty periods', syncFacultyAssignedPeriodsFromBackend);
+    }
+    await load('substitution records', syncSubstitutionsFromBackend);
+    await load('leave and coverage records', async () => {
+        if (role === 'STUDENT') {
+            await syncFacultyLeavesFromBackend();
+        } else {
+            await Promise.all([syncCoverageRequestsFromBackend(), syncFacultyLeavesFromBackend()]);
         }
-        await syncLeaveAndSubstitutionData();
-        if (currentUserRole === 'FACULTY') {
-            await syncFacultyAssignedPeriodsFromBackend();
-        }
-        renderStaffAvailability();
-        populateSubstituteFacultyOptions();
-        populateSubPeriodOptions();
-        renderTodaysSubstitutions();
-        populateStaffIdentityDropdown();
-        renderCoverageRequests();
-        updateLeaveButtonState();
-    } catch (error) {
-        console.error('Unable to load leave and substitution data:', error);
-        showToast('Availability Load Failed', error.message || 'Could not load leave and substitution data.');
+    });
+
+    renderStaffAvailability();
+    populateStaffIdentityDropdown();
+    populateSubstituteFacultyOptions();
+    populateSubPeriodOptions();
+    renderTodaysSubstitutions();
+    renderCoverageRequests();
+    updateLeaveButtonState();
+
+    if (loadErrors.length) {
+        showToast('Some Availability Data Did Not Load', loadErrors.join(' | '));
     }
 }
 
@@ -4475,13 +4587,14 @@ async function initSubstitutionModal() {
         }
 
         function getEffectiveRole() {
-            if (currentUserRole) return String(currentUserRole).toUpperCase();
+            const normalizeRole = value => String(value || '').replace(/^ROLE_/i, '').toUpperCase();
+            if (currentUserRole) return normalizeRole(currentUserRole);
             const legacyRole = localStorage.getItem('sece_logged_in_role');
-            if (legacyRole) return String(legacyRole).toUpperCase();
+            if (legacyRole) return normalizeRole(legacyRole);
             try {
                 const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
                 if (userInfo && userInfo.role) {
-                    return String(userInfo.role.replace('ROLE_', '')).toUpperCase();
+                    return normalizeRole(userInfo.role);
                 }
             } catch (e) { }
             return '';
@@ -5385,23 +5498,80 @@ async function initSubstitutionModal() {
             }
         }
 
-        // Handle Forgot Password Submit
-        function handleForgotPasswordSubmit(e) {
-            e.preventDefault();
+        window.verifyRecoveryMobile = async function () {
             const userType = document.getElementById('fpUserType').value;
-            const identifier = document.getElementById('fpIdentifier').value.trim().toLowerCase();
+            const identifier = document.getElementById('fpIdentifier').value.trim();
             const mobile = document.getElementById('fpMobile').value.replace(/\D/g, '');
-            const newPassword = document.getElementById('fpNewPassword').value;
-            const confirmPassword = document.getElementById('fpConfirmPassword').value;
+            const email = document.getElementById('fpAdminEmail')?.value.trim() || '';
+            const status = document.getElementById('fpRecoveryStatus');
+            const verifyButton = document.getElementById('fpVerifyButton');
 
-            if (!isValidUsername(userType, identifier)) {
-                alert(`Invalid username for ${userType}.`);
+            invalidateRecoveryVerification();
+            if (!identifier) {
+                if (status) status.textContent = 'Enter your username first.';
                 return;
             }
             if (userType !== 'ADMIN' && !/^\d{10}$/.test(mobile)) {
-                alert('Enter a valid 10-digit registered mobile number.');
+                if (status) status.textContent = 'Enter the registered 10-digit mobile number.';
                 return;
             }
+            if (userType === 'ADMIN' && !email) {
+                if (status) status.textContent = 'Enter the administrator email address.';
+                return;
+            }
+
+            const params = new URLSearchParams({ username: identifier, accountType: userType });
+            if (userType === 'ADMIN') params.set('email', email);
+            else params.set('mobile', mobile);
+            if (verifyButton) verifyButton.disabled = true;
+            if (status) status.textContent = 'Verifying account details...';
+
+            try {
+                const response = await fetch('/api/auth/verify-recovery', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString()
+                });
+                await readAuthResponse(response);
+
+                const form = document.getElementById('forgotPasswordForm');
+                form.dataset.recoveryVerified = 'true';
+                ['fpNewPassword', 'fpConfirmPassword'].forEach(id => {
+                    document.getElementById(id).disabled = false;
+                });
+                document.getElementById('fpSubmitButton').disabled = false;
+                if (status) {
+                    status.textContent = userType === 'ADMIN'
+                        ? 'Administrator email verified. You can now set a new password.'
+                        : 'Mobile number verified. You can now set a new password.';
+                    status.className = 'small mb-3 text-success';
+                }
+            } catch (error) {
+                if (status) {
+                    status.textContent = error.message || 'Could not verify the account details.';
+                    status.className = 'small mb-3 text-danger';
+                }
+            } finally {
+                if (verifyButton) verifyButton.disabled = false;
+            }
+        };
+
+        // Handle Forgot Password Submit
+        async function handleForgotPasswordSubmit(e) {
+            e.preventDefault();
+            const form = document.getElementById('forgotPasswordForm');
+            if (form.dataset.recoveryVerified !== 'true') {
+                alert('Verify your registered mobile number before setting a new password.');
+                return;
+            }
+
+            const userType = document.getElementById('fpUserType').value;
+            const identifier = document.getElementById('fpIdentifier').value.trim();
+            const mobile = document.getElementById('fpMobile').value.replace(/\D/g, '');
+            const email = document.getElementById('fpAdminEmail')?.value.trim() || '';
+            const newPassword = document.getElementById('fpNewPassword').value;
+            const confirmPassword = document.getElementById('fpConfirmPassword').value;
+
             if (!isLowercaseAlnum(newPassword) || !isLowercaseAlnum(confirmPassword) || newPassword.length < 4) {
                 alert('Password must contain at least 4 lowercase letters/numbers and no spaces or symbols.');
                 return;
@@ -5411,46 +5581,43 @@ async function initSubstitutionModal() {
                 return;
             }
 
-            // For Admin, the fixed username is sufficient for the local demo.
-            // For Student/Faculty, recovery requires the registered mobile number.
+            const params = new URLSearchParams({
+                username: identifier,
+                newPassword
+            });
+            let endpoint = '/api/auth/reset-password/mobile';
             if (userType === 'ADMIN') {
-                if (identifier !== ADMIN_USERNAME) {
-                    alert('Invalid Admin username.');
-                    return;
-                }
+                endpoint = '/api/auth/reset-password';
+                params.set('email', email);
             } else {
-                let record = null;
-                if (userType === 'STUDENT') {
-                    record = studentsRoster.find(s => (s.username || buildGeneratedUsername('STUDENT', s.name)) === identifier);
-                    if (!record || String(record.phone || '').replace(/\D/g, '') !== mobile) {
-                        alert('The mobile number does not match the enrolled student account.');
-                        return;
-                    }
-                } else if (userType === 'CLASS_ADVISOR') {
-                    record = staffDirectory.find(s => buildClassAdvisorUsername(s.name) === identifier);
-                    if (!record || (safetyNormalizePhone(record.phone) !== mobile && record.mobile !== mobile)) {
-                        alert('Class Advisor mobile number is not registered for this account. Ask Admin to register it first.');
-                        return;
-                    }
-                } else {
-                    record = staffDirectory.find(s => buildGeneratedUsername('FACULTY', s.name) === identifier);
-                    if (!record || (safetyNormalizePhone(record.phone) !== mobile && record.mobile !== mobile)) {
-                        // Staff records in this original file do not contain phone numbers.
-                        // If a faculty mobile is not registered, recovery is denied rather than guessed.
-                        alert('Faculty mobile number is not registered for this account. Ask Admin to register it first.');
-                        return;
-                    }
-                }
+                params.set('accountType', userType);
+                params.set('mobile', mobile);
             }
 
-            localStorage.setItem('sece_password_' + identifier, newPassword);
+            const submitButton = document.getElementById('fpSubmitButton');
+            if (submitButton) submitButton.disabled = true;
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString()
+                });
+                const result = await readAuthResponse(response);
 
-            const modalEl = document.getElementById('forgotPasswordModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-            document.getElementById('forgotPasswordForm').reset();
-            updateForgotPasswordHint();
-            showToast('Password Reset Successfully!', `Password updated for ${userType} account ${identifier}.`);
+                const modalEl = document.getElementById('forgotPasswordModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                form.reset();
+                updateForgotPasswordHint();
+                showToast('Password Reset Successfully!', result.message || 'You can now sign in with your new password.');
+            } catch (error) {
+                const status = document.getElementById('fpRecoveryStatus');
+                if (status) {
+                    status.textContent = error.message || 'Password reset failed.';
+                    status.className = 'small mb-3 text-danger';
+                }
+                if (submitButton) submitButton.disabled = false;
+            }
         }
 
         function safetyNormalizePhone(value) {
@@ -5826,6 +5993,17 @@ async function initSubstitutionModal() {
             window.openAccountSettingsModal = openAccountSettingsModal;
             window.handleAccountSettingsSubmit = handleAccountSettingsSubmit;
             window.updateForgotPasswordHint = updateForgotPasswordHint;
+            window.invalidateRecoveryVerification = invalidateRecoveryVerification;
+            window.togglePasswordVisibility = function (inputId, button) {
+                const input = document.getElementById(inputId);
+                if (!input || input.disabled) return;
+                const isVisible = input.type === 'password';
+                input.type = isVisible ? 'text' : 'password';
+                button.setAttribute('aria-pressed', String(isVisible));
+                button.setAttribute('aria-label', `${isVisible ? 'Hide' : 'Show'} ${inputId.includes('Confirm') ? 'confirmation password' : inputId.includes('Current') ? 'current password' : 'new password'}`);
+                const icon = button.querySelector('i');
+                if (icon) icon.className = isVisible ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+            };
             window.openForgotPasswordForLogin = openForgotPasswordForLogin;
             window.restoreLoginSession = restoreLoginSession;
             window.loadSavedStudents = loadSavedStudents;

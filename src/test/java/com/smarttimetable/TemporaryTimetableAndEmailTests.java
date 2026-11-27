@@ -89,6 +89,7 @@ class TemporaryTimetableAndEmailTests {
         fac1.setDisplayName("Mr. Kumar");
         fac1.setPersonalEmail("fac1_zz@personal.test");
         fac1.setCollegeEmail("fac1_zz@college.test");
+        fac1.setPhone1("+91 98765 43210");
         fac1.setDepartment(dept);
         fac1.setUser(fac1User);
         fac1 = teacherRepo.save(fac1);
@@ -105,6 +106,7 @@ class TemporaryTimetableAndEmailTests {
         fac2 = teacherRepo.save(fac2);
 
         Student st1 = new Student("ZZ001", "Arun", "K", "stu1_zz@test.edu", "stu1_zz@college.edu", dept, course, secA, 3, stu1User);
+        st1.setPhone("9876543210");
         studentRepo.save(st1);
         Student st2 = new Student("ZZ002", "Bala", "M", "stu2_zz@test.edu", "stu2_zz@college.edu", dept, course, secB, 3, stu2User);
         studentRepo.save(st2);
@@ -597,6 +599,16 @@ class TemporaryTimetableAndEmailTests {
                 .andExpect(jsonPath("$[0].sectionName").value(secA.getSectionName()))
                 .andExpect(jsonPath("$[0].slotNumber").value(3));
 
+        mockMvc.perform(get("/api/teachers/me")
+                        .header("Authorization", "Bearer " + fac1Jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(fac1.getId()))
+                .andExpect(jsonPath("$.firstName").value("Kumar"))
+                .andExpect(jsonPath("$.user").doesNotExist());
+        mockMvc.perform(get("/api/teachers/me")
+                        .header("Authorization", "Bearer " + studentJwt))
+                .andExpect(status().isForbidden());
+
         String coveragePayload = String.format(
                 "{\"date\":\"%s\",\"sectionName\":\"%s\",\"day\":\"Monday\",\"periodIndex\":2,\"subjectName\":\"Java Programming\",\"absentStaff\":\"Mr. Kumar\",\"status\":\"OPEN\"}",
                 nextMonday, secA.getSectionName());
@@ -646,5 +658,84 @@ class TemporaryTimetableAndEmailTests {
                         .header("Authorization", "Bearer " + fac1Jwt))
                 .andExpect(status().isNoContent());
         assertThat(facultyLeaveRepo.findByDate(nextMonday)).isEmpty();
+    }
+
+    @Test
+    void passwordRecoveryRequiresRegisteredMobileAndUpdatesLoginCredentials() throws Exception {
+        mockMvc.perform(post("/api/auth/verify-recovery")
+                        .param("username", stu1User.getUsername())
+                        .param("accountType", "STUDENT")
+                        .param("mobile", "1111111111"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/auth/reset-password/mobile")
+                        .param("username", stu1User.getUsername())
+                        .param("accountType", "STUDENT")
+                        .param("mobile", "1111111111")
+                        .param("newPassword", "freshpass1"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/auth/verify-recovery")
+                        .param("username", stu1User.getUsername())
+                        .param("accountType", "STUDENT")
+                        .param("mobile", "9876543210"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"));
+
+        mockMvc.perform(post("/api/auth/reset-password/mobile")
+                        .param("username", stu1User.getUsername())
+                        .param("accountType", "STUDENT")
+                        .param("mobile", "9876543210")
+                        .param("newPassword", "freshpass1"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"test_stu1_zz\",\"password\":\"pass123\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"test_stu1_zz\",\"password\":\"freshpass1\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void facultyRecoveryAcceptsRegisteredPhoneWithCountryCode() throws Exception {
+        mockMvc.perform(post("/api/auth/verify-recovery")
+                        .param("username", fac1User.getUsername())
+                        .param("accountType", "FACULTY")
+                        .param("mobile", "9876543210"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"));
+
+        mockMvc.perform(post("/api/auth/verify-recovery")
+                        .param("username", fac1User.getUsername())
+                        .param("accountType", "STUDENT")
+                        .param("mobile", "9876543210"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .param("username", fac1User.getUsername())
+                        .param("email", "fac1_zz@test.edu")
+                        .param("newPassword", "freshpass1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void authenticatedPasswordChangeUpdatesTheCredentialUsedForLogin() throws Exception {
+        String studentJwt = jwtUtil.generateToken(
+                userDetailsService.loadUserByUsername(stu1User.getUsername()), "ROLE_STUDENT");
+
+        mockMvc.perform(post("/api/auth/change-password")
+                        .header("Authorization", "Bearer " + studentJwt)
+                        .param("currentPassword", "pass123")
+                        .param("newPassword", "changedpw1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"test_stu1_zz\",\"password\":\"changedpw1\"}"))
+                .andExpect(status().isOk());
     }
 }

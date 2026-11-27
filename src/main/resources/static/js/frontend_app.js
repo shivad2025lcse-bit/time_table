@@ -328,15 +328,16 @@ function openAccountSettingsModal() {
     new bootstrap.Modal(document.getElementById('accountSettingsModal')).show();
 }
 
-function handleAccountSettingsSubmit(e) {
+async function handleAccountSettingsSubmit(e) {
     e.preventDefault();
     const username = localStorage.getItem('sece_logged_in_user');
     const role = currentUserRole;
     if (!username || !role) { alert('Please log in first.'); return; }
 
+    const currentPassword = document.getElementById('asCurrentPassword').value;
     const newPassword = document.getElementById('asNewPassword').value;
     const confirmPassword = document.getElementById('asConfirmPassword').value;
-    if (!newPassword || !confirmPassword) { alert('Enter and confirm your new password.'); return; }
+    if (!currentPassword || !newPassword || !confirmPassword) { alert('Enter your current password and confirm the new password.'); return; }
     if (!isLowercaseAlnum(newPassword) || !isLowercaseAlnum(confirmPassword)) {
         alert('Password can contain only lowercase letters and numbers.');
         return;
@@ -344,19 +345,44 @@ function handleAccountSettingsSubmit(e) {
     if (newPassword.length < 4) { alert('Password must be at least 4 characters.'); return; }
     if (newPassword !== confirmPassword) { alert('New passwords do not match.'); return; }
 
-    localStorage.setItem('sece_password_' + username, newPassword);
-    const modalEl = document.getElementById('accountSettingsModal');
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) modal.hide();
-    document.getElementById('accountSettingsForm').reset();
-    showToast('Password Updated', 'Your new password has been saved successfully.');
+    const formData = new URLSearchParams({ currentPassword, newPassword });
+    try {
+        const response = await apiFetch('/api/auth/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        });
+        const body = await response.text();
+        if (!response.ok) throw new Error(body || 'Password update failed.');
+        const modalEl = document.getElementById('accountSettingsModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        document.getElementById('accountSettingsForm').reset();
+        showToast('Password Updated', 'Your password was updated. Sign in next time with the new password.');
+    } catch (error) {
+        alert(error.message || 'Could not update your password.');
+    }
 }
 
 function updateForgotPasswordHint() {
-    const role = document.getElementById('fpUserType').value;
-    const config = AUTH_CONFIG[role];
-    document.getElementById('fpIdentifier').placeholder = config.example;
-    document.getElementById('fpUsernameHint').innerText = usernameRuleText(role);
+    const role = document.getElementById('fpUserType')?.value || 'STUDENT';
+    const config = AUTH_CONFIG[role] || AUTH_CONFIG.FACULTY;
+    const isAdmin = role === 'ADMIN';
+    const identifier = document.getElementById('fpIdentifier');
+    const mobileGroup = document.getElementById('fpMobileGroup');
+    const emailGroup = document.getElementById('fpAdminEmailGroup');
+    const mobileInput = document.getElementById('fpMobile');
+    const emailInput = document.getElementById('fpAdminEmail');
+    const verifyButton = document.getElementById('fpVerifyButton');
+    if (identifier) identifier.placeholder = config.example;
+    const usernameHint = document.getElementById('fpUsernameHint');
+    if (usernameHint) usernameHint.innerText = usernameRuleText(role);
+    if (mobileGroup) mobileGroup.classList.toggle('d-none', isAdmin);
+    if (emailGroup) emailGroup.classList.toggle('d-none', !isAdmin);
+    if (mobileInput) mobileInput.required = !isAdmin;
+    if (emailInput) emailInput.required = isAdmin;
+    if (verifyButton) verifyButton.textContent = isAdmin ? 'Verify administrator email' : 'Verify mobile number';
+    invalidateRecoveryVerification();
 }
 
 function openForgotPasswordForLogin() {
@@ -4997,23 +5023,117 @@ function renderNotificationStatus() {
     }
 }
 
-// Handle Forgot Password Submit
-function handleForgotPasswordSubmit(e) {
-    e.preventDefault();
-    const userType = document.getElementById('fpUserType').value;
-    const identifier = document.getElementById('fpIdentifier').value.trim().toLowerCase();
-    const mobile = document.getElementById('fpMobile').value.replace(/\D/g, '');
-    const newPassword = document.getElementById('fpNewPassword').value;
-    const confirmPassword = document.getElementById('fpConfirmPassword').value;
+function invalidateRecoveryVerification() {
+    const form = document.getElementById('forgotPasswordForm');
+    if (!form) return;
+    form.dataset.recoveryVerified = 'false';
+    ['fpNewPassword', 'fpConfirmPassword'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.disabled = true;
+            input.value = '';
+            input.type = 'password';
+        }
+    });
+    document.querySelectorAll('#forgotPasswordForm button[aria-pressed]').forEach(button => {
+        button.setAttribute('aria-pressed', 'false');
+        button.setAttribute('aria-label', button.getAttribute('aria-label').replace(/^Hide/, 'Show'));
+        const icon = button.querySelector('i');
+        if (icon) icon.className = 'fa-solid fa-eye';
+    });
+    const submit = document.getElementById('fpSubmitButton');
+    if (submit) submit.disabled = true;
+    const status = document.getElementById('fpRecoveryStatus');
+    if (status) {
+        status.textContent = '';
+        status.className = 'small mb-3';
+    }
+}
 
-    if (!isValidUsername(userType, identifier)) {
-        alert(`Invalid username for ${userType}.`);
+async function readRecoveryResponse(response) {
+    const body = await response.text();
+    let result = {};
+    if (body) {
+        try {
+            result = JSON.parse(body);
+        } catch {
+            result = { message: body };
+        }
+    }
+    if (!response.ok) {
+        throw new Error(result.message || result.error || `Request failed with HTTP ${response.status}.`);
+    }
+    return result;
+}
+
+async function verifyRecoveryMobile() {
+    const userType = document.getElementById('fpUserType').value;
+    const identifier = document.getElementById('fpIdentifier').value.trim();
+    const mobile = document.getElementById('fpMobile').value.replace(/\D/g, '');
+    const email = document.getElementById('fpAdminEmail')?.value.trim() || '';
+    const status = document.getElementById('fpRecoveryStatus');
+    const verifyButton = document.getElementById('fpVerifyButton');
+    invalidateRecoveryVerification();
+    if (!identifier) {
+        if (status) status.textContent = 'Enter your username first.';
         return;
     }
     if (userType !== 'ADMIN' && !/^\d{10}$/.test(mobile)) {
-        alert('Enter a valid 10-digit registered mobile number.');
+        if (status) status.textContent = 'Enter the registered 10-digit mobile number.';
         return;
     }
+    if (userType === 'ADMIN' && !email) {
+        if (status) status.textContent = 'Enter the administrator email address.';
+        return;
+    }
+
+    const params = new URLSearchParams({ username: identifier, accountType: userType });
+    if (userType === 'ADMIN') params.set('email', email);
+    else params.set('mobile', mobile);
+    if (verifyButton) verifyButton.disabled = true;
+    if (status) status.textContent = 'Verifying account details...';
+    try {
+        await readRecoveryResponse(await fetch('/api/auth/verify-recovery', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        }));
+        const form = document.getElementById('forgotPasswordForm');
+        form.dataset.recoveryVerified = 'true';
+        ['fpNewPassword', 'fpConfirmPassword'].forEach(id => {
+            document.getElementById(id).disabled = false;
+        });
+        document.getElementById('fpSubmitButton').disabled = false;
+        if (status) {
+            status.textContent = userType === 'ADMIN'
+                ? 'Administrator email verified. You can now set a new password.'
+                : 'Mobile number verified. You can now set a new password.';
+            status.className = 'small mb-3 text-success';
+        }
+    } catch (error) {
+        if (status) {
+            status.textContent = error.message || 'Could not verify the account details.';
+            status.className = 'small mb-3 text-danger';
+        }
+    } finally {
+        if (verifyButton) verifyButton.disabled = false;
+    }
+}
+
+async function handleForgotPasswordSubmit(e) {
+    e.preventDefault();
+    const form = document.getElementById('forgotPasswordForm');
+    const status = document.getElementById('fpRecoveryStatus');
+    if (form.dataset.recoveryVerified !== 'true') {
+        alert('Verify your registered mobile number before setting a new password.');
+        return;
+    }
+    const userType = document.getElementById('fpUserType').value;
+    const identifier = document.getElementById('fpIdentifier').value.trim();
+    const mobile = document.getElementById('fpMobile').value.replace(/\D/g, '');
+    const email = document.getElementById('fpAdminEmail')?.value.trim() || '';
+    const newPassword = document.getElementById('fpNewPassword').value;
+    const confirmPassword = document.getElementById('fpConfirmPassword').value;
     if (!isLowercaseAlnum(newPassword) || !isLowercaseAlnum(confirmPassword) || newPassword.length < 4) {
         alert('Password must contain at least 4 lowercase letters/numbers and no spaces or symbols.');
         return;
@@ -5022,47 +5142,47 @@ function handleForgotPasswordSubmit(e) {
         alert('Passwords do not match.');
         return;
     }
-
-    // For Admin, the fixed username is sufficient for the local demo.
-    // For Student/Faculty, recovery requires the registered mobile number.
+    const params = new URLSearchParams({ username: identifier, newPassword });
+    let endpoint = '/api/auth/reset-password/mobile';
     if (userType === 'ADMIN') {
-        if (identifier !== ADMIN_USERNAME) {
-            alert('Invalid Admin username.');
-            return;
-        }
+        endpoint = '/api/auth/reset-password';
+        params.set('email', email);
     } else {
-        let record = null;
-        if (userType === 'STUDENT') {
-            record = studentsRoster.find(s => (s.username || buildGeneratedUsername('STUDENT', s.name)) === identifier);
-            if (!record || String(record.phone || '').replace(/\D/g, '') !== mobile) {
-                alert('The mobile number does not match the enrolled student account.');
-                return;
-            }
-        } else if (userType === 'CLASS_ADVISOR') {
-            record = staffDirectory.find(s => buildClassAdvisorUsername(s.name) === identifier);
-            if (!record || (safetyNormalizePhone(record.phone) !== mobile && record.mobile !== mobile)) {
-                alert('Class Advisor mobile number is not registered for this account. Ask Admin to register it first.');
-                return;
-            }
-        } else {
-            record = staffDirectory.find(s => buildGeneratedUsername('FACULTY', s.name) === identifier);
-            if (!record || (safetyNormalizePhone(record.phone) !== mobile && record.mobile !== mobile)) {
-                // Staff records in this original file do not contain phone numbers.
-                // If a faculty mobile is not registered, recovery is denied rather than guessed.
-                alert('Faculty mobile number is not registered for this account. Ask Admin to register it first.');
-                return;
-            }
-        }
+        params.set('accountType', userType);
+        params.set('mobile', mobile);
     }
+    const submit = document.getElementById('fpSubmitButton');
+    if (submit) submit.disabled = true;
+    try {
+        const result = await readRecoveryResponse(await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        }));
+        const modal = bootstrap.Modal.getInstance(document.getElementById('forgotPasswordModal'));
+        if (modal) modal.hide();
+        form.reset();
+        updateForgotPasswordHint();
+        showToast('Password Reset Successfully!', result.message || 'You can now sign in with your new password.');
+    } catch (error) {
+        if (status) {
+            status.textContent = error.message || 'Password reset failed.';
+            status.className = 'small mb-3 text-danger';
+        }
+        if (submit) submit.disabled = false;
+    }
+}
 
-    localStorage.setItem('sece_password_' + identifier, newPassword);
-
-    const modalEl = document.getElementById('forgotPasswordModal');
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) modal.hide();
-    document.getElementById('forgotPasswordForm').reset();
-    updateForgotPasswordHint();
-    showToast('Password Reset Successfully!', `Password updated for ${userType} account ${identifier}.`);
+function togglePasswordVisibility(inputId, button) {
+    const input = document.getElementById(inputId);
+    if (!input || input.disabled) return;
+    const visible = input.type === 'password';
+    input.type = visible ? 'text' : 'password';
+    button.setAttribute('aria-pressed', String(visible));
+    const label = inputId.includes('Confirm') ? 'confirmation password' : inputId.includes('Current') ? 'current password' : 'new password';
+    button.setAttribute('aria-label', `${visible ? 'Hide' : 'Show'} ${label}`);
+    const icon = button.querySelector('i');
+    if (icon) icon.className = visible ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
 }
 
 function safetyNormalizePhone(value) {
@@ -6402,6 +6522,9 @@ window.openNotificationModal = openNotificationModal;
 window.handleNotificationRegister = handleNotificationRegister;
 window.renderNotificationStatus = renderNotificationStatus;
 window.handleForgotPasswordSubmit = handleForgotPasswordSubmit;
+window.verifyRecoveryMobile = verifyRecoveryMobile;
+window.invalidateRecoveryVerification = invalidateRecoveryVerification;
+window.togglePasswordVisibility = togglePasswordVisibility;
 window.safetyNormalizePhone = safetyNormalizePhone;
 window.downloadTimetablePNG = downloadTimetablePNG;
 window.exportTimetableCSV = exportTimetableCSV;

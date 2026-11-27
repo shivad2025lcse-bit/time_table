@@ -107,17 +107,107 @@ public class AuthService {
     public Map<String, Object> resetPassword(String username, String email, String newPassword) {
         User user = findUserByUsernameFlexible(username);
         if (user == null) {
-            throw new RuntimeException("User not found with username: " + username);
+            throw new IllegalArgumentException("Account details do not match.");
+        }
+        if (user.getRole() != com.smarttimetable.entity.Role.ROLE_ADMIN) {
+            throw new IllegalArgumentException("Students and faculty must verify their registered mobile number.");
         }
 
-        if (!user.getEmail().equalsIgnoreCase(email.trim())) {
-            throw new RuntimeException("Email address does not match account record.");
+        if (email == null || user.getEmail() == null || !user.getEmail().equalsIgnoreCase(email.trim())) {
+            throw new IllegalArgumentException("Account details do not match.");
         }
 
+        validateRecoveryPassword(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setRawPassword(newPassword);
         userRepository.save(user);
 
+        return passwordResetResponse(user);
+    }
+
+    public Map<String, Object> verifyRecovery(String username, String accountType, String mobile, String email) {
+        User user = findUserByUsernameFlexible(username);
+        if (user == null || accountType == null) {
+            throw new IllegalArgumentException("Account details do not match.");
+        }
+
+        String normalizedType = accountType.trim().toUpperCase();
+        if ("ADMIN".equals(normalizedType)) {
+            if (user.getRole() != com.smarttimetable.entity.Role.ROLE_ADMIN
+                    || email == null || user.getEmail() == null
+                    || !user.getEmail().equalsIgnoreCase(email.trim())) {
+                throw new IllegalArgumentException("Account details do not match.");
+            }
+            return Map.of("status", "SUCCESS", "message", "Account verified. You can set a new password.");
+        }
+
+        boolean studentAccount = "STUDENT".equals(normalizedType)
+                && user.getRole() == com.smarttimetable.entity.Role.ROLE_STUDENT;
+        boolean facultyAccount = ("FACULTY".equals(normalizedType) || "CLASS_ADVISOR".equals(normalizedType))
+                && user.getRole() == com.smarttimetable.entity.Role.ROLE_FACULTY;
+        if (!studentAccount && !facultyAccount) {
+            throw new IllegalArgumentException("Account details do not match.");
+        }
+
+        String enteredPhone = normalizeRecoveryPhone(mobile);
+        boolean phoneMatches = false;
+        if (studentAccount) {
+            phoneMatches = studentRepository.findByUserId(user.getId())
+                    .map(student -> phoneMatches(enteredPhone, student.getPhone()))
+                    .orElse(false);
+        } else {
+            Optional<Teacher> teacher = teacherRepository.findByUserId(user.getId());
+            if (teacher.isPresent()) {
+                Teacher profile = teacher.get();
+                boolean advisorTypeMatches = !"CLASS_ADVISOR".equals(normalizedType)
+                        || (profile.getClassAdvisorFor() != null && !profile.getClassAdvisorFor().isBlank());
+                phoneMatches = advisorTypeMatches
+                        && (phoneMatches(enteredPhone, profile.getPhone1())
+                        || phoneMatches(enteredPhone, profile.getPhone2()));
+            }
+        }
+
+        if (!phoneMatches) {
+            throw new IllegalArgumentException("The mobile number does not match this account's registered number.");
+        }
+        return Map.of("status", "SUCCESS", "message", "Mobile number verified. You can set a new password.");
+    }
+
+    public Map<String, Object> resetPasswordWithMobile(
+            String username, String accountType, String mobile, String newPassword) {
+        verifyRecovery(username, accountType, mobile, null);
+        User user = findUserByUsernameFlexible(username);
+        if (user == null) {
+            throw new IllegalArgumentException("Account details do not match.");
+        }
+        validateRecoveryPassword(newPassword);
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setRawPassword(newPassword);
+        userRepository.save(user);
+        return passwordResetResponse(user);
+    }
+
+    private void validateRecoveryPassword(String newPassword) {
+        if (newPassword == null || !newPassword.matches("[a-z0-9]{4,}")) {
+            throw new IllegalArgumentException("Password must contain at least 4 lowercase letters or numbers.");
+        }
+    }
+
+    private boolean phoneMatches(String enteredPhone, String registeredPhone) {
+        if (enteredPhone.isEmpty() || registeredPhone == null) {
+            return false;
+        }
+        String registeredDigits = registeredPhone.replaceAll("\\D", "");
+        return registeredDigits.length() >= 10
+                && enteredPhone.equals(registeredDigits.substring(registeredDigits.length() - 10));
+    }
+
+    private String normalizeRecoveryPhone(String mobile) {
+        String digits = mobile == null ? "" : mobile.replaceAll("\\D", "");
+        return digits.length() == 10 ? digits : "";
+    }
+
+    private Map<String, Object> passwordResetResponse(User user) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "SUCCESS");
         response.put("message", "Password reset successfully for " + user.getUsername() + "! You can now log in with your new password.");

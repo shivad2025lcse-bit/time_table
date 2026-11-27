@@ -72,7 +72,39 @@ public class AuthController {
             @RequestParam String email,
             @RequestParam String newPassword
     ) {
-        return ResponseEntity.ok(authService.resetPassword(username, email, newPassword));
+        try {
+            return ResponseEntity.ok(authService.resetPassword(username, email, newPassword));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/verify-recovery")
+    public ResponseEntity<Map<String, Object>> verifyRecovery(
+            @RequestParam String username,
+            @RequestParam String accountType,
+            @RequestParam(required = false) String mobile,
+            @RequestParam(required = false) String email
+    ) {
+        try {
+            return ResponseEntity.ok(authService.verifyRecovery(username, accountType, mobile, email));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/reset-password/mobile")
+    public ResponseEntity<Map<String, Object>> resetPasswordWithMobile(
+            @RequestParam String username,
+            @RequestParam String accountType,
+            @RequestParam String mobile,
+            @RequestParam String newPassword
+    ) {
+        try {
+            return ResponseEntity.ok(authService.resetPasswordWithMobile(username, accountType, mobile, newPassword));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
     }
 
     @PostMapping("/change-password")

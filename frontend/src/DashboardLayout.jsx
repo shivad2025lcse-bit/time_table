@@ -961,15 +961,23 @@ export default function DashboardLayout() {
                                                     </div>
                                                     <div className="mb-3">
                                                         <label className="form-label small text-white fw-semibold">Enter New Password</label>
-                                                        <input type="password" id="fpNewPassword" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Enter new password" pattern="[a-z0-9]+"
-                                                            onInput={(e) => e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')} required minLength="4" />
+                                                        <div className="input-group input-group-sm">
+                                                            <input type="password" id="fpNewPassword" className="form-control bg-dark text-white border-secondary" placeholder="Enter new password" pattern="[a-z0-9]+"
+                                                                onInput={(e) => e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')} required minLength="4" disabled />
+                                                            <button type="button" className="btn btn-outline-secondary" aria-label="Show new password" aria-pressed="false"
+                                                                onClick={(event) => window.togglePasswordVisibility?.('fpNewPassword', event.currentTarget)}><i className="fa-solid fa-eye"></i></button>
+                                                        </div>
                                                     </div>
-                                                    <div className="mb-3">
+                                                    <div className="mb-3" id="fpMobileGroup">
                                                         <label className="form-label small text-white fw-semibold">Re-enter New Password</label>
-                                                        <input type="password" id="fpConfirmPassword" className="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Re-enter new password" pattern="[a-z0-9]+"
-                                                            onInput={(e) => e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')} required minLength="4" />
+                                                        <div className="input-group input-group-sm">
+                                                            <input type="password" id="fpConfirmPassword" className="form-control bg-dark text-white border-secondary" placeholder="Re-enter new password" pattern="[a-z0-9]+"
+                                                                onInput={(e) => e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')} required minLength="4" disabled />
+                                                            <button type="button" className="btn btn-outline-secondary" aria-label="Show confirmation password" aria-pressed="false"
+                                                                onClick={(event) => window.togglePasswordVisibility?.('fpConfirmPassword', event.currentTarget)}><i className="fa-solid fa-eye"></i></button>
+                                                        </div>
                                                     </div>
-                                                    <button type="submit" className="btn btn-sm btn-warning w-100 fw-bold"><i className="fa-solid fa-rotate me-1"></i> Submit</button>
+                                                    <button type="submit" id="fpSubmitButton" className="btn btn-sm btn-warning w-100 fw-bold" disabled><i className="fa-solid fa-rotate me-1"></i> Submit</button>
                                                 </form>
                                             </div>
                                         </div>
@@ -1105,6 +1113,16 @@ export default function DashboardLayout() {
                                                                     <th>Name</th>
                                                                     <th>Department & Sec</th>
                                                                     <th>Email</th>
+                                                    <div className="mb-3 d-none" id="fpAdminEmailGroup">
+                                                        <label className="form-label small text-white fw-semibold">Administrator Email</label>
+                                                        <input type="email" id="fpAdminEmail" className="form-control form-control-sm bg-dark text-white border-secondary" autoComplete="email"
+                                                            onInput={() => window.invalidateRecoveryVerification?.()} />
+                                                    </div>
+                                                    <button type="button" id="fpVerifyButton" className="btn btn-sm btn-outline-info w-100 mb-3"
+                                                        onClick={() => window.verifyRecoveryMobile?.()}>
+                                                        Verify mobile number
+                                                    </button>
+                                                    <div id="fpRecoveryStatus" className="small mb-3" role="status" aria-live="polite"></div>
                                                                     <th>Phone (SMS)</th>
                                                                     <th className="text-center">Action</th>
                                                                 </tr>
@@ -3074,15 +3092,27 @@ export default function DashboardLayout() {
                                                         <form id="changePasswordForm" onSubmit={(e) => { e.preventDefault(); window.handleChangePasswordSubmit && window.handleChangePasswordSubmit(e); }}>
                                                             <div className="mb-3">
                                                                 <label className="form-label text-muted small">Current Password</label>
-                                                                <input type="password" id="cpCurrentPassword" className="form-control bg-dark text-white border-secondary" required />
+                                                                <div className="input-group">
+                                                                    <input type="password" id="cpCurrentPassword" className="form-control bg-dark text-white border-secondary" required autoComplete="current-password" />
+                                                                    <button type="button" className="btn btn-outline-secondary" aria-label="Show current password" aria-pressed="false"
+                                                                        onClick={(event) => window.togglePasswordVisibility?.('cpCurrentPassword', event.currentTarget)}><i className="fa-solid fa-eye"></i></button>
+                                                                </div>
                                                             </div>
                                                             <div className="mb-3">
                                                                 <label className="form-label text-muted small">New Password</label>
-                                                                <input type="password" id="cpNewPassword" className="form-control bg-dark text-white border-secondary" required />
+                                                                <div className="input-group">
+                                                                    <input type="password" id="cpNewPassword" className="form-control bg-dark text-white border-secondary" required autoComplete="new-password" />
+                                                                    <button type="button" className="btn btn-outline-secondary" aria-label="Show new password" aria-pressed="false"
+                                                                        onClick={(event) => window.togglePasswordVisibility?.('cpNewPassword', event.currentTarget)}><i className="fa-solid fa-eye"></i></button>
+                                                                </div>
                                                             </div>
                                                             <div className="mb-3">
                                                                 <label className="form-label text-muted small">Confirm New Password</label>
-                                                                <input type="password" id="cpConfirmPassword" className="form-control bg-dark text-white border-secondary" required />
+                                                                <div className="input-group">
+                                                                    <input type="password" id="cpConfirmPassword" className="form-control bg-dark text-white border-secondary" required autoComplete="new-password" />
+                                                                    <button type="button" className="btn btn-outline-secondary" aria-label="Show confirmation password" aria-pressed="false"
+                                                                        onClick={(event) => window.togglePasswordVisibility?.('cpConfirmPassword', event.currentTarget)}><i className="fa-solid fa-eye"></i></button>
+                                                                </div>
                                                             </div>
                                                             <div className="d-grid mt-4">
                                                                 <button type="submit" className="btn btn-warning fw-bold">Update Password</button>

@@ -531,25 +531,37 @@
                         <div class="mb-3">
                             <label class="form-label small text-white fw-semibold">Username</label>
                             <input type="text" id="fpIdentifier" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. sarjuk23" pattern="[a-z0-9]+"
-                                   oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')" required>
+                                   oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, ''); invalidateRecoveryVerification()" required>
                             <div id="fpUsernameHint" class="form-text text-muted">Student username = "s" + first 4 letters of first name + last name initial + a number. Example: sarjuk23. Lowercase only.</div>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-3" id="fpMobileGroup">
                             <label class="form-label small text-white fw-semibold"><i class="fa-solid fa-mobile-screen-button text-success me-1"></i> Registered Mobile Number</label>
-                            <input type="tel" id="fpMobile" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="+91 9876543210" required>
-                            <div id="fpMobileHint" class="form-text text-muted">Required for Student/Faculty recovery. Admin recovery does not use a mobile number.</div>
+                            <input type="tel" id="fpMobile" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="9876543210" autocomplete="tel" oninput="invalidateRecoveryVerification()" required>
+                            <div id="fpMobileHint" class="form-text text-muted">Enter the mobile number registered to this account. The number is checked by the server.</div>
                         </div>
+                        <div class="mb-3 d-none" id="fpAdminEmailGroup">
+                            <label class="form-label small text-white fw-semibold">Administrator Email</label>
+                            <input type="email" id="fpAdminEmail" class="form-control form-control-sm bg-dark text-white border-secondary" autocomplete="email" oninput="invalidateRecoveryVerification()">
+                        </div>
+                        <button type="button" id="fpVerifyButton" class="btn btn-sm btn-outline-info w-100 mb-3" onclick="verifyRecoveryMobile()">Verify mobile number</button>
+                        <div id="fpRecoveryStatus" class="small mb-3" role="status" aria-live="polite"></div>
                         <div class="mb-3">
                             <label class="form-label small text-white fw-semibold">Enter New Password</label>
-                            <input type="password" id="fpNewPassword" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Enter new password" pattern="[a-z0-9]+"
-                                   oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')" required minlength="4">
+                            <div class="input-group input-group-sm">
+                                <input type="password" id="fpNewPassword" class="form-control bg-dark text-white border-secondary" placeholder="Enter new password" pattern="[a-z0-9]+"
+                                       oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')" required minlength="4" disabled>
+                                <button type="button" class="btn btn-outline-secondary" aria-label="Show new password" aria-pressed="false" onclick="togglePasswordVisibility('fpNewPassword', this)"><i class="fa-solid fa-eye"></i></button>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label small text-white fw-semibold">Re-enter New Password</label>
-                            <input type="password" id="fpConfirmPassword" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Re-enter new password" pattern="[a-z0-9]+"
-                                   oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')" required minlength="4">
+                            <div class="input-group input-group-sm">
+                                <input type="password" id="fpConfirmPassword" class="form-control bg-dark text-white border-secondary" placeholder="Re-enter new password" pattern="[a-z0-9]+"
+                                       oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')" required minlength="4" disabled>
+                                <button type="button" class="btn btn-outline-secondary" aria-label="Show confirmation password" aria-pressed="false" onclick="togglePasswordVisibility('fpConfirmPassword', this)"><i class="fa-solid fa-eye"></i></button>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-sm btn-warning w-100 fw-bold"><i class="fa-solid fa-rotate me-1"></i> Submit</button>
+                        <button type="submit" id="fpSubmitButton" class="btn btn-sm btn-warning w-100 fw-bold" disabled><i class="fa-solid fa-rotate me-1"></i> Submit</button>
                     </form>
                 </div>
             </div>
@@ -578,14 +590,27 @@
                             <div id="asUsernameHint" class="form-text text-muted">Must follow your role's format — lowercase letters and numbers only.</div>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label small text-white fw-semibold">Current Password</label>
+                            <div class="input-group input-group-sm">
+                                <input type="password" id="asCurrentPassword" class="form-control bg-dark text-white border-secondary" autocomplete="current-password" required>
+                                <button type="button" class="btn btn-outline-secondary" aria-label="Show current password" aria-pressed="false" onclick="togglePasswordVisibility('asCurrentPassword', this)"><i class="fa-solid fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label small text-white fw-semibold">New Password</label>
-                            <input type="password" id="asNewPassword" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Enter a new password" pattern="[a-z0-9]*"
-                                   oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')" minlength="4">
+                            <div class="input-group input-group-sm">
+                                <input type="password" id="asNewPassword" class="form-control bg-dark text-white border-secondary" placeholder="Enter a new password" pattern="[a-z0-9]*"
+                                       oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')" minlength="4" required autocomplete="new-password">
+                                <button type="button" class="btn btn-outline-secondary" aria-label="Show new password" aria-pressed="false" onclick="togglePasswordVisibility('asNewPassword', this)"><i class="fa-solid fa-eye"></i></button>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label small text-white fw-semibold">Confirm New Password</label>
-                            <input type="password" id="asConfirmPassword" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Re-enter new password" pattern="[a-z0-9]*"
-                                   oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')" minlength="4">
+                            <div class="input-group input-group-sm">
+                                <input type="password" id="asConfirmPassword" class="form-control bg-dark text-white border-secondary" placeholder="Re-enter new password" pattern="[a-z0-9]*"
+                                       oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')" minlength="4" required autocomplete="new-password">
+                                <button type="button" class="btn btn-outline-secondary" aria-label="Show confirmation password" aria-pressed="false" onclick="togglePasswordVisibility('asConfirmPassword', this)"><i class="fa-solid fa-eye"></i></button>
+                            </div>
                         </div>
                         <button type="submit" class="btn btn-sm btn-info w-100 fw-bold"><i class="fa-solid fa-check me-1"></i> Save Password</button>
                     </form>

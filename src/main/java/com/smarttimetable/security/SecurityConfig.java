@@ -61,6 +61,8 @@ public class SecurityConfig {
                     "/icons.svg",
                     "/api/auth/login",
                     "/api/auth/reset-password",
+                    "/api/auth/verify-recovery",
+                    "/api/auth/reset-password/mobile",
                     "/api/notifications/**",
                     "/api/operations/**",
                     "/api/teachers/**",
