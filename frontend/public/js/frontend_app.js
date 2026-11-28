@@ -2592,116 +2592,9 @@ async function initSubstitutionModal() {
         }
 
         // Student Dashboard Ongoing Period Logic
-        function updateStudentDashboardPeriod() {
-            if (typeof currentUserRole !== 'undefined' && currentUserRole !== 'STUDENT') {
-                const studentAlert = document.getElementById('studentUpcomingClassAlert');
-                if (studentAlert) studentAlert.classList.add('d-none');
-                return;
-            }
-
-            const studentAlert = document.getElementById('studentUpcomingClassAlert');
-            const studentTitle = document.getElementById('studentUpcomingClassTitle');
-            const studentText = document.getElementById('studentUpcomingClassText');
-
-            if (!studentAlert || !studentTitle || !studentText) return;
-
-            if (!window.currentTimetableEntries || window.currentTimetableEntries.length === 0) {
-                studentAlert.classList.add('d-none');
-                return;
-            }
-
-            const now = new Date();
-            const todayStr = now.toLocaleDateString('en-US', { weekday: 'long' });
-            const h = now.getHours();
-            const m = now.getMinutes();
-            const time = h + m / 60.0;
-
-            const timeSlots = [
-                { idx: 1, start: 8.66, end: 9.66, label: "08:40 AM - 09:40 AM" }, // Period 1
-                { idx: 2, start: 9.66, end: 10.66, label: "09:40 AM - 10:40 AM" }, // Period 2
-                { idx: 3, start: 11.00, end: 12.00, label: "11:00 AM - 12:00 PM" }, // Period 3
-                { idx: 4, start: 12.00, end: 13.00, label: "12:00 PM - 01:00 PM" }, // Period 4
-                { idx: 5, start: 13.66, end: 14.50, label: "01:40 PM - 02:30 PM" }, // Period 5
-                { idx: 6, start: 14.50, end: 15.33, label: "02:30 PM - 03:20 PM" }, // Period 6
-                { idx: 7, start: 15.33, end: 16.16, label: "03:20 PM - 04:10 PM" }  // Period 7
-            ];
-
-            const todaysEntries = window.currentTimetableEntries.filter(e => e.day === todayStr);
-
-            let activeEntry = null;
-            let matchingSlot = null;
-            let isOngoing = false;
-
-            // First, check if there is a class going on RIGHT NOW
-            for (let slot of timeSlots) {
-                if (time >= slot.start && time < slot.end) {
-                    const entry = todaysEntries.find(e => parseInt(e.periodIndex) === slot.idx);
-                    if (entry) {
-                        activeEntry = entry;
-                        matchingSlot = slot;
-                        isOngoing = true;
-                        break;
-                    }
-                }
-            }
-
-            // If no class is ongoing right now, find the NEXT upcoming class for today
-            if (!activeEntry) {
-                for (let slot of timeSlots) {
-                    if (slot.start > time) {
-                        const entry = todaysEntries.find(e => parseInt(e.periodIndex) === slot.idx);
-                        if (entry) {
-                            activeEntry = entry;
-                            matchingSlot = slot;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (activeEntry && matchingSlot) {
-                studentAlert.classList.remove('d-none');
-                studentAlert.classList.add('d-flex');
-
-                studentTitle.innerText = isOngoing ? "Currently Ongoing Period" : "Next Upcoming Class";
-                if (isOngoing) {
-                    studentAlert.style.borderLeft = "4px solid #198754";
-                    studentAlert.className = "alert alert-success mb-3 align-items-center shadow-sm d-flex";
-                    studentAlert.querySelector('i').className = "fa-solid fa-clock fa-spin fa-2x me-3 text-success";
-                } else {
-                    studentAlert.style.borderLeft = "4px solid #0dcaf0";
-                    studentAlert.className = "alert alert-info mb-3 align-items-center shadow-sm d-flex";
-                    studentAlert.querySelector('i').className = "fa-solid fa-clock fa-2x me-3 text-info";
-                }
-
-                const subName = activeEntry.subjectName || 'Unknown Subject';
-                const teacher = activeEntry.teacherName || 'Unknown Faculty';
-                const room = activeEntry.classroomNumber || activeEntry.laboratoryName || 'Unknown Venue';
-
-                studentText.innerHTML = `<strong>${subName}</strong> &bull; ${matchingSlot.label}<br/><span class="text-muted small">Faculty: ${teacher} | Venue: ${room}</span>`;
-            } else {
-                studentAlert.classList.remove('d-none');
-                studentAlert.classList.add('d-flex');
-                studentTitle.innerText = "No More Classes";
-                studentAlert.style.borderLeft = "4px solid #6c757d";
-                studentAlert.className = "alert alert-secondary mb-3 align-items-center shadow-sm d-flex";
-                studentAlert.querySelector('i').className = "fa-solid fa-mug-hot fa-2x me-3 text-secondary";
-
-                if (todaysEntries.length === 0) {
-                    studentText.innerHTML = `You have no classes scheduled for today (${todayStr}). Enjoy your day!`;
-                } else {
-                    studentText.innerHTML = `You have finished all your scheduled classes for today.`;
-                }
-            }
-        }
-
-        // Call on load and every minute
-        if (window.__studentDashboardPeriodInterval) clearInterval(window.__studentDashboardPeriodInterval);
-        window.__studentDashboardPeriodInterval = setInterval(updateStudentDashboardPeriod, 60000);
-        if (document.readyState === 'complete') {
-            setTimeout(updateStudentDashboardPeriod, 1000);
-        } else {
-            window.addEventListener('load', () => setTimeout(updateStudentDashboardPeriod, 1000));
+        if (window.__studentDashboardPeriodInterval) {
+            clearInterval(window.__studentDashboardPeriodInterval);
+            window.__studentDashboardPeriodInterval = null;
         }
 
 
@@ -2887,7 +2780,7 @@ async function initSubstitutionModal() {
 
             const roleBanner = document.getElementById('roleBanner');
             if (roleBanner) {
-                if (role === 'ADMIN') {
+                if (role === 'ADMIN' || role === 'STUDENT') {
                     roleBanner.classList.add('d-none');
                 } else {
                     roleBanner.classList.remove('d-none');
@@ -3219,13 +3112,17 @@ async function initSubstitutionModal() {
 
             renderNotificationStatus();
             toggleSubstitutionUI();
+            if (typeof window.refreshDownloadTtSetting === 'function') {
+                window.refreshDownloadTtSetting();
+            }
             const refreshLeaveAndSubstitutionState = async () => {
                 try {
                     await Promise.all([
                         syncSubstitutionsFromBackend(),
                         syncFacultyLeavesFromBackend(),
                         role === 'STUDENT' ? Promise.resolve() : syncCoverageRequestsFromBackend(),
-                        fetchPeriodNotificationsFromAPI()
+                        fetchPeriodNotificationsFromAPI(),
+                        typeof window.refreshDownloadTtSetting === 'function' ? window.refreshDownloadTtSetting() : Promise.resolve()
                     ]);
                     renderTimetableGrid();
                     renderTodaysSubstitutions();
@@ -5975,6 +5872,12 @@ async function initSubstitutionModal() {
         }
 
         function downloadTimetablePNG() {
+            const isAdminView = (typeof currentUserRole !== 'undefined' && currentUserRole === 'ADMIN') ||
+                window.location.pathname.includes('/admin');
+            if (isAdminView && window._downloadTtEnabled === false) {
+                showToast('Download Disabled', 'Admin Download TT option is currently disabled.');
+                return;
+            }
             showToast('Generating Timetable PNG...', 'Capturing high-resolution image...');
             let element = document.getElementById('timetableCaptureArea');
             let fileName = `SRI_ESHWAR_TIMETABLE_${currentSection}_2026.png`;
@@ -8738,10 +8641,7 @@ async function initSubstitutionModal() {
                     const data = await response.json();
 
                     const dynContainer = document.getElementById("studentDynamicDashboard");
-                    const alertLegacy = document.getElementById("studentUpcomingClassAlert");
-
                     if (dynContainer) dynContainer.classList.remove("d-none");
-                    if (alertLegacy) alertLegacy.classList.add("d-none");
 
                     if (data.status === "NO_PROFILE") {
                         if (document.getElementById("dynCurrentName")) document.getElementById("dynCurrentName").innerText = "Profile Incomplete";
@@ -9145,7 +9045,87 @@ async function initSubstitutionModal() {
             };
 
 
+            window._downloadTtEnabled = true;
+
+            window.applyDownloadTtVisibility = function (enabled) {
+                const isEnabled = enabled !== false;
+                window._downloadTtEnabled = isEnabled;
+                const isAdminView = (typeof currentUserRole !== 'undefined' && currentUserRole === 'ADMIN') ||
+                    String(localStorage.getItem('user_role') || '').toUpperCase() === 'ADMIN' ||
+                    window.location.pathname.includes('/admin');
+
+                // Student & Faculty ALWAYS keep Download TT built-in and visible; ONLY Admin view is toggled
+                const stuWrap = document.getElementById('studentDownloadTtWrap');
+                if (stuWrap) stuWrap.classList.remove('d-none');
+
+                ['sidebarDownloadTtWrap', 'facultyDownloadPngBtn'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.toggle('d-none', isAdminView && !isEnabled);
+                });
+
+                const sw = document.getElementById('adminDownloadTtSwitch');
+                if (sw) sw.checked = isEnabled;
+                const enBtn = document.getElementById('adminEnableDownloadTtBtn');
+                const disBtn = document.getElementById('adminDisableDownloadTtBtn');
+                if (enBtn) enBtn.disabled = isEnabled;
+                if (disBtn) disBtn.disabled = !isEnabled;
+                const badge = document.getElementById('adminDownloadTtBadge');
+                if (badge) {
+                    badge.textContent = isEnabled ? 'Enabled' : 'Disabled';
+                    badge.className = `badge ${isEnabled ? 'bg-success' : 'bg-danger'}`;
+                }
+                const bannerBtn = document.getElementById('adminBannerDownloadTtBtn');
+                if (bannerBtn) {
+                    bannerBtn.innerHTML = `<i class="fa-solid fa-sliders me-1"></i> Download TT: ${isEnabled ? 'ON' : 'OFF'}`;
+                    bannerBtn.className = `btn btn-sm py-0 ${isEnabled ? 'btn-outline-info' : 'btn-outline-danger'}`;
+                }
+            };
+
+            window.refreshDownloadTtSetting = async function () {
+                if (!localStorage.getItem('jwt_token')) return;
+                try {
+                    const res = await apiFetch('/api/operations/download-tt-setting');
+                    if (res && res.ok) {
+                        const data = await res.json();
+                        window.applyDownloadTtVisibility(data.downloadTtEnabled !== false);
+                    }
+                } catch (e) { }
+            };
+
+            window.toggleDownloadTtEnabled = async function (enabled) {
+                if (!adminOnly()) {
+                    const sw = document.getElementById('adminDownloadTtSwitch');
+                    if (sw) sw.checked = window._downloadTtEnabled !== false;
+                    return;
+                }
+                const target = !!enabled;
+                try {
+                    const res = await apiFetch('/api/operations/download-tt-setting', {
+                        method: 'PUT',
+                        body: JSON.stringify({ enabled: target })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res || !res.ok) throw new Error(data.error || 'Failed to update Download TT setting.');
+                    window.applyDownloadTtVisibility(data.downloadTtEnabled !== false);
+                    showToast(
+                        data.downloadTtEnabled ? 'Admin Download TT Enabled' : 'Admin Download TT Disabled',
+                        data.downloadTtEnabled
+                            ? 'Download TT is now enabled in Admin view.'
+                            : 'Download TT is now disabled in Admin view (Student & Faculty remain built-in).'
+                    );
+                } catch (err) {
+                    window.applyDownloadTtVisibility(window._downloadTtEnabled);
+                    alert('Error updating Download TT setting: ' + err.message);
+                }
+            };
+
             function exportTimetableCSV() {
+                const isAdminView = (typeof currentUserRole !== 'undefined' && currentUserRole === 'ADMIN') ||
+                    window.location.pathname.includes('/admin');
+                if (isAdminView && window._downloadTtEnabled === false) {
+                    showToast('Download Disabled', 'Admin Download TT option is currently disabled.');
+                    return;
+                }
                 if (currentUserRole === 'FACULTY') {
                     const uname = String(localStorage.getItem('sece_logged_in_user') || 'faculty').toUpperCase();
                     const ttKey = 'faculty_personal_tt_' + uname.toLowerCase();
@@ -11864,20 +11844,7 @@ async function initSubstitutionModal() {
                     pop = document.createElement('div');
                     pop.id = 'smartTtSuggestionPopover';
                     pop.setAttribute('tabindex', '-1');
-                    pop.style.cssText = [
-                        'position:fixed',
-                        'z-index:2055',
-                        'width:360px',
-                        'max-width:94vw',
-                        'background:#111827',
-                        'border:1px solid #38bdf8',
-                        'border-radius:10px',
-                        'box-shadow:0 14px 36px rgba(0,0,0,0.65)',
-                        'padding:10px',
-                        'display:none',
-                        'color:#f8fafc',
-                        'font-size:0.82rem'
-                    ].join(';');
+                    pop.style.display = 'none';
                     pop.addEventListener('mousedown', (e) => {
                         e.stopPropagation();
                         // Keep input focus cleanly so clicking inside popover never steals/loses cell state
@@ -12022,8 +11989,8 @@ async function initSubstitutionModal() {
                     const active = st.step === s.id;
                     const done = Boolean(s.val);
                     const cls = active
-                        ? 'btn-info text-dark fw-bold'
-                        : (done ? 'btn-outline-success text-success' : 'btn-outline-secondary text-light');
+                        ? 'tt-pop-tab-active'
+                        : (done ? 'btn-outline-success text-success' : 'tt-pop-tab-idle');
                     return `<button type="button" class="btn btn-sm ${cls} py-0 px-2" style="font-size:0.72rem;" data-tt-step="${s.id}">${s.label}${s.val ? `: ${esc(s.val)}` : ''}</button>`;
                 }).join('');
 
@@ -12038,9 +12005,9 @@ async function initSubstitutionModal() {
                     );
                     itemsHtml = list.length ? list.map(s => {
                         const meta = [s.code && s.code !== s.label ? s.code : '', s.faculty, s.venue].filter(Boolean).join(' • ');
-                    return `<button type="button" class="btn btn-sm btn-outline-info text-start d-flex flex-column py-1 px-2" style="max-width:100%;" data-tt-pick="subject" data-val="${esc(s.label)}">
-                <span class="fw-bold text-white" style="font-size:0.78rem;">${esc(s.label)}</span>
-                ${meta ? `<span class="text-muted text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}
+                    return `<button type="button" class="btn btn-sm btn-outline-info tt-pop-item text-start d-flex flex-column py-1 px-2" style="max-width:100%;" data-tt-pick="subject" data-val="${esc(s.label)}">
+                <span class="fw-bold tt-pop-item-title" style="font-size:0.78rem;">${esc(s.label)}</span>
+                ${meta ? `<span class="tt-pop-item-meta text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}
             </button>`;
                 }).join('') : '<div class="text-muted small py-2">No matching subjects. Type any custom subject or add in Manage Resources.</div>';
             } else if (st.step === 'staff') {
@@ -12059,9 +12026,9 @@ async function initSubstitutionModal() {
                 );
                 itemsHtml = list.length ? list.map(t => {
                     const meta = [t.dept, t.subjectHandling].filter(Boolean).join(' • ');
-                    return `<button type="button" class="btn btn-sm btn-outline-warning text-start d-flex flex-column py-1 px-2" data-tt-pick="staff" data-val="${esc(t.label)}">
-                <span class="fw-semibold text-white" style="font-size:0.76rem;">${esc(t.label)}</span>
-                ${meta ? `<span class="text-muted text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}
+                    return `<button type="button" class="btn btn-sm btn-outline-warning tt-pop-item text-start d-flex flex-column py-1 px-2" data-tt-pick="staff" data-val="${esc(t.label)}">
+                <span class="fw-semibold tt-pop-item-title" style="font-size:0.76rem;">${esc(t.label)}</span>
+                ${meta ? `<span class="tt-pop-item-meta text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}
             </button>`;
                 }).join('') : '<div class="text-muted small py-2">No matching staff found. Add faculty in Manage Faculty Details to see them here.</div>';
             } else if (st.step === 'venue') {
@@ -12071,9 +12038,9 @@ async function initSubstitutionModal() {
                 );
                 itemsHtml = list.length ? list.map(v => {
                     const meta = [v.type, v.building].filter(Boolean).join(' • ');
-                    return `<button type="button" class="btn btn-sm btn-outline-success text-start d-flex flex-column py-1 px-2" data-tt-pick="venue" data-val="${esc(v.label)}">
-                <span class="fw-bold text-white" style="font-size:0.76rem;">${esc(v.label)}</span>
-                ${meta ? `<span class="text-muted" style="font-size:0.65rem;">${esc(meta)}</span>` : ''}
+                    return `<button type="button" class="btn btn-sm btn-outline-success tt-pop-item text-start d-flex flex-column py-1 px-2" data-tt-pick="venue" data-val="${esc(v.label)}">
+                <span class="fw-bold tt-pop-item-title" style="font-size:0.76rem;">${esc(v.label)}</span>
+                ${meta ? `<span class="tt-pop-item-meta" style="font-size:0.65rem;">${esc(meta)}</span>` : ''}
             </button>`;
                 }).join('') : '<div class="text-muted small py-2">No matching venues found. Add venues in Manage Venues / Resources.</div>';
             } else if (st.step === 'dept') {
@@ -12082,7 +12049,7 @@ async function initSubstitutionModal() {
                     !q || d.code.toLowerCase().includes(q) || (d.name || '').toLowerCase().includes(q)
                 );
                 itemsHtml = list.length ? list.map(d =>
-                    `<button type="button" class="btn btn-sm ${st.dept === d.code ? 'btn-info text-dark fw-bold' : 'btn-outline-info text-white'} py-1 px-2" data-tt-pick="dept" data-val="${esc(d.code)}">
+                    `<button type="button" class="btn btn-sm ${st.dept === d.code ? 'tt-pop-tab-active' : 'btn-outline-info tt-pop-item tt-pop-item-title'} py-1 px-2" data-tt-pick="dept" data-val="${esc(d.code)}">
                 ${esc(d.code)}${d.name && d.name !== d.code ? ` <small class="opacity-75">(${esc(d.name)})</small>` : ''}
             </button>`
                 ).join('') : '<div class="text-muted small py-2">No departments found.</div>';
@@ -12096,7 +12063,7 @@ async function initSubstitutionModal() {
                 const list = Array.from(yrs).sort((a, b) => order.indexOf(a) - order.indexOf(b));
                 itemsHtml = list.map(y => {
                     const count = (cat.sections || []).filter(s => (!st.dept || s.dept === st.dept) && s.year === y).length;
-                    return `<button type="button" class="btn btn-sm ${st.year === y ? 'btn-info text-dark fw-bold' : 'btn-outline-info text-white'} py-1 px-3" data-tt-pick="year" data-val="${esc(y)}">
+                    return `<button type="button" class="btn btn-sm ${st.year === y ? 'tt-pop-tab-active' : 'btn-outline-info tt-pop-item tt-pop-item-title'} py-1 px-3" data-tt-pick="year" data-val="${esc(y)}">
                 ${esc(y)} Year ${count ? `<span class="badge bg-secondary ms-1">${count}</span>` : ''}
             </button>`;
                 }).join('');
@@ -12112,8 +12079,8 @@ async function initSubstitutionModal() {
                 const buttons = [];
                 matching.forEach(s => {
                     shownCodes.add(s.sectionCode);
-                    buttons.push(`<button type="button" class="btn btn-sm btn-outline-warning text-white fw-semibold py-1 px-2" data-tt-pick="section" data-val="${esc(s.sectionCode)}" data-full-sec="${esc(s.sectionName)}">
-                ${esc(s.sectionCode)} <small class="text-muted">(${esc(s.sectionName)})</small>
+                    buttons.push(`<button type="button" class="btn btn-sm btn-outline-warning tt-pop-item tt-pop-item-title fw-semibold py-1 px-2" data-tt-pick="section" data-val="${esc(s.sectionCode)}" data-full-sec="${esc(s.sectionName)}">
+                ${esc(s.sectionCode)} <small class="tt-pop-item-meta">(${esc(s.sectionName)})</small>
             </button>`);
                 });
                 itemsHtml = buttons.length ? buttons.join('') : '<div class="text-muted small py-2">No sections stored for this Dept & Year yet. Create a section in Manage Sections to see it here.</div>';
@@ -12125,8 +12092,8 @@ async function initSubstitutionModal() {
                 <i class="fa-solid fa-wand-magic-sparkles me-1"></i>${st.mode === 'FACULTY' ? 'Faculty TT Quick Assign' : 'Period Quick Assign'}
             </span>
             <div class="d-flex gap-1">
-                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" style="font-size:0.68rem;" data-tt-action="free">Set FREE</button>
-                <button type="button" class="btn btn-xs btn-outline-light py-0 px-2" style="font-size:0.68rem;" data-tt-action="close">Done</button>
+                <button type="button" class="btn btn-xs tt-pop-done-btn py-0 px-2" style="font-size:0.68rem;" data-tt-action="free">Set FREE</button>
+                <button type="button" class="btn btn-xs tt-pop-done-btn py-0 px-2" style="font-size:0.68rem;" data-tt-action="close">Done</button>
             </div>
         </div>
         <div class="d-flex flex-wrap gap-1 mb-2">${tabsHtml}</div>

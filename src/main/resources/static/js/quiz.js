@@ -267,6 +267,301 @@ function injectQuizModals() {
             0% { transform: translateY(0) rotate(0deg); opacity: 1; }
             100% { transform: translateY(100vh) rotate(540deg); opacity: 0; }
         }
+        /* Shared semantic defaults + Light Theme support for ALL Quiz Modals */
+        .cc-level-badge {
+            white-space: normal !important;
+            word-break: break-word;
+            line-height: 1.2 !important;
+            font-size: 0.72rem !important;
+            padding: 5px 8px !important;
+            max-width: 100%;
+            display: inline-block;
+            text-align: center;
+        }
+        .cc-dash-card {
+            background: #0a041f;
+            border: 1px solid #6d28d9;
+            color: #e2e8f0;
+        }
+        .cc-metric-green { background: #0d1f12; border: 1px solid #10b981; min-width: 0; overflow: hidden; }
+        .cc-metric-blue { background: #0d1a3a; border: 1px solid #3b82f6; min-width: 0; overflow: hidden; }
+        .cc-metric-amber { background: #1a1200; border: 1px solid #eab308; min-width: 0; overflow: hidden; }
+        .cc-metric-purple { background: #120326; border: 1px solid #8b5cf6; min-width: 0; overflow: hidden; }
+        .cc-metric-red { background: #1a0000; border: 1px solid #ef4444; min-width: 0; overflow: hidden; }
+        .cc-sub-strip { background: #0a041f; border: 1px solid #3b0764; }
+        .cc-analytics-table { color: #e0e0ff; background: #0d0d2e; }
+        .cc-analytics-table thead { background: #1a003a; }
+        .cc-weak-card { background: #1a0000; border: 1px solid #dc2626; }
+        .cc-weak-card .card-header { background: #2d0000; }
+        .cc-detail-answer-card { background: #1e1e1e; }
+        body[data-theme="light"] .cc-modal-content,
+        html[data-theme="light"] .cc-modal-content {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        body[data-theme="light"] .cc-modal-header,
+        html[data-theme="light"] .cc-modal-header {
+            background: linear-gradient(90deg, #f8fafc, #eef2ff) !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .cc-modal-header small,
+        html[data-theme="light"] .cc-modal-header small {
+            color: #475569 !important;
+        }
+        body[data-theme="light"] .cc-modal-content .btn-close-white,
+        html[data-theme="light"] .cc-modal-content .btn-close-white {
+            filter: none !important;
+        }
+        body[data-theme="light"] .cc-modal-body,
+        html[data-theme="light"] .cc-modal-body {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .cc-nav-tabs,
+        html[data-theme="light"] .cc-nav-tabs {
+            background-color: #e2e8f0 !important;
+            border-bottom-color: #cbd5e1 !important;
+        }
+        body[data-theme="light"] .cc-nav-link,
+        html[data-theme="light"] .cc-nav-link {
+            color: #334155 !important;
+            opacity: 0.85;
+        }
+        body[data-theme="light"] .cc-nav-link.active,
+        html[data-theme="light"] .cc-nav-link.active {
+            background-color: #ffffff !important;
+            color: #4f46e5 !important;
+            border-bottom: 2px solid #4f46e5 !important;
+        }
+        body[data-theme="light"] .cc-form-label,
+        html[data-theme="light"] .cc-form-label {
+            color: #1e293b !important;
+        }
+        body[data-theme="light"] .cc-form-control,
+        html[data-theme="light"] .cc-form-control {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        body[data-theme="light"] .cc-btn-purple,
+        html[data-theme="light"] .cc-btn-purple {
+            background-color: #6d28d9 !important;
+            color: #ffffff !important;
+        }
+        body[data-theme="light"] .cc-btn-gray,
+        html[data-theme="light"] .cc-btn-gray {
+            background-color: #e2e8f0 !important;
+            color: #1e293b !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+        body[data-theme="light"] .cc-q-card,
+        html[data-theme="light"] .cc-q-card {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .cc-q-card .input-group-text,
+        html[data-theme="light"] .cc-q-card .input-group-text {
+            background-color: #eef2ff !important;
+            color: #4f46e5 !important;
+            border-color: #cbd5e1 !important;
+        }
+        body[data-theme="light"] .cc-voice-bar,
+        html[data-theme="light"] .cc-voice-bar {
+            background: linear-gradient(90deg, #ecfdf5, #eef2ff) !important;
+            border-color: #a5b4fc !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] #fqVoiceHelpBox,
+        html[data-theme="light"] #fqVoiceHelpBox {
+            color: #334155 !important;
+            border-color: #cbd5e1 !important;
+        }
+        body[data-theme="light"] .cc-vis-panel,
+        html[data-theme="light"] .cc-vis-panel {
+            background: #f0f9ff !important;
+            border-color: #38bdf8 !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .cc-sub-strip,
+        html[data-theme="light"] .cc-sub-strip {
+            background: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .sq-lobby-banner,
+        html[data-theme="light"] .sq-lobby-banner {
+            background: linear-gradient(90deg, #eef2ff, #e0f2fe) !important;
+            border-color: #818cf8 !important;
+            color: #1e1b4b !important;
+        }
+        body[data-theme="light"] .sq-challenge-card,
+        html[data-theme="light"] .sq-challenge-card {
+            background: linear-gradient(135deg, #ffffff, #f5f3ff) !important;
+            border-color: #8b5cf6 !important;
+            border-bottom-color: #6d28d9 !important;
+            color: #1e1b4b !important;
+        }
+        body[data-theme="light"] .sq-challenge-card h5,
+        body[data-theme="light"] .sq-challenge-card .small,
+        html[data-theme="light"] .sq-challenge-card h5,
+        html[data-theme="light"] .sq-challenge-card .small {
+            color: #1e1b4b !important;
+        }
+        body[data-theme="light"] .sq-blooket-stage,
+        html[data-theme="light"] .sq-blooket-stage {
+            background: radial-gradient(circle at top right, #ede9fe 0%, #e0e7ff 60%, #f8fafc 100%) !important;
+            border-color: #a78bfa !important;
+        }
+        body[data-theme="light"] .sq-blooket-hud,
+        html[data-theme="light"] .sq-blooket-hud {
+            background: #ffffff !important;
+            border-color: #c4b5fd !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .sq-blooket-hud .badge.bg-dark,
+        html[data-theme="light"] .sq-blooket-hud .badge.bg-dark {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .sq-progress-strip,
+        html[data-theme="light"] .sq-progress-strip {
+            background: #ffffff !important;
+            border-color: #c4b5fd !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .sq-desc-wrap,
+        html[data-theme="light"] .sq-desc-wrap {
+            background: #ffffff !important;
+            border-color: #a78bfa !important;
+        }
+        .sq-opt-tile,
+        .sq-opt-tile span {
+            color: #ffffff !important;
+        }
+        .sq-opt-tile .sq-opt-selected-badge {
+            color: #1e1b4b !important;
+        }
+        body[data-theme="light"] .sq-q-pill,
+        html[data-theme="light"] .sq-q-pill {
+            background: #e2e8f0 !important;
+            border-color: #cbd5e1 !important;
+            color: #1e293b !important;
+        }
+        body[data-theme="light"] .sq-q-pill.active,
+        html[data-theme="light"] .sq-q-pill.active {
+            background: #f59e0b !important;
+            border-color: #d97706 !important;
+            color: #1e1b4b !important;
+        }
+        body[data-theme="light"] .sq-q-pill.answered,
+        html[data-theme="light"] .sq-q-pill.answered {
+            background: #10b981 !important;
+            border-color: #059669 !important;
+            color: #ffffff !important;
+        }
+        body[data-theme="light"] .cc-dash-card,
+        html[data-theme="light"] .cc-dash-card {
+            background: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .cc-metric-green,
+        html[data-theme="light"] .cc-metric-green {
+            background: #ecfdf5 !important;
+            border-color: #10b981 !important;
+            color: #065f46 !important;
+        }
+        body[data-theme="light"] .cc-metric-blue,
+        html[data-theme="light"] .cc-metric-blue {
+            background: #eff6ff !important;
+            border-color: #3b82f6 !important;
+            color: #1e40af !important;
+        }
+        body[data-theme="light"] .cc-metric-amber,
+        html[data-theme="light"] .cc-metric-amber {
+            background: #fffbeb !important;
+            border-color: #f59e0b !important;
+            color: #92400e !important;
+        }
+        body[data-theme="light"] .cc-metric-purple,
+        html[data-theme="light"] .cc-metric-purple {
+            background: #f5f3ff !important;
+            border-color: #8b5cf6 !important;
+            color: #4c1d95 !important;
+        }
+        body[data-theme="light"] .cc-metric-red,
+        html[data-theme="light"] .cc-metric-red {
+            background: #fef2f2 !important;
+            border-color: #ef4444 !important;
+            color: #991b1b !important;
+        }
+        body[data-theme="light"] .cc-analytics-table,
+        html[data-theme="light"] .cc-analytics-table {
+            background: #ffffff !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .cc-analytics-table thead,
+        html[data-theme="light"] .cc-analytics-table thead {
+            background: #eef2ff !important;
+            color: #1e1b4b !important;
+        }
+        body[data-theme="light"] .cc-weak-card,
+        html[data-theme="light"] .cc-weak-card {
+            background: #fef2f2 !important;
+            border-color: #ef4444 !important;
+            color: #7f1d1d !important;
+        }
+        body[data-theme="light"] .cc-weak-card .card-header,
+        html[data-theme="light"] .cc-weak-card .card-header {
+            background: #fee2e2 !important;
+        }
+        body[data-theme="light"] .cc-weak-card p,
+        html[data-theme="light"] .cc-weak-card p {
+            color: #7f1d1d !important;
+        }
+        body[data-theme="light"] .cc-detail-answer-card,
+        html[data-theme="light"] .cc-detail-answer-card {
+            background: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] .cc-modal-content .badge.bg-success,
+        body[data-theme="light"] .cc-modal-content .badge.bg-danger,
+        body[data-theme="light"] .cc-modal-content .badge.bg-primary,
+        body[data-theme="light"] .cc-modal-content .sq-play-3d-btn,
+        html[data-theme="light"] .cc-modal-content .badge.bg-success,
+        html[data-theme="light"] .cc-modal-content .badge.bg-danger,
+        html[data-theme="light"] .cc-modal-content .badge.bg-primary,
+        html[data-theme="light"] .cc-modal-content .sq-play-3d-btn {
+            color: #ffffff !important;
+        }
+        body[data-theme="light"] .cc-modal-content .badge.bg-dark,
+        html[data-theme="light"] .cc-modal-content .badge.bg-dark {
+            background-color: #e2e8f0 !important;
+            color: #0f172a !important;
+            border-color: #94a3b8 !important;
+        }
+        body[data-theme="light"] .cc-modal-content .badge.bg-secondary,
+        body[data-theme="light"] .cc-modal-content .badge.bg-info,
+        body[data-theme="light"] .cc-modal-content .badge.bg-warning,
+        html[data-theme="light"] .cc-modal-content .badge.bg-secondary,
+        html[data-theme="light"] .cc-modal-content .badge.bg-info,
+        html[data-theme="light"] .cc-modal-content .badge.bg-warning {
+            color: #0f172a !important;
+        }
+        body[data-theme="light"] #sqHistoryList .list-group-item,
+        html[data-theme="light"] #sqHistoryList .list-group-item {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        body[data-theme="light"] #sqHistoryList .list-group-item .small,
+        html[data-theme="light"] #sqHistoryList .list-group-item .small {
+            color: #334155 !important;
+        }
     </style>
     <div class="modal fade" id="facultyQuizModal" tabindex="-1"
          data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
@@ -309,7 +604,7 @@ function injectQuizModals() {
                     </li>
                 </ul>
 
-                <div class="modal-body p-4" style="background-color: #120326;">
+                <div class="modal-body cc-modal-body p-4" style="background-color: #120326;">
                     <!-- VOICE ASSISTANT BAR (Toggled by Enable/Disable switch) -->
                     <div id="fqVoiceBar" class="cc-voice-bar" style="display:none;">
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -356,7 +651,7 @@ function injectQuizModals() {
                     </div>
 
                     <!-- STUDENT QUIZ VISIBILITY CONTROL (FACULTY: ENABLE / HIDE PER CLASS) -->
-                    <div class="p-3 rounded mb-3" style="background: rgba(15, 23, 42, 0.9); border: 1px solid #38bdf8;">
+                    <div class="p-3 rounded mb-3 cc-vis-panel" style="background: rgba(15, 23, 42, 0.9); border: 1px solid #38bdf8;">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                             <div>
                                 <h6 class="fw-bold text-info mb-0">
@@ -403,7 +698,7 @@ function injectQuizModals() {
                     <div class="tab-content">
                         <!-- CREATE TAB -->
                         <div class="tab-pane fade show active" id="fqCreateTab" role="tabpanel">
-                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-2 px-3 rounded mb-3" style="background:#0a041f; border:1px solid #3b0764;">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-2 px-3 rounded mb-3 cc-sub-strip" style="background:#0a041f; border:1px solid #3b0764;">
                                 <div class="small">
                                     <i class="fa-solid fa-bullhorn text-info me-1"></i>
                                     Target Class: <strong id="fqTargetSectionPreview" class="text-warning">Not selected</strong>
@@ -597,10 +892,10 @@ function injectQuizModals() {
                     <!-- No close button during active quiz - controlled by firewall -->
                     <button id="sqCloseBtn" type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4" style="background-color: #120326;">
+                <div class="modal-body cc-modal-body p-4" style="background-color: #120326;">
                     <!-- List of quizzes -->
                     <div id="sqListContainer">
-                        <div class="p-3 rounded mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2" style="background:linear-gradient(90deg,#3b0764,#1e1b4b);border:1px solid #7c3aed;">
+                        <div class="p-3 rounded mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2 sq-lobby-banner" style="background:linear-gradient(90deg,#3b0764,#1e1b4b);border:1px solid #7c3aed;">
                             <div>
                                 <h6 class="fw-bold text-warning mb-0"><i class="fa-solid fa-trophy me-2"></i>Available Quiz Challenges</h6>
                                 <small class="text-light opacity-75">Pick a challenge and answer on colored arcade tiles — your level graph updates on completion!</small>
@@ -631,7 +926,7 @@ function injectQuizModals() {
                         </div>
 
                         <!-- Progress & Navigation Strip -->
-                        <div class="p-3 rounded mb-3" style="background:rgba(10,4,31,0.85);border:1px solid #6d28d9;">
+                        <div class="p-3 rounded mb-3 sq-progress-strip" style="background:rgba(10,4,31,0.85);border:1px solid #6d28d9;">
                             <div class="d-flex justify-content-between align-items-center small mb-2">
                                 <span id="sqProgressLabel" class="fw-bold text-warning">Question 1 of 1 &bull; 0 Answered</span>
                                 <div class="d-flex align-items-center gap-2">
@@ -685,7 +980,7 @@ function injectQuizModals() {
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4" style="background-color: #120326;">
+                <div class="modal-body cc-modal-body p-4" style="background-color: #120326;">
                     <div id="sqHistoryListContainer">
                         <div id="sqHistoryList" class="list-group mb-3">
                             <div class="text-center py-4 text-muted">Loading history...</div>
@@ -1362,8 +1657,8 @@ window.quizLoadResults = async (quizId) => {
             }
             const accuracy = totalQ > 0 ? ((correct / totalQ) * 100).toFixed(1) : '?';
             return `
-            <div class="card mb-3" style="background:#1a0000;border:1px solid #dc2626;">
-                <div class="card-header d-flex justify-content-between align-items-center" style="background:#2d0000;">
+            <div class="card mb-3 cc-weak-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <strong class="text-danger"><i class="fa-solid fa-user-xmark me-1"></i>${name}</strong>
                     <div class="d-flex gap-2 align-items-center">
                         <span class="badge bg-danger">${pct}%</span>
@@ -1381,25 +1676,25 @@ window.quizLoadResults = async (quizId) => {
         <!-- Summary Stats Cards -->
         <div class="row g-3 mb-4">
             <div class="col-md-3">
-                <div class="p-3 rounded text-center" style="background:#0d1f12;border:1px solid #10b981;">
+                <div class="p-3 rounded text-center cc-metric-green">
                     <div class="fs-4 fw-bold text-success">${total}</div>
                     <div class="small text-muted">Students Attempted</div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="p-3 rounded text-center" style="background:#0d1a3a;border:1px solid #3b82f6;">
+                <div class="p-3 rounded text-center cc-metric-blue">
                     <div class="fs-4 fw-bold text-info">${classAccuracy}%</div>
                     <div class="small text-muted">Class Avg Score</div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="p-3 rounded text-center" style="background:#1a1200;border:1px solid #eab308;">
+                <div class="p-3 rounded text-center cc-metric-amber">
                     <div class="fs-4 fw-bold text-warning">${passRate}%</div>
                     <div class="small text-muted">Pass Rate</div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="p-3 rounded text-center" style="background:#1a0000;border:1px solid #ef4444;">
+                <div class="p-3 rounded text-center cc-metric-red">
                     <div class="fs-4 fw-bold text-danger">${failCount}</div>
                     <div class="small text-muted">Need Attention</div>
                 </div>
@@ -1408,16 +1703,16 @@ window.quizLoadResults = async (quizId) => {
 
         <!-- Class Performance Bar Chart -->
         ${total > 0 ? `
-        <div class="mb-4 p-3 rounded" style="background:#0a041f;border:1px solid #4c1d95;">
-            <h6 class="fw-bold mb-3" style="color:#a78bfa;"><i class="fa-solid fa-chart-bar me-2"></i>Student Performance Overview</h6>
+        <div class="mb-4 p-3 rounded cc-dash-card">
+            <h6 class="fw-bold mb-3" style="color:${_quizIsLight() ? '#4f46e5' : '#a78bfa'};"><i class="fa-solid fa-chart-bar me-2"></i>Student Performance Overview</h6>
             <canvas id="${chartId}" height="120"></canvas>
         </div>` : ''}
 
         <!-- Detailed Table -->
         <h6 class="fw-bold mb-2">All Submissions (${all.length})</h6>
         <div class="table-responsive mb-4">
-            <table class="table table-sm" style="color:#e0e0ff;background:#0d0d2e;">
-                <thead style="background:#1a003a;">
+            <table class="table table-sm cc-analytics-table">
+                <thead>
                     <tr>
                         <th>Student</th>
                         <th>Score</th>
@@ -1473,12 +1768,12 @@ window.quizLoadResults = async (quizId) => {
                         scales: {
                             y: {
                                 min: 0, max: 100,
-                                grid: { color: 'rgba(255,255,255,0.05)' },
-                                ticks: { color: '#94a3b8', callback: v => v + '%' }
+                                grid: { color: _quizChartColors().grid },
+                                ticks: { color: _quizChartColors().text, callback: v => v + '%' }
                             },
                             x: {
                                 grid: { display: false },
-                                ticks: { color: '#94a3b8', maxRotation: 45 }
+                                ticks: { color: _quizChartColors().text, maxRotation: 45 }
                             }
                         }
                     }
@@ -1759,7 +2054,7 @@ window.quizStudentStart = async (quizId) => {
                         <span class="flex-grow-1" style="line-height:1.3;">${escHtml(opt)}</span>
                         <span class="sq-opt-selected-badge"><i class="fa-solid fa-check me-1"></i>SELECTED</span>
                     </div>`).join('') + `</div>`
-                : `<div class="mt-3 p-3 rounded" style="background:rgba(10,4,31,0.9);border:2px solid #7c3aed;">
+                : `<div class="mt-3 p-3 rounded sq-desc-wrap" style="background:rgba(10,4,31,0.9);border:2px solid #7c3aed;">
                         <textarea name="sq_q_${q.id}" id="sq_desc_${q.id}" rows="5"
                             class="form-control"
                             style="background:#0a1628;color:#e0f0ff;border-color:#3b82f6;font-size:0.98rem;"
@@ -1865,7 +2160,7 @@ window.quizStudentSubmit = async (e) => {
 
             const reviewHtml = (sub.answers || []).map((a, idx) => {
                 const q = a.question || {};
-                return `<div class="p-2 px-3 rounded mb-2 small" style="background:#0a041f; border:1px solid ${a.isCorrect ? '#10b981' : '#ef4444'};">
+                return `<div class="p-2 px-3 rounded mb-2 small cc-sub-strip" style="border:1px solid ${a.isCorrect ? '#10b981' : '#ef4444'};">
                     <div class="fw-bold text-white">Q${idx + 1}. ${q.questionText || ''}</div>
                     <div class="mt-1">Your answer: <span class="${a.isCorrect ? 'text-success' : 'text-danger'} fw-bold">${a.answerText || '(Blank)'}</span>
                     ${!a.isCorrect && q.correctAnswer ? ` &bull; Correct: <span class="text-success fw-bold">${q.correctAnswer}</span>` : ''}</div>
@@ -1877,29 +2172,29 @@ window.quizStudentSubmit = async (e) => {
                 <div class="text-center mb-4">
                     <div style="font-size:3rem;">${isPassed ? '🎉' : '📚'}</div>
                     <h4 class="fw-bold mt-2" style="color:${level.color}">${level.label}</h4>
-                    <span class="badge bg-purple border border-info px-3 py-1">+${sub.totalScore ?? 0} XP Earned</span>
+                    <span class="badge bg-primary border border-info px-3 py-1">+${sub.totalScore ?? 0} XP Earned</span>
                 </div>
                 <div class="row g-3 mb-4">
                     <div class="col-6 col-md-3">
-                        <div class="p-3 rounded text-center" style="background:#0d1f12;border:1px solid #10b981;">
+                        <div class="p-3 rounded text-center cc-metric-green">
                             <div class="fs-3 fw-bold" style="color:${level.color}">${pct}%</div>
                             <div class="small text-muted mt-1">Score</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="p-3 rounded text-center" style="background:#0d1a3a;border:1px solid #3b82f6;">
+                        <div class="p-3 rounded text-center cc-metric-blue">
                             <div class="fs-3 fw-bold text-info">${accuracy}%</div>
                             <div class="small text-muted mt-1">Accuracy</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="p-3 rounded text-center" style="background:#1a1200;border:1px solid #eab308;">
+                        <div class="p-3 rounded text-center cc-metric-amber">
                             <div class="fs-3 fw-bold text-warning">${correct}/${totalQ}</div>
                             <div class="small text-muted mt-1">Correct</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="p-3 rounded text-center" style="background:#0a041f;border:1px solid #8b5cf6;">
+                        <div class="p-3 rounded text-center cc-metric-purple">
                             <div class="fs-3 fw-bold text-info">${sub.totalScore ?? 0}</div>
                             <div class="small text-muted mt-1">Marks</div>
                         </div>
@@ -1910,7 +2205,7 @@ window.quizStudentSubmit = async (e) => {
                 </div>
                 ${reviewHtml ? `<div class="mb-3"><h6 class="fw-bold text-info mb-2"><i class="fa-solid fa-magnifying-glass-chart me-1"></i>Answer Review</h6>${reviewHtml}</div>` : ''}
                 ${!isPassed && sub.aiWeaknessAnalysis ? `
-                <div class="p-3 rounded mb-3" style="background:#1a0000;border:1px solid #dc2626;">
+                <div class="p-3 rounded mb-3 cc-weak-card">
                     <h6 class="text-warning fw-bold"><i class="fa-solid fa-robot me-1"></i>AI Study Recommendations</h6>
                     <p style="color:#fde68a;white-space:pre-wrap;">${sub.aiWeaknessAnalysis}</p>
                 </div>` : ''}
@@ -1934,7 +2229,7 @@ window.quizStudentSubmit = async (e) => {
                     options: {
                         cutout: '70%',
                         plugins: {
-                            legend: { labels: { color: '#94a3b8' } },
+                            legend: { labels: { color: _quizChartColors().text } },
                             tooltip: { callbacks: { label: c => c.label + ': ' + c.raw + ' Q' } }
                         }
                     }
@@ -1996,6 +2291,19 @@ function _showSuccess(msg) {
 /**
  * Dynamically loads Chart.js if not already loaded, then calls `cb`.
  */
+function _quizIsLight() {
+    return document.body.getAttribute('data-theme') === 'light' ||
+        document.documentElement.getAttribute('data-theme') === 'light';
+}
+
+function _quizChartColors() {
+    const isLight = _quizIsLight();
+    return {
+        text: isLight ? '#1e293b' : '#94a3b8',
+        grid: isLight ? 'rgba(15,23,42,0.1)' : 'rgba(255,255,255,0.05)'
+    };
+}
+
 function _ensureChartJs(cb) {
     if (window.Chart) { cb(); return; }
     const s = document.createElement('script');
@@ -2068,17 +2376,17 @@ window.openStudentQuizHistoryModal = async () => {
                              {label:'Needs Improvement 📚',cls:'danger'};
 
         const summaryHtml = `
-            <div class="mb-4 p-3 rounded" style="background:#0a041f;border:1px solid #6d28d9;">
-                <h6 class="fw-bold mb-3" style="color:#a78bfa;"><i class="fa-solid fa-chart-line me-2"></i>My Performance Dashboard</h6>
+            <div class="mb-4 p-3 rounded cc-dash-card">
+                <h6 class="fw-bold mb-3" style="color:${_quizIsLight() ? '#4f46e5' : '#a78bfa'};"><i class="fa-solid fa-chart-line me-2"></i>My Performance Dashboard</h6>
                 <div class="row g-2 mb-3">
-                    <div class="col-3"><div class="p-2 rounded text-center" style="background:#0d1f12;border:1px solid #10b981;">
+                    <div class="col-6 col-md-3"><div class="p-2 rounded text-center h-100 cc-metric-green d-flex flex-column justify-content-center">
                         <div class="fs-5 fw-bold text-success">${avgScore}%</div><div class="tiny text-muted" style="font-size:0.72rem;">Avg Score</div></div></div>
-                    <div class="col-3"><div class="p-2 rounded text-center" style="background:#0d1a3a;border:1px solid #3b82f6;">
+                    <div class="col-6 col-md-3"><div class="p-2 rounded text-center h-100 cc-metric-blue d-flex flex-column justify-content-center">
                         <div class="fs-5 fw-bold text-info">${bestScore}%</div><div class="tiny text-muted" style="font-size:0.72rem;">Best Score</div></div></div>
-                    <div class="col-3"><div class="p-2 rounded text-center" style="background:#1a1200;border:1px solid #eab308;">
+                    <div class="col-6 col-md-3"><div class="p-2 rounded text-center h-100 cc-metric-amber d-flex flex-column justify-content-center">
                         <div class="fs-5 fw-bold text-warning">${passedCount}/${totalAttempted}</div><div class="tiny text-muted" style="font-size:0.72rem;">Passed</div></div></div>
-                    <div class="col-3"><div class="p-2 rounded text-center" style="background:#120326;border:1px solid #8b5cf6;">
-                        <span class="badge bg-${overallLevel.cls} fs-6">${overallLevel.label}</span><div class="tiny text-muted mt-1" style="font-size:0.72rem;">Level</div></div></div>
+                    <div class="col-6 col-md-3"><div class="p-2 rounded text-center h-100 cc-metric-purple d-flex flex-column justify-content-center align-items-center">
+                        <span class="badge bg-${overallLevel.cls} cc-level-badge">${overallLevel.label}</span><div class="tiny text-muted mt-1" style="font-size:0.72rem;">Level</div></div></div>
                 </div>
                 <canvas id="${perfChartId}" height="100"></canvas>
             </div>
@@ -2147,6 +2455,8 @@ window.openStudentQuizHistoryModal = async () => {
                 _ensureChartJs(() => {
                     const ctx = document.getElementById(perfChartId);
                     if (!ctx) return;
+                    const existingChart = Chart.getChart(ctx);
+                    if (existingChart) existingChart.destroy();
                     new Chart(ctx, {
                         type: 'line',
                         data: {
@@ -2177,12 +2487,12 @@ window.openStudentQuizHistoryModal = async () => {
                         options: {
                             responsive: true,
                             plugins: {
-                                legend: { labels: { color: '#94a3b8' } },
+                                legend: { labels: { color: _quizChartColors().text } },
                                 tooltip: { callbacks: { label: c => c.dataset.label + ': ' + c.raw + '%' } }
                             },
                             scales: {
-                                y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', callback: v => v + '%' } },
-                                x: { grid: { display: false }, ticks: { color: '#94a3b8', maxRotation: 30 } }
+                                y: { min: 0, max: 100, grid: { color: _quizChartColors().grid }, ticks: { color: _quizChartColors().text, callback: v => v + '%' } },
+                                x: { grid: { display: false }, ticks: { color: _quizChartColors().text, maxRotation: 30 } }
                             }
                         }
                     });
@@ -2253,26 +2563,26 @@ window.showQuizHistoryDetails = (sub) => {
         <!-- Metrics Row -->
         <div class="row g-2 mb-4">
             <div class="col-6 col-md-3">
-                <div class="p-2 rounded text-center" style="background:#0d1f12;border:1px solid #10b981;">
+                <div class="p-2 rounded text-center h-100 cc-metric-green d-flex flex-column justify-content-center">
                     <div class="fs-5 fw-bold" style="color:${detailLevel.color}">${sub.percentage ? sub.percentage.toFixed(1) : '0'}%</div>
                     <div class="tiny text-muted" style="font-size:0.72rem;">Score</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
-                <div class="p-2 rounded text-center" style="background:#0d1a3a;border:1px solid #3b82f6;">
+                <div class="p-2 rounded text-center h-100 cc-metric-blue d-flex flex-column justify-content-center">
                     <div class="fs-5 fw-bold text-info">${detailAccuracy}%</div>
                     <div class="tiny text-muted" style="font-size:0.72rem;">Accuracy</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
-                <div class="p-2 rounded text-center" style="background:#1a1200;border:1px solid #eab308;">
+                <div class="p-2 rounded text-center h-100 cc-metric-amber d-flex flex-column justify-content-center">
                     <div class="fs-5 fw-bold text-warning">${correctCount}/${totalQCount}</div>
                     <div class="tiny text-muted" style="font-size:0.72rem;">Correct / Total</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
-                <div class="p-2 rounded text-center" style="background:#120326;border:1px solid #8b5cf6;">
-                    <div style="color:${detailLevel.color};font-size:0.85rem;font-weight:bold;">${detailLevel.label}</div>
+                <div class="p-2 rounded text-center h-100 cc-metric-purple d-flex flex-column justify-content-center align-items-center">
+                    <div class="cc-level-badge fw-bold" style="color:${detailLevel.color};">${detailLevel.label}</div>
                     <div class="tiny text-muted" style="font-size:0.72rem;">Level</div>
                 </div>
             </div>
@@ -2281,7 +2591,7 @@ window.showQuizHistoryDetails = (sub) => {
         <div class="d-flex justify-content-center mb-4">
             <div style="width:160px;height:160px;"><canvas id="${detailDonutId}"></canvas></div>
         </div>
-        ${sub.aiWeaknessAnalysis ? `<div class="p-3 rounded mb-3" style="background:#1a0000;border:1px solid #dc2626;"><div class="text-warning small"><strong>AI Feedback:</strong><br/>${sub.aiWeaknessAnalysis.replace(/\\n/g, '<br/>')}</div></div>` : ''}
+        ${sub.aiWeaknessAnalysis ? `<div class="p-3 rounded mb-3 cc-weak-card"><div class="text-warning small"><strong>AI Feedback:</strong><br/>${sub.aiWeaknessAnalysis.replace(/\\n/g, '<br/>')}</div></div>` : ''}
         <h6 class="fw-bold mb-3 border-bottom border-secondary pb-2">Questions & Answers</h6>
     `;
 
@@ -2296,7 +2606,7 @@ window.showQuizHistoryDetails = (sub) => {
             let icon = isCorrect ? '<i class="fa-solid fa-check text-success"></i>' : '<i class="fa-solid fa-xmark text-danger"></i>';
 
             html += `
-                <div class="mb-4 p-3 border border-secondary rounded" style="background:#1e1e1e;">
+                <div class="mb-4 p-3 border border-secondary rounded cc-detail-answer-card">
                     <div class="fw-bold mb-2">Q${idx + 1}. ${q ? q.questionText : 'Unknown Question'}</div>
                     <div class="small mb-1"><span class="text-muted">Your Answer:</span> <span class="${colorClass} fw-bold">${ans.answerText || '-'}</span> ${icon}</div>
                     ${!isCorrect && q && q.correctAnswer ? `<div class="small"><span class="text-muted">Correct Answer:</span> <span class="text-success fw-bold">${q.correctAnswer}</span></div>` : ''}
@@ -2326,7 +2636,7 @@ window.showQuizHistoryDetails = (sub) => {
             options: {
                 cutout: '65%',
                 plugins: {
-                    legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+                    legend: { labels: { color: _quizChartColors().text, font: { size: 11 } } },
                     tooltip: { callbacks: { label: c => c.label + ': ' + c.raw } }
                 }
             }

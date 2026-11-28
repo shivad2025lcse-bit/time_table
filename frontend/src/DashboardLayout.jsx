@@ -146,7 +146,7 @@ export default function DashboardLayout() {
             return;
         }
         window.__seceLegacyScriptsLoaded = true;
-        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js?v=58", "/js/charts.js", "/js/reports.js", "/js/quiz.js?v=4", "/js/temp_timetable.js?v=1"];
+        const scripts = ["/js/theme.js", "/js/app.js", "/js/timetable.js", "/js/frontend_app.js?v=62", "/js/charts.js", "/js/reports.js", "/js/quiz.js?v=6", "/js/temp_timetable.js?v=1"];
         scripts.forEach(src => {
             const script = document.createElement("script");
             script.src = src + '?v=' + new Date().getTime();
@@ -306,8 +306,8 @@ export default function DashboardLayout() {
 
 
 
-            <div id="applicationShell" style={{ display: isLoginPage ? "none" : "block" }}>
-                <header className="inst-header no-print sticky-top" style={{ zIndex: 1050, backgroundColor: 'var(--sece-bg, #0b0f17)', borderBottom: '1px solid rgba(255,255,255,0.1)', height: '60px' }}>
+            <div id="applicationShell" className="app-shell" style={{ display: isLoginPage ? "none" : "flex" }}>
+                <header className="inst-header no-print flex-shrink-0" style={{ zIndex: 1050, backgroundColor: 'var(--sece-bg, #0b0f17)', borderBottom: '1px solid rgba(255,255,255,0.1)', height: '60px' }}>
                     <div className="container-fluid px-3 h-100">
                         <div className="d-flex align-items-center justify-content-between h-100">
                             <div className="d-flex align-items-center gap-3">
@@ -384,23 +384,25 @@ export default function DashboardLayout() {
                                     <i id="themeIcon" className="fa-solid fa-sun"></i>
                                     <span id="themeToggleLabel" className="d-none d-md-block">Light</span>
                                 </button>
-                                <button className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 ms-1 ms-md-2" type="button" onClick={() => window.logoutUser?.()}>
-                                    <i className="fa-solid fa-right-from-bracket"></i> <span className="d-none d-md-block">Logout</span>
-                                </button>
+                                {!isStudent && (
+                                    <button className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 ms-1 ms-md-2" type="button" onClick={() => window.logoutUser?.()}>
+                                        <i className="fa-solid fa-right-from-bracket"></i> <span className="d-none d-md-block">Logout</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
                 </header>
 
-                <div id="announcementTickerContainer" className="w-100 bg-success text-white py-1 marquee-l2r-container no-print" style={{ borderBottom: "2px solid #198754", zIndex: 1040, position: 'relative' }}>
+                <div id="announcementTickerContainer" className="w-100 bg-success text-white py-1 marquee-l2r-container no-print flex-shrink-0" style={{ borderBottom: "2px solid #198754", zIndex: 1040, position: 'relative' }}>
                     <div id="announcementMarquee" className="marquee-l2r-content mb-0 fw-bold fs-6" style={{ letterSpacing: "0.5px" }}></div>
                 </div>
 
                 <div className="app-layout">
                     {/* Sidebar Drawer / Menu */}
                     <aside className={`app-sidebar no-print d-flex flex-column p-3 ${isSidebarOpen ? 'open-mobile' : 'closed-desktop'}`}>
-                        <div className="text-muted text-uppercase small fw-bold mb-3 px-2" style={{ letterSpacing: '1px' }}>Navigation</div>
-                        <nav className="d-flex flex-column gap-2 flex-grow-1">
+                        <div className="text-muted text-uppercase small fw-bold mb-3 px-2 flex-shrink-0" style={{ letterSpacing: '1px' }}>Navigation</div>
+                        <nav className="d-flex flex-column gap-2 flex-shrink-0">
                             {isAdmin && (
                                 <>
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#manageStudentsModal" onClick={() => window.innerWidth <= 992 && setIsSidebarOpen(false)}>
@@ -506,27 +508,76 @@ export default function DashboardLayout() {
                                     <button className="sidebar-nav-link" data-bs-toggle="modal" data-bs-target="#emailVerificationModal" onClick={() => { window.openEmailVerificationModal?.(); window.innerWidth <= 992 && setIsSidebarOpen(false); }}>
                                         <i className="fa-solid fa-envelope-circle-check fa-fw me-3 text-success"></i> Email Alerts (OTP)
                                     </button>
+                                    <div id="studentDownloadTtWrap" className="dropdown">
+                                        <button className="btn btn-sm btn-success dropdown-toggle fw-bold d-flex align-items-center justify-content-center gap-2 w-100" type="button" data-bs-toggle="dropdown">
+                                            <i className="fa-solid fa-download"></i> Download TT
+                                        </button>
+                                        <ul className="dropdown-menu dropdown-menu-dark shadow w-100">
+                                            <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.downloadTimetablePNG?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }}><i className="fa-solid fa-file-image me-2 text-info"></i> PNG Image</a></li>
+                                            <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.exportTimetableCSV?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }}><i className="fa-solid fa-file-csv me-2 text-success"></i> CSV Spreadsheet</a></li>
+                                            <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); (window.printTimetableOnly ? window.printTimetableOnly() : window.print()); if (window.innerWidth <= 992) setIsSidebarOpen(false); }}><i className="fa-solid fa-file-pdf me-2 text-danger"></i> Print / PDF</a></li>
+                                        </ul>
+                                    </div>
+                                    <button className="sidebar-nav-link text-danger" onClick={() => window.logoutUser?.()}>
+                                        <i className="fa-solid fa-right-from-bracket fa-fw me-3"></i> Logout
+                                    </button>
                                 </>
                             )}
                         </nav>
 
-                        {/* Download TT - Shared */}
-                        <div className="px-2 mb-3 dropdown">
-                            <button className="btn btn-sm btn-success dropdown-toggle fw-bold d-flex align-items-center justify-content-center gap-2 w-100" type="button" data-bs-toggle="dropdown">
-                                <i className="fa-solid fa-download"></i> Download TT
-                            </button>
-                            <ul className="dropdown-menu dropdown-menu-dark shadow w-100">
-                                <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.downloadTimetablePNG?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-image me-2 text-info"></i> PNG Image</a></li>
-                                <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.exportTimetableCSV?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-csv me-2 text-success"></i> CSV Spreadsheet</a></li>
-                                <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); (window.printTimetableOnly ? window.printTimetableOnly() : window.print()); if (window.innerWidth <= 992) setIsSidebarOpen(false); }} ><i className="fa-solid fa-file-pdf me-2 text-danger"></i> Print / PDF</a></li>
-                            </ul>
-                        </div>
+                        {!isStudent && (
+                            <div className="mt-3 pt-2 flex-shrink-0">
+                                {isAdmin && (
+                                    <div id="adminDownloadTtControl" className="px-2 mb-2">
+                                        <div className="p-2 rounded border border-secondary bg-dark">
+                                            <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                                <span className="small fw-semibold text-white" style={{ fontSize: '0.76rem' }}>
+                                                    <i className="fa-solid fa-sliders me-1 text-info"></i> Admin Download TT
+                                                </span>
+                                                <span id="adminDownloadTtBadge" className="badge bg-success" style={{ fontSize: '0.66rem' }}>Enabled</span>
+                                            </div>
+                                            <div className="d-flex gap-1">
+                                                <button
+                                                    type="button"
+                                                    id="adminEnableDownloadTtBtn"
+                                                    className="btn btn-xs btn-success flex-fill fw-semibold py-1"
+                                                    style={{ fontSize: '0.72rem' }}
+                                                    onClick={() => window.toggleDownloadTtEnabled?.(true)}
+                                                >
+                                                    <i className="fa-solid fa-check me-1"></i> Enable
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    id="adminDisableDownloadTtBtn"
+                                                    className="btn btn-xs btn-danger flex-fill fw-semibold py-1"
+                                                    style={{ fontSize: '0.72rem' }}
+                                                    onClick={() => window.toggleDownloadTtEnabled?.(false)}
+                                                >
+                                                    <i className="fa-solid fa-ban me-1"></i> Disable
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
-                        <div className="mt-auto pt-3 border-top border-secondary">
-                            <button className="sidebar-nav-link text-danger" onClick={() => window.logoutUser?.()}>
-                                <i className="fa-solid fa-right-from-bracket fa-fw me-3"></i> Logout
-                            </button>
-                        </div>
+                                <div id="sidebarDownloadTtWrap" className="px-2 mb-3 dropdown">
+                                    <button className="btn btn-sm btn-success dropdown-toggle fw-bold d-flex align-items-center justify-content-center gap-2 w-100" type="button" data-bs-toggle="dropdown">
+                                        <i className="fa-solid fa-download"></i> Download TT
+                                    </button>
+                                    <ul className="dropdown-menu dropdown-menu-dark shadow w-100">
+                                        <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.downloadTimetablePNG?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }}><i className="fa-solid fa-file-image me-2 text-info"></i> PNG Image</a></li>
+                                        <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); window.exportTimetableCSV?.(); if (window.innerWidth <= 992) setIsSidebarOpen(false); }}><i className="fa-solid fa-file-csv me-2 text-success"></i> CSV Spreadsheet</a></li>
+                                        <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); (window.printTimetableOnly ? window.printTimetableOnly() : window.print()); if (window.innerWidth <= 992) setIsSidebarOpen(false); }}><i className="fa-solid fa-file-pdf me-2 text-danger"></i> Print / PDF</a></li>
+                                    </ul>
+                                </div>
+
+                                <div className="mt-2 pt-3 border-top border-secondary">
+                                    <button className="sidebar-nav-link text-danger" onClick={() => window.logoutUser?.()}>
+                                        <i className="fa-solid fa-right-from-bracket fa-fw me-3"></i> Logout
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </aside>
 
                     {/* Mobile Overlay */}
@@ -570,15 +621,6 @@ export default function DashboardLayout() {
 
                         </div>
 
-                        {/* Student Upcoming Class Alert (Legacy) */}
-                        <div id="studentUpcomingClassAlert" className="alert alert-info d-none mb-3 align-items-center shadow-sm" role="alert" style={{ borderLeft: "4px solid #0dcaf0" }}>
-                            <i className="fa-solid fa-clock fa-2x me-3 text-info"></i>
-                            <div>
-                                <h6 className="alert-heading mb-1 fw-bold" id="studentUpcomingClassTitle">Upcoming Class</h6>
-                                <p className="mb-0 text-dark" id="studentUpcomingClassText">Loading...</p>
-                            </div>
-                        </div>
-
                         {/* Faculty Next Class Alert */}
                         <div id="facultyNextClassAlert" className="alert alert-primary d-none mb-3 align-items-center shadow-sm" role="alert" style={{ borderLeft: "4px solid #0d6efd" }}>
                             <i className="fa-solid fa-person-chalkboard fa-2x me-3 text-primary"></i>
@@ -604,7 +646,8 @@ export default function DashboardLayout() {
                             <div className="d-flex align-items-center gap-2">
                                 <button id="quickAssignBtn" className="btn btn-sm btn-outline-dark py-0 border-0 d-none" onClick={() => window.quickAssignWednesdayALT()}><i className="fa-solid fa-bolt text-warning me-1"></i> Quick Preset: Wed 4,5 ALT</button>
                                 <button id="resetTimetableBtn" className="btn btn-sm btn-outline-danger py-0 d-none" onClick={() => window.resetTimetableEdits()}><i className="fa-solid fa-rotate-left me-1"></i> Reset Edits to Default</button>
-                                <button className="btn btn-sm btn-success py-0" onClick={() => window.downloadTimetablePNG()}><i className="fa-solid fa-download me-1"></i> Download PNG</button>
+                                {isAdmin && <button id="adminBannerDownloadTtBtn" type="button" className="btn btn-sm btn-outline-info py-0" onClick={() => window.toggleDownloadTtEnabled?.(!window._downloadTtEnabled)}><i className="fa-solid fa-sliders me-1"></i> Download TT: ON</button>}
+                                {!isStudent && <button id="facultyDownloadPngBtn" className="btn btn-sm btn-success py-0" onClick={() => window.downloadTimetablePNG()}><i className="fa-solid fa-download me-1"></i> Download PNG</button>}
                             </div>
                         </div>
 

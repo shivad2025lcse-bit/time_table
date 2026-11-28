@@ -19,6 +19,19 @@ function applyTheme(theme) {
         btn.classList.toggle('btn-outline-secondary', target === 'light');
         btn.classList.toggle('btn-outline-warning', target !== 'light');
     }
+    if (window.Chart && Chart.instances) {
+        const txtCol = target === 'light' ? '#1e293b' : '#94a3b8';
+        const gridCol = target === 'light' ? 'rgba(15,23,42,0.1)' : 'rgba(255,255,255,0.05)';
+        Object.values(Chart.instances).forEach(ch => {
+            try {
+                if (ch.options?.plugins?.legend?.labels) ch.options.plugins.legend.labels.color = txtCol;
+                if (ch.options?.scales?.x?.ticks) ch.options.scales.x.ticks.color = txtCol;
+                if (ch.options?.scales?.y?.ticks) ch.options.scales.y.ticks.color = txtCol;
+                if (ch.options?.scales?.y?.grid) ch.options.scales.y.grid.color = gridCol;
+                ch.update('none');
+            } catch (e) { }
+        });
+    }
 }
 
 function toggleTheme() {

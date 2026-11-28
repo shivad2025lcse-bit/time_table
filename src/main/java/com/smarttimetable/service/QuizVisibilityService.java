@@ -39,6 +39,26 @@ public class QuizVisibilityService {
                 .orElse(true);
     }
 
+    public boolean isDownloadTtEnabled() {
+        return configRepository.findTopByOrderByIdAsc()
+                .map(cfg -> Boolean.TRUE.equals(cfg.getDownloadTtEnabled()))
+                .orElse(true);
+    }
+
+    @Transactional
+    public Map<String, Object> setDownloadTtEnabled(boolean enabled, String actor) {
+        QuizVisibilityConfig cfg = configRepository.findTopByOrderByIdAsc()
+                .orElseGet(QuizVisibilityConfig::new);
+        cfg.setDownloadTtEnabled(enabled);
+        cfg.setUpdatedBy(actor);
+        configRepository.save(cfg);
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("downloadTtEnabled", Boolean.TRUE.equals(cfg.getDownloadTtEnabled()));
+        res.put("updatedBy", actor);
+        res.put("message", enabled ? "Download TT option is now ENABLED." : "Download TT option is now DISABLED.");
+        return res;
+    }
+
     public boolean isQuizVisibleForSection(Long sectionId) {
         if (!isGlobalQuizEnabled()) {
             return false;

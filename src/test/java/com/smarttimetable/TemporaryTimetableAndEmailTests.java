@@ -1073,4 +1073,49 @@ class TemporaryTimetableAndEmailTests {
         assertThat(easyTexts2).hasSize(4);
         assertThat(easyTexts2).doesNotContainAnyElementsOf(easyTexts);
     }
+
+    @Test
+    void testAdminCanEnableAndDisableDownloadTtSetting() throws Exception {
+        String adminJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(adminUser.getUsername()), "ROLE_ADMIN");
+        String facultyJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(fac1User.getUsername()), "ROLE_FACULTY");
+        String stuJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(stu1User.getUsername()), "ROLE_STUDENT");
+
+        // Faculty and Student cannot toggle Download TT setting
+        mockMvc.perform(put("/api/operations/download-tt-setting")
+                        .header("Authorization", "Bearer " + facultyJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/operations/download-tt-setting")
+                        .header("Authorization", "Bearer " + stuJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isForbidden());
+
+        // Admin disables Download TT -> GET reflects false for all authenticated roles
+        mockMvc.perform(put("/api/operations/download-tt-setting")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.downloadTtEnabled").value(false));
+
+        mockMvc.perform(get("/api/operations/download-tt-setting")
+                        .header("Authorization", "Bearer " + stuJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.downloadTtEnabled").value(false));
+
+        // Admin re-enables Download TT -> GET reflects true
+        mockMvc.perform(put("/api/operations/download-tt-setting")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.downloadTtEnabled").value(true));
+
+        mockMvc.perform(get("/api/operations/download-tt-setting")
+                        .header("Authorization", "Bearer " + facultyJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.downloadTtEnabled").value(true));
+    }
 }

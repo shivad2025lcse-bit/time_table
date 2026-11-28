@@ -14,6 +14,9 @@ public class QuizVisibilityConfig {
     @Column(name = "global_quiz_enabled", nullable = false)
     private Boolean globalQuizEnabled = true;
 
+    @Column(name = "download_tt_enabled")
+    private Boolean downloadTtEnabled = true;
+
     @Column(name = "updated_by", length = 120)
     private String updatedBy;
 
@@ -35,6 +38,14 @@ public class QuizVisibilityConfig {
 
     public void setGlobalQuizEnabled(Boolean globalQuizEnabled) {
         this.globalQuizEnabled = globalQuizEnabled == null ? Boolean.TRUE : globalQuizEnabled;
+    }
+
+    public Boolean getDownloadTtEnabled() {
+        return downloadTtEnabled == null ? Boolean.TRUE : downloadTtEnabled;
+    }
+
+    public void setDownloadTtEnabled(Boolean downloadTtEnabled) {
+        this.downloadTtEnabled = downloadTtEnabled == null ? Boolean.TRUE : downloadTtEnabled;
     }
 
     public String getUpdatedBy() { return updatedBy; }

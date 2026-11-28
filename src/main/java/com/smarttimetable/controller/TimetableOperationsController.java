@@ -40,6 +40,9 @@ public class TimetableOperationsController {
         @Autowired
         private EmailNotificationService emailNotificationService;
 
+        @Autowired
+        private com.smarttimetable.service.QuizVisibilityService quizVisibilityService;
+
         private Teacher resolveFacultyActor(Authentication authentication) {
                 if (authentication == null)
                         return null;
@@ -325,5 +328,21 @@ public class TimetableOperationsController {
                                 eventType, sectionName, dateStr, dayName, periodNumber, subject, venue, originalFaculty,
                                 substituteFaculty, reason);
                 return ResponseEntity.ok(result);
+        }
+
+        @GetMapping("/download-tt-setting")
+        @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
+        public ResponseEntity<Map<String, Object>> getDownloadTtSetting() {
+                return ResponseEntity.ok(Map.of("downloadTtEnabled", quizVisibilityService.isDownloadTtEnabled()));
+        }
+
+        @PutMapping("/download-tt-setting")
+        @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('ROLE_ADMIN')")
+        public ResponseEntity<Map<String, Object>> updateDownloadTtSetting(
+                        @RequestBody Map<String, Object> body,
+                        Authentication authentication) {
+                boolean enabled = body != null && Boolean.parseBoolean(String.valueOf(body.get("enabled")));
+                String actor = authentication != null ? authentication.getName() : "admin";
+                return ResponseEntity.ok(quizVisibilityService.setDownloadTtEnabled(enabled, actor));
         }
 }
