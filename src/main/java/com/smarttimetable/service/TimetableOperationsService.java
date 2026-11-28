@@ -40,6 +40,8 @@ public class TimetableOperationsService {
     private SectionRepository sectionRepo;
     @Autowired
     private TimetableRepository timetableRepo;
+    @Autowired
+    private FacultyTimetableSyncService facultyTimetableSyncService;
 
     // Overrides
     public List<TimetableOverride> getAllOverrides() {
@@ -349,6 +351,7 @@ public class TimetableOperationsService {
         result.put("venues", new ArrayList<>(venueMap.values()));
         result.put("departments", new ArrayList<>(deptMap.values()));
         result.put("sections", sectionsList);
+        result.put("assignments", facultyTimetableSyncService.getActiveFacultyAssignments());
         return result;
     }
 }

@@ -84,6 +84,10 @@ public class TimetableController {
                     (java.util.Map<String, java.util.Map<String, String>>) request.get("grid");
             return ResponseEntity.ok(excelImportService.assignUploadedClassTimetable(
                     dept, year, sec, sectionName, classAdvisor, semester, gridData));
+        } catch (com.smarttimetable.service.FacultyTimetableSyncService.FacultyConflictException conflictEx) {
+            return ResponseEntity.status(409).body(java.util.Map.of(
+                    "error", conflictEx.getMessage(),
+                    "conflicts", conflictEx.getConflicts()));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Class assignment failed"));
@@ -166,7 +170,7 @@ public class TimetableController {
     // Faculty & Admin Period Update Access
     @PutMapping("/entry/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
-    public ResponseEntity<TimetableEntryDto> updatePeriodEntry(
+    public ResponseEntity<?> updatePeriodEntry(
             @PathVariable Long id,
             @RequestParam(required = false) Long teacherId,
             @RequestParam(required = false) Long classroomId,
@@ -174,6 +178,14 @@ public class TimetableController {
             @RequestParam(required = false) String day
     ) {
         return timetableRepository.findById(id).map(entry -> {
+            Teacher targetTeacher = teacherId != null ? teacherRepository.findById(teacherId).orElse(entry.getTeacher()) : entry.getTeacher();
+            String targetDay = (day != null && !day.isEmpty()) ? day : entry.getDay();
+            List<java.util.Map<String, Object>> conflicts = facultyTimetableSyncService.findSingleEntryConflicts(entry, targetTeacher, targetDay);
+            if (!conflicts.isEmpty()) {
+                return ResponseEntity.status(409).body((Object) java.util.Map.of(
+                        "error", String.valueOf(conflicts.get(0).get("message")),
+                        "conflicts", conflicts));
+            }
             if (teacherId != null) {
                 Teacher t = teacherRepository.findById(teacherId).orElse(null);
                 if (t != null) {
@@ -197,7 +209,7 @@ public class TimetableController {
             }
             TimetableEntry updated = timetableRepository.save(entry);
             facultyTimetableSyncService.syncAllFacultyTimetablesFromStudentTimetables();
-            return ResponseEntity.ok(timetableGeneratorService.convertToDto(updated));
+            return ResponseEntity.ok((Object) timetableGeneratorService.convertToDto(updated));
         }).orElse(ResponseEntity.notFound().build());
     }
 
@@ -284,9 +296,26 @@ public class TimetableController {
         try {
             java.util.Map<String, Object> result = excelImportService.importTimetableExcel(file, sectionName, semester);
             return ResponseEntity.ok(result);
+        } catch (com.smarttimetable.service.FacultyTimetableSyncService.FacultyConflictException conflictEx) {
+            return ResponseEntity.status(409).body(java.util.Map.of(
+                    "error", conflictEx.getMessage(),
+                    "conflicts", conflictEx.getConflicts()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", "Excel import failed: " + e.getMessage()));
         }
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    @PostMapping("/check-faculty-conflicts")
+    public ResponseEntity<?> checkFacultyConflicts(@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> request) {
+        String sectionName = (String) request.get("section");
+        Integer semester = request.get("semester") != null ? Integer.valueOf(request.get("semester").toString()) : null;
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, java.util.Map<String, String>> gridData = (java.util.Map<String, java.util.Map<String, String>>) request.get("grid");
+        List<java.util.Map<String, Object>> conflicts = facultyTimetableSyncService.findGridFacultyConflicts(sectionName, semester, gridData);
+        return ResponseEntity.ok(java.util.Map.of(
+                "hasConflicts", !conflicts.isEmpty(),
+                "conflicts", conflicts));
     }
 
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -299,6 +328,10 @@ public class TimetableController {
             java.util.Map<String, java.util.Map<String, String>> gridData = (java.util.Map<String, java.util.Map<String, String>>) request.get("grid");
             java.util.Map<String, Object> result = excelImportService.saveManualTimetable(sectionName, semester, gridData);
             return ResponseEntity.ok(result);
+        } catch (com.smarttimetable.service.FacultyTimetableSyncService.FacultyConflictException conflictEx) {
+            return ResponseEntity.status(409).body(java.util.Map.of(
+                    "error", conflictEx.getMessage(),
+                    "conflicts", conflictEx.getConflicts()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", "Manual save failed: " + e.getMessage()));
         }

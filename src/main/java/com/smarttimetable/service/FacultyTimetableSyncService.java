@@ -226,6 +226,206 @@ public class FacultyTimetableSyncService {
         return summary;
     }
 
+    public static class FacultyConflictException extends RuntimeException {
+        private final List<Map<String, Object>> conflicts;
+
+        public FacultyConflictException(List<Map<String, Object>> conflicts) {
+            super(buildSummaryMessage(conflicts));
+            this.conflicts = conflicts != null ? conflicts : Collections.emptyList();
+        }
+
+        public List<Map<String, Object>> getConflicts() {
+            return conflicts;
+        }
+
+        private static String buildSummaryMessage(List<Map<String, Object>> conflicts) {
+            if (conflicts == null || conflicts.isEmpty()) {
+                return "Faculty is already assigned to another class for this period.";
+            }
+            Object firstMsg = conflicts.get(0).get("message");
+            if (conflicts.size() == 1) {
+                return String.valueOf(firstMsg);
+            }
+            return firstMsg + " (and " + (conflicts.size() - 1) + " more conflict(s))";
+        }
+    }
+
+    /**
+     * Returns all active-semester faculty class assignments across all sections for UI conflict hints.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getActiveFacultyAssignments() {
+        List<Teacher> allTeachers = teacherRepository.findAll();
+        List<TimetableEntry> activeEntries = filterActiveSemesterEntries(timetableRepository.findAll());
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (TimetableEntry entry : activeEntries) {
+            String day = normalizeDay(entry.getDay());
+            Integer slotNum = entry.getTimeSlot() != null ? entry.getTimeSlot().getSlotNumber() : null;
+            if (day == null || slotNum == null || entry.getSection() == null || entry.getSubject() == null) {
+                continue;
+            }
+            String subText = firstNonBlank(entry.getSubject().getSubjectName(), entry.getSubject().getSubjectCode(), "");
+            if (subText.isEmpty() || subText.equalsIgnoreCase("FREE") || subText.equals("-")) {
+                continue;
+            }
+            String secName = entry.getSection().getSectionName() != null ? entry.getSection().getSectionName().trim() : "";
+            String venue = resolveVenueText(entry);
+            List<Teacher> owners = resolveTeachersForEntry(entry, allTeachers);
+            for (Teacher t : owners) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("teacherId", t.getId());
+                item.put("teacherUsername", resolveCanonicalUsername(t));
+                item.put("teacherEmployeeId", t.getEmployeeId() != null ? t.getEmployeeId() : "");
+                item.put("teacherName", t.getName());
+                item.put("teacherDisplayName", (t.getDisplayName() != null && !t.getDisplayName().isBlank()) ? t.getDisplayName().trim() : t.getName());
+                item.put("facultyText", entry.getAssignedFaculty() != null ? entry.getAssignedFaculty() : "");
+                item.put("sectionName", secName);
+                item.put("subjectName", subText);
+                item.put("venue", venue);
+                item.put("day", day);
+                item.put("slotNumber", slotNum);
+                item.put("period", "P" + slotNum);
+                result.add(item);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Checks whether any cell in gridData assigns a faculty member who is already assigned
+     * to another class/section on the same day and period.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> findGridFacultyConflicts(
+            String targetSectionName,
+            Integer targetSemester,
+            Map<String, Map<String, String>> gridData) {
+        if (gridData == null || gridData.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String cleanTarget = targetSectionName != null ? targetSectionName.trim() : "";
+        List<Teacher> allTeachers = teacherRepository.findAll();
+        List<TimetableEntry> activeEntries = filterActiveSemesterEntries(timetableRepository.findAll());
+
+        // (teacherId + "|" + day + "|" + slotNumber) -> existing entry info
+        Map<String, TimetableEntry> occupiedByTeacherSlot = new LinkedHashMap<>();
+        for (TimetableEntry existing : activeEntries) {
+            String secName = (existing.getSection() != null && existing.getSection().getSectionName() != null)
+                    ? existing.getSection().getSectionName().trim() : "";
+            if (!cleanTarget.isEmpty() && secName.equalsIgnoreCase(cleanTarget)) {
+                continue;
+            }
+            String day = normalizeDay(existing.getDay());
+            Integer slotNum = existing.getTimeSlot() != null ? existing.getTimeSlot().getSlotNumber() : null;
+            if (day == null || slotNum == null) continue;
+            for (Teacher owner : resolveTeachersForEntry(existing, allTeachers)) {
+                if (owner.getId() != null) {
+                    occupiedByTeacherSlot.putIfAbsent(owner.getId() + "|" + day + "|" + slotNum, existing);
+                }
+            }
+        }
+
+        List<Map<String, Object>> conflicts = new ArrayList<>();
+        Set<String> dedupeKeys = new HashSet<>();
+
+        for (Map.Entry<String, Map<String, String>> dayEntry : gridData.entrySet()) {
+            String day = normalizeDay(dayEntry.getKey());
+            Map<String, String> periods = dayEntry.getValue();
+            if (day == null || periods == null) continue;
+
+            for (int p = 1; p <= 7; p++) {
+                String cellVal = periods.get("P" + p);
+                if (cellVal == null || cellVal.trim().isEmpty()) continue;
+                String[] parts = cellVal.split(",");
+                String subText = parts.length > 0 ? parts[0].trim() : "";
+                String facText = parts.length > 1 ? parts[1].trim() : "";
+                if (subText.isEmpty() || subText.equalsIgnoreCase("FREE") || facText.isEmpty()) continue;
+
+                List<Teacher> requestedTeachers = matchTeachers(facText, allTeachers);
+                for (Teacher reqTeacher : requestedTeachers) {
+                    if (reqTeacher.getId() == null) continue;
+                    TimetableEntry existing = occupiedByTeacherSlot.get(reqTeacher.getId() + "|" + day + "|" + p);
+                    if (existing != null) {
+                        String conflictKey = reqTeacher.getId() + "|" + day + "|" + p;
+                        if (dedupeKeys.add(conflictKey)) {
+                            conflicts.add(buildConflictMap(reqTeacher, facText, day, p, existing));
+                        }
+                    }
+                }
+            }
+        }
+        return conflicts;
+    }
+
+    /**
+     * Checks whether assigning targetTeacher on targetDay/slotNumber conflicts with another section.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> findSingleEntryConflicts(TimetableEntry entry, Teacher targetTeacher, String targetDay) {
+        if (entry == null || targetTeacher == null || targetTeacher.getId() == null || entry.getTimeSlot() == null) {
+            return Collections.emptyList();
+        }
+        String day = normalizeDay(targetDay != null && !targetDay.isBlank() ? targetDay : entry.getDay());
+        Integer slotNum = entry.getTimeSlot().getSlotNumber();
+        if (day == null || slotNum == null) {
+            return Collections.emptyList();
+        }
+        String ownSection = (entry.getSection() != null && entry.getSection().getSectionName() != null)
+                ? entry.getSection().getSectionName().trim() : "";
+        List<Teacher> allTeachers = teacherRepository.findAll();
+        List<TimetableEntry> activeEntries = filterActiveSemesterEntries(timetableRepository.findAll());
+
+        List<Map<String, Object>> conflicts = new ArrayList<>();
+        for (TimetableEntry existing : activeEntries) {
+            if (existing.getId() != null && existing.getId().equals(entry.getId())) continue;
+            String existingSec = (existing.getSection() != null && existing.getSection().getSectionName() != null)
+                    ? existing.getSection().getSectionName().trim() : "";
+            if (!ownSection.isEmpty() && existingSec.equalsIgnoreCase(ownSection)) continue;
+            if (!day.equalsIgnoreCase(normalizeDay(existing.getDay()))) continue;
+            Integer exSlot = existing.getTimeSlot() != null ? existing.getTimeSlot().getSlotNumber() : null;
+            if (!Objects.equals(slotNum, exSlot)) continue;
+
+            for (Teacher owner : resolveTeachersForEntry(existing, allTeachers)) {
+                if (owner.getId() != null && owner.getId().equals(targetTeacher.getId())) {
+                    String facLabel = (targetTeacher.getDisplayName() != null && !targetTeacher.getDisplayName().isBlank())
+                            ? targetTeacher.getDisplayName() : targetTeacher.getName();
+                    conflicts.add(buildConflictMap(targetTeacher, facLabel, day, slotNum, existing));
+                    break;
+                }
+            }
+        }
+        return conflicts;
+    }
+
+    private Map<String, Object> buildConflictMap(Teacher teacher, String requestedLabel, String day, int slotNum, TimetableEntry existing) {
+        String teacherLabel = (teacher.getDisplayName() != null && !teacher.getDisplayName().isBlank())
+                ? teacher.getDisplayName().trim()
+                : (teacher.getName() != null && !teacher.getName().isBlank() ? teacher.getName().trim() : requestedLabel);
+        String existingSec = (existing.getSection() != null && existing.getSection().getSectionName() != null)
+                ? existing.getSection().getSectionName().trim() : "another class";
+        String existingSub = existing.getSubject() != null
+                ? firstNonBlank(existing.getSubject().getSubjectName(), existing.getSubject().getSubjectCode(), "")
+                : "";
+        String existingVenue = resolveVenueText(existing);
+        String details = joinNonBlank(", ", existingSub, existingVenue);
+        String message = teacherLabel + " is already assigned to " + existingSec
+                + (details.isEmpty() ? "" : " (" + details + ")")
+                + " on " + day + " Period " + slotNum + ".";
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("day", day);
+        map.put("period", "P" + slotNum);
+        map.put("slotNumber", slotNum);
+        map.put("faculty", teacherLabel);
+        map.put("teacherUsername", resolveCanonicalUsername(teacher));
+        map.put("existingSection", existingSec);
+        map.put("existingSubject", existingSub);
+        map.put("existingVenue", existingVenue);
+        map.put("message", message);
+        return map;
+    }
+
     /**
      * Resolves the best matching Teacher for a faculty string (used when persisting TimetableEntry or syncing).
      */

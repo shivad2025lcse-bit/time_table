@@ -6,6 +6,7 @@ D:\Java_project\src\main\java\com\smarttimetable\controller\DashboardController.
 D:\Java_project\src\main\java\com\smarttimetable\controller\DepartmentController.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\EmailSubscriptionController.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\FacultyAvailabilityController.java
+D:\Java_project\src\main\java\com\smarttimetable\controller\FacultyLeaveController.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\LaboratoryController.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\NotificationController.java
 D:\Java_project\src\main\java\com\smarttimetable\controller\package-info.java
@@ -46,6 +47,7 @@ D:\Java_project\src\main\java\com\smarttimetable\entity\EmailNotificationLog.jav
 D:\Java_project\src\main\java\com\smarttimetable\entity\EmailProviderConfig.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\EmailSubscription.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\FacultyAvailability.java
+D:\Java_project\src\main\java\com\smarttimetable\entity\FacultyLeave.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\FacultyTimetable.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Laboratory.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\LearningResource.java
@@ -54,6 +56,7 @@ D:\Java_project\src\main\java\com\smarttimetable\entity\PeriodNotification.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Quiz.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\QuizQuestion.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\QuizSubmission.java
+D:\Java_project\src\main\java\com\smarttimetable\entity\QuizVisibilityConfig.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Role.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Section.java
 D:\Java_project\src\main\java\com\smarttimetable\entity\Student.java
@@ -89,6 +92,7 @@ D:\Java_project\src\main\java\com\smarttimetable\repository\EmailNotificationLog
 D:\Java_project\src\main\java\com\smarttimetable\repository\EmailProviderConfigRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\EmailSubscriptionRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\FacultyAvailabilityRepository.java
+D:\Java_project\src\main\java\com\smarttimetable\repository\FacultyLeaveRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\FacultyTimetableRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\LaboratoryRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\LearningResourceRepository.java
@@ -97,6 +101,7 @@ D:\Java_project\src\main\java\com\smarttimetable\repository\PeriodNotificationRe
 D:\Java_project\src\main\java\com\smarttimetable\repository\QuizQuestionRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\QuizRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\QuizSubmissionRepository.java
+D:\Java_project\src\main\java\com\smarttimetable\repository\QuizVisibilityConfigRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\SectionRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\StudentAnswerRepository.java
 D:\Java_project\src\main\java\com\smarttimetable\repository\StudentNotificationRepository.java
@@ -129,11 +134,13 @@ D:\Java_project\src\main\java\com\smarttimetable\service\EmailNotificationServic
 D:\Java_project\src\main\java\com\smarttimetable\service\EmailSubscriptionService.java
 D:\Java_project\src\main\java\com\smarttimetable\service\ExcelImportService.java
 D:\Java_project\src\main\java\com\smarttimetable\service\FacultyAvailabilityService.java
+D:\Java_project\src\main\java\com\smarttimetable\service\FacultyTimetableSyncService.java
 D:\Java_project\src\main\java\com\smarttimetable\service\LaboratoryService.java
 D:\Java_project\src\main\java\com\smarttimetable\service\MockAiEvaluationServiceImpl.java
 D:\Java_project\src\main\java\com\smarttimetable\service\NotificationService.java
 D:\Java_project\src\main\java\com\smarttimetable\service\package-info.java
 D:\Java_project\src\main\java\com\smarttimetable\service\QuizService.java
+D:\Java_project\src\main\java\com\smarttimetable\service\QuizVisibilityService.java
 D:\Java_project\src\main\java\com\smarttimetable\service\SectionService.java
 D:\Java_project\src\main\java\com\smarttimetable\service\StudentService.java
 D:\Java_project\src\main\java\com\smarttimetable\service\SubjectService.java

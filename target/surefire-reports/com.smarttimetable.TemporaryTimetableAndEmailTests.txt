@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.smarttimetable.TemporaryTimetableAndEmailTests
 -------------------------------------------------------------------------------
-Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 20.01 s -- in com.smarttimetable.TemporaryTimetableAndEmailTests
+Tests run: 21, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 81.61 s -- in com.smarttimetable.TemporaryTimetableAndEmailTests

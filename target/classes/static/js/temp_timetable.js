@@ -143,7 +143,7 @@
         const c = (typeof changeOrId === 'object' && changeOrId)
             ? changeOrId
             : (window._tempUpdatesLookup && window._tempUpdatesLookup[changeOrId])
-              || (window._cachedAdminTtcList || []).find(x => x.id === changeOrId);
+            || (window._cachedAdminTtcList || []).find(x => x.id === changeOrId);
         const body = document.getElementById('tempChangeDetailBody');
         const modalEl = document.getElementById('tempChangeDetailModal');
         if (!c || !body || !modalEl) return;
@@ -434,7 +434,7 @@
                         if (d && !acc.some(x => x.id === d.id)) acc.push(d);
                         return acc;
                     }, [...window._ttcDepartments])
-                    .map(d => `<option value="${d.id}">${esc(d.code || d.name)}</option>`).join('');
+                        .map(d => `<option value="${d.id}">${esc(d.code || d.name)}</option>`).join('');
             }
             window.onTtcDeptChange();
 
@@ -823,7 +823,7 @@
                 const sel = document.getElementById('facReqSectionSelect');
                 if (sel) sel.innerHTML = secs.map(s => `<option value="${s.id}">${esc(s.sectionName)}</option>`).join('');
             }
-        } catch (_) {}
+        } catch (_) { }
         await window.loadFacultyEffectiveTempView();
     };
 

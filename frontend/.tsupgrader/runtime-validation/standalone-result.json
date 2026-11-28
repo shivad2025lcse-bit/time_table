@@ -1,0 +1,168 @@
+{
+  "planHash": "8285c14fde1f5b5eec41173f781f8f7ffff7134d1ae237255f3274ed0a78663e",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-11-27T09:43:30.7009227Z",
+  "retryCount": 1,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 32801,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "frontend-lint",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E frontend@0.0.0 lint\r\n\u003E oxlint\r\n\r\npublic/js/quiz.js:2296:13: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout_backup.jsx:288:225: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout_backup.jsx:503:62: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:161:75: warning react-hooks(exhaustive-deps): React Hook useEffect has missing dependencies: \u0027isStudent\u0027, \u0027isAdmin\u0027, and \u0027isFaculty\u0027 help: Either include it or remove the dependency array.\r\nsrc/DashboardLayout.jsx:343:53: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:345:53: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:396:157: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:396:237: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:399:157: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:399:229: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:405:196: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:420:194: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:428:124: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:431:157: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:431:237: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:434:148: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:434:210: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:437:150: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:437:214: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:440:152: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:440:210: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:443:91: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:443:153: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:446:196: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:449:149: warning eslint(no-unused-expressions): Expected expression to be used help: Consider using this expression or removing it\r\nsrc/DashboardLayout.jsx:449:205: warning eslint(no-unused-expressions): Expected expression to be\n\u2026[truncated]",
+        "durationMs": 3885
+      },
+      {
+        "name": "frontend-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E frontend@0.0.0 build\r\n\u003E vite build\r\n\r\n\u001B[36mvite v8.2.2 \u001B[32mbuilding client environment for production...\u001B[36m\u001B[39m\r\ntransforming...\r\n\u2713 25 modules transformed.\r\nrendering chunks...\r\ncomputing gzip size...\r\ndist/index.html                   1.57 kB \u2502 gzip:  0.72 kB\r\ndist/assets/index-Bsm0hk8a.css   17.47 kB \u2502 gzip:  4.15 kB\r\ndist/assets/index-BkLSLupv.js   423.45 kB \u2502 gzip: 98.68 kB\r\n\r\n\u001B[32m\u2713 built in 1.09s\u001B[39m\r\n",
+        "durationMs": 6875
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E frontend@0.0.0 test\r\n\u003E vitest run --maxWorkers=1\r\n\r\n\r\n RUN  v4.1.12 D:/Java_project/frontend\r\n\r\n\r\n Test Files  1 passed (1)\r\n      Tests  3 passed (3)\r\n   Start at  15:13:10\r\n   Duration  15.44s (transform 1.12s, setup 0ms, import 3.23s, tests 4.27s, environment 6.94s)\r\n\r\n",
+        "durationMs": 25344,
+        "testResults": {
+          "testFramework": "vitest",
+          "runnerDetectedFrom": "package_json",
+          "testsTotal": 3,
+          "testsPassed": 3,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": false
+        }
+      },
+      {
+        "name": "frontend-home-200",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!doctype html\u003E\r\n\u003Chtml lang=\u0022en\u0022\u003E\r\n  \u003Chead\u003E\n    \u003Cscript type=\u0022module\u0022\u003Eimport { injectIntoGlobalHook } from \u0022/@react-refresh\u0022;\ninjectIntoGlobalHook(window);\nwindow.$RefreshReg$ = () =\u003E {};\nwindow.$RefreshSig$ = () =\u003E (type) =\u003E type;\u003C/script\u003E\n\n    \u003Cscript type=\u0022module\u0022 src=\u0022/@vite/client\u0022\u003E\u003C/script\u003E\n\r\n    \u003Cmeta charset=\u0022UTF-8\u0022 /\u003E\r\n    \u003Clink rel=\u0022icon\u0022 type=\u0022image/svg\u002Bxml\u0022 href=\u0022/favicon.svg\u0022 /\u003E\r\n    \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0\u0022 /\u003E\r\n    \u003Ctitle\u003ESRI ESHWAR COLLEGE OF ENGINEERING TIME TABLE VIEWER\u003C/title\u003E\r\n    \u003C!-- Google Fonts --\u003E\r\n    \u003Clink href=\u0022https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800\u0026family=Plus\u002BJakarta\u002BSans:wght@400;600;700;800\u0026display=swap\u0022 rel=\u0022stylesheet\u0022\u003E\r\n    \u003C!-- Bootstrap 5 CSS --\u003E\r\n    \u003Clink href=\u0022https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css\u0022 rel=\u0022stylesheet\u0022\u003E\r\n    \u003C!-- FontAwesome 6 Icons --\u003E\r\n    \u003Clink href=\u0022https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css\u0022 rel=\u0022stylesheet\u0022\u003E\r\n    \u003C!-- html2canvas for PNG Timetable Image Download --\u003E\r\n    \u003Cscript src=\u0022https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js\u0022\u003E\u003C/script\u003E\r\n    \u003Cscript src=\u0022https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js\u0022\u003E\u003C/script\u003E\r\n    \u003C!-- SheetJS for Excel Import --\u003E\r\n    \u003Cscript src=\u0022https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js\u0022\u003E\u003C/script\u003E\r\n    \u003C!-- Tesseract.js for browser OCR fallback on timetable images/PDFs --\u003E\r\n    \u003Cscript src=\u0022https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js\u0022\u003E\u003C/script\u003E\r\n  \u003C/head\u003E\r\n  \u003Cbody\u003E\r\n    \u003Cdiv id=\u0022root\u0022\u003E\u003C/div\u003E\r\n    \u003Cscript type=\u0022module\u0022 src=\u0022/src/main.jsx\u0022\u003E\u003C/script\u003E\r\n  \u003C/body\u003E\r\n\u003C/html\u003E\r\n\n--- server output ---\n\r\n\u003E frontend@0.0.0 dev\r\n\u003E vite --host 127.0.0.1 --port 5173 --strictPort\r\n\r\n\r\n  \u001B[32m\u001B[1mVITE\u001B[22m v8.2.2\u001B[39m  \u001B[2mready in \u001B[0m\u001B[1m866\u001B[22m\u001B[2m\u001B[0m ms\u001B[22m\r\n\r\n  \u001B[32m\u279C\u001B[39m  \u001B[1mLocal\u001B[22m:   \u001B[36mhttp://127.0.0.1:\u001B[1m5173\u001B[22m/\u001B[39m\r\n",
+        "durationMs": 2748
+      },
+      {
+        "name": "timetable-api-proxy-200",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n[{\u0022id\u0022:171,\u0022day\u0022:\u0022Monday\u0022,\u0022timeSlotId\u0022:1,\u0022timeSlotLabel\u0022:\u002208:40 - 09:40\u0022,\u0022slotNumber\u0022:1,\u0022subjectId\u0022:9,\u0022subjectCode\u0022:\u0022DAALAB\u0022,\u0022subjectName\u0022:\u0022DAA LAB\u0022,\u0022subjectType\u0022:\u0022LAB\u0022,\u0022teacherId\u0022:4,\u0022teacherName\u0022:\u0022Ms.B.Suchithra\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022Cloud Lab\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:172,\u0022day\u0022:\u0022Monday\u0022,\u0022timeSlotId\u0022:2,\u0022timeSlotLabel\u0022:\u002209:40 - 10:40\u0022,\u0022slotNumber\u0022:2,\u0022subjectId\u0022:9,\u0022subjectCode\u0022:\u0022DAALAB\u0022,\u0022subjectName\u0022:\u0022DAA LAB\u0022,\u0022subjectType\u0022:\u0022LAB\u0022,\u0022teacherId\u0022:4,\u0022teacherName\u0022:\u0022Ms.B.Suchithra\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022Cloud Lab\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:173,\u0022day\u0022:\u0022Monday\u0022,\u0022timeSlotId\u0022:3,\u0022timeSlotLabel\u0022:\u002211:00 - 12:00\u0022,\u0022slotNumber\u0022:3,\u0022subjectId\u0022:3,\u0022subjectCode\u0022:\u0022DBMS\u0022,\u0022subjectName\u0022:\u0022DBMS\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:4,\u0022teacherName\u0022:\u0022Ms.N.Gayathri\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FF 04\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:174,\u0022day\u0022:\u0022Monday\u0022,\u0022timeSlotId\u0022:4,\u0022timeSlotLabel\u0022:\u002212:00 - 13:00\u0022,\u0022slotNumber\u0022:4,\u0022subjectId\u0022:4,\u0022subjectCode\u0022:\u0022DM\u0022,\u0022subjectName\u0022:\u0022DM\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:4,\u0022teacherName\u0022:\u0022Ms.N.Akila Devi\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FF 04\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:175,\u0022day\u0022:\u0022Monday\u0022,\u0022timeSlotId\u0022:5,\u0022timeSlotLabel\u0022:\u002213:40 - 14:30\u0022,\u0022slotNumber\u0022:5,\u0022subjectId\u0022:2,\u0022subjectCode\u0022:\u0022DAA\u0022,\u0022subjectName\u0022:\u0022DAA\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:4,\u0022teacherName\u0022:\u0022Ms.B.Suchithra\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FF 04\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:176,\u0022day\u0022:\u0022Monday\u0022,\u0022timeSlotId\u0022:6,\u0022timeSlotLabel\u0022:\u002214:30 - 15:20\u0022,\u0022slotNumber\u0022:6,\u0022subjectId\u0022:15,\u0022subjectCode\u0022:\u0022SE\u0022,\u0022subjectName\u0022:\u0022SE\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:14,\u0022teacherName\u0022:\u0022Mr.B.Saravanan\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FF 04\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:177,\u0022day\u0022:\u0022Monday\u0022,\u0022timeSlotId\u0022:7,\u0022timeSlotLabel\u0022:\u002215:20 - 16:10\u0022,\u0022slotNumber\u0022:7,\u0022subjectId\u0022:16,\u0022subjectCode\u0022:\u0022DMT\u0022,\u0022subjectName\u0022:\u0022DM-T\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:13,\u0022teacherName\u0022:\u0022Dr.M.P.Sindhu\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FF 04\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:178,\u0022day\u0022:\u0022Tuesday\u0022,\u0022timeSlotId\u0022:1,\u0022timeSlotLabel\u0022:\u002208:40 - 09:40\u0022,\u0022slotNumber\u0022:1,\u0022subjectId\u0022:4,\u0022subjectCode\u0022:\u0022DM\u0022,\u0022subjectName\u0022:\u0022DM\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:4,\u0022teacherName\u0022:\u0022Ms.N.Akila Devi\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FF 04\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:179,\u0022day\u0022:\u0022Tuesday\u0022,\u0022timeSlotId\u0022:2,\u0022timeSlotLabel\u0022:\u002209:40 - 10:40\u0022,\u0022slotNumber\u0022:2,\u0022subjectId\u0022:4,\u0022subjectCode\u0022:\u0022DM\u0022,\u0022subjectName\u0022:\u0022DM\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:4,\u0022teacherName\u0022:\u0022Ms.N.Akila Devi\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FF 04\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:180,\u0022day\u0022:\u0022Tuesday\u0022,\u0022timeSlotId\u0022:3,\u0022timeSlotLabel\u0022:\u002211:00 - 12:00\u0022,\u0022slotNumber\u0022:3,\u0022subjectId\u0022:14,\u0022subjectCode\u0022:\u0022ALT\u0022,\u0022subjectName\u0022:\u0022ALT\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:4,\u0022teacherName\u0022:\u0022Ms.M.Rubeena\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FF 04\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:181,\u0022day\u0022:\u0022Tuesday\u0022,\u0022timeSlotId\u0022:4,\u0022timeSlotLabel\u0022:\u002212:00 - 13:00\u0022,\u0022slotNumber\u0022:4,\u0022subjectId\u0022:14,\u0022subjectCode\u0022:\u0022ALT\u0022,\u0022subjectName\u0022:\u0022ALT\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:4,\u0022teacherName\u0022:\u0022Ms.M.Rubeena\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FF 04\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semester\u0022:3},{\u0022id\u0022:182,\u0022day\u0022:\u0022Tuesday\u0022,\u0022timeSlotId\u0022:5,\u0022timeSlotLabel\u0022:\u002213:40 - 14:30\u0022,\u0022slotNumber\u0022:5,\u0022subjectId\u0022:7,\u0022subjectCode\u0022:\u0022JAVAPRACTICAL\u0022,\u0022subjectName\u0022:\u0022JAVA (Practical)\u0022,\u0022subjectType\u0022:\u0022THEORY\u0022,\u0022teacherId\u0022:10,\u0022teacherName\u0022:\u0022Mr.M.Karthick Raja\u0022,\u0022classroomId\u0022:null,\u0022roomNumber\u0022:\u0022FS Lab\u0022,\u0022laboratoryId\u0022:null,\u0022labName\u0022:null,\u0022sectionId\u0022:1,\u0022sectionName\u0022:\u0022II CSE C\u0022,\u0022semeste\n\u2026[truncated]",
+        "durationMs": 672
+      }
+    ],
+    "executions": [
+      {
+        "source": "setup[0]",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "ci"
+        ],
+        "cwd": "D:\\Java_project\\frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "frontend-lint",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "lint"
+        ],
+        "cwd": "D:\\Java_project\\frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "frontend-build",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "build"
+        ],
+        "cwd": "D:\\Java_project\\frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "test"
+        ],
+        "cwd": "D:\\Java_project\\frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "frontend-home-200",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "dev",
+          "--",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "5173",
+          "--strictPort"
+        ],
+        "cwd": "D:\\Java_project\\frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "timetable-api-proxy-200",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "dev",
+          "--",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "5173",
+          "--strictPort"
+        ],
+        "cwd": "D:\\Java_project\\frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}

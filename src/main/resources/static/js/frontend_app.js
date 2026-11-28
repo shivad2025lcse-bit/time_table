@@ -3261,6 +3261,13 @@ async function initSubstitutionModal() {
             document.getElementById('editFaculty').value = pData.faculty || 'Dr.S.K.Harikarthick, ASP/CSE';
             document.getElementById('editVenue').value = pData.venue || 'SF 04';
             document.getElementById('editCategory').value = pData.cat || 'cat-theory';
+            if (typeof window.refreshTtSuggestionCatalog === 'function') {
+                window.refreshTtSuggestionCatalog(false).then(() => {
+                    if (window.checkEditPeriodFacultyConflict) window.checkEditPeriodFacultyConflict();
+                });
+            } else if (window.checkEditPeriodFacultyConflict) {
+                window.checkEditPeriodFacultyConflict();
+            }
 
             const modal = new bootstrap.Modal(document.getElementById('editPeriodModal'));
             modal.show();
@@ -3279,6 +3286,7 @@ async function initSubstitutionModal() {
                     document.getElementById('editCategory').value = 'cat-lab';
                 }
             }
+            if (window.checkEditPeriodFacultyConflict) window.checkEditPeriodFacultyConflict();
         }
 
         // Set Quick Wednesday ALT
@@ -3287,7 +3295,28 @@ async function initSubstitutionModal() {
             document.getElementById('editFaculty').value = 'Placement Team';
             document.getElementById('editVenue').value = 'SF 05';
             document.getElementById('editCategory').value = 'cat-alt';
+            if (window.checkEditPeriodFacultyConflict) window.checkEditPeriodFacultyConflict();
         }
+
+        window.checkEditPeriodFacultyConflict = function () {
+            const alertEl = document.getElementById('editPeriodConflictAlert');
+            const day = (document.getElementById('editDay')?.value || '').trim();
+            const pIdx = parseInt(document.getElementById('editPeriod')?.value || '0', 10);
+            const fac = (document.getElementById('editFaculty')?.value || '').trim();
+            const conflict = (typeof window.findFacultyClassConflict === 'function')
+                ? window.findFacultyClassConflict(fac, day, pIdx + 1, typeof currentSection !== 'undefined' ? currentSection : '')
+                : null;
+            if (alertEl) {
+                if (conflict) {
+                    alertEl.className = 'alert alert-warning py-2 px-3 small mb-3';
+                    alertEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i><strong>Faculty Already Assigned:</strong> ${conflict.message}`;
+                } else {
+                    alertEl.className = 'alert alert-warning py-2 px-3 small d-none mb-3';
+                    alertEl.textContent = '';
+                }
+            }
+            return conflict;
+        };
 
         function _syncSectionTimetableAndRefreshFaculty(sectionName, explicitGrid) {
             if (!sectionName || !localStorage.getItem('jwt_token')) return;
@@ -3318,9 +3347,15 @@ async function initSubstitutionModal() {
                 method: 'POST',
                 body: JSON.stringify({ section: sectionName, semester: sem, grid })
             }).then(async res => {
-                if (res && res.ok && typeof window.syncFacultyPersonalTtFromBackend === 'function') {
-                    await window.syncFacultyPersonalTtFromBackend();
-                    if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+                if (res && res.ok) {
+                    if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
+                    if (typeof window.syncFacultyPersonalTtFromBackend === 'function') {
+                        await window.syncFacultyPersonalTtFromBackend();
+                        if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+                    }
+                } else if (res && res.status === 409) {
+                    const errBody = await res.json().catch(() => ({}));
+                    showToast('Faculty Already Assigned', errBody.error || 'Faculty is already assigned to another class for this period.', 'warning');
                 }
             }).catch(err => console.warn('Could not sync section edit to backend:', err));
         }
@@ -3336,6 +3371,11 @@ async function initSubstitutionModal() {
             const cat = document.getElementById('editCategory').value;
 
             const isTemporary = document.getElementById('editTypeTemporary') && document.getElementById('editTypeTemporary').checked;
+            const conflict = window.checkEditPeriodFacultyConflict ? window.checkEditPeriodFacultyConflict() : null;
+            if (conflict && !isTemporary && sub && sub.toUpperCase() !== 'FREE') {
+                showToast('Faculty Already Assigned', conflict.message, 'danger');
+                return;
+            }
 
             if (isTemporary) {
                 const dateStr = todayDateStr();
@@ -8406,8 +8446,25 @@ async function initSubstitutionModal() {
                     });
                 });
 
-                localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
-                localStorage.removeItem('class_tt_' + section);
+                const builderAlertEl = document.getElementById('ttBuilderConflictAlert');
+                if (builderAlertEl) {
+                    builderAlertEl.className = 'alert alert-danger py-2 px-3 small d-none mt-2 mb-0';
+                    builderAlertEl.textContent = '';
+                }
+
+                // Pre-check client conflict catalog before overwriting
+                if (typeof window.findGridFacultyConflicts === 'function') {
+                    const localConflicts = window.findGridFacultyConflicts(data.grid, section);
+                    if (localConflicts.length > 0) {
+                        const msg = localConflicts.map(c => c.message).join(' | ');
+                        if (builderAlertEl) {
+                            builderAlertEl.className = 'alert alert-danger py-2 px-3 small mt-2 mb-0';
+                            builderAlertEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i><strong>Faculty Already Assigned:</strong> ${msg}`;
+                        }
+                        showToast('Faculty Already Assigned', localConflicts[0].message, 'danger');
+                        return;
+                    }
+                }
 
                 try {
                     const res = await apiFetch('/api/timetable/save-manual', {
@@ -8420,12 +8477,28 @@ async function initSubstitutionModal() {
                     });
                     if (res && res.ok) {
                         const resData = await res.json();
+                        localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
+                        localStorage.removeItem('class_tt_' + section);
+                        if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
                         showToast('Success', resData.message || `Timetable for ${section} saved to database!`);
+                    } else if (res && res.status === 409) {
+                        const errData = await res.json().catch(() => ({}));
+                        const errMsg = errData.error || 'Selected faculty is already assigned to another class for this period.';
+                        if (builderAlertEl) {
+                            builderAlertEl.className = 'alert alert-danger py-2 px-3 small mt-2 mb-0';
+                            builderAlertEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i><strong>Faculty Already Assigned:</strong> ${errMsg}`;
+                        }
+                        showToast('Faculty Already Assigned', errMsg, 'danger');
+                        return;
                     } else {
+                        localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
+                        localStorage.removeItem('class_tt_' + section);
                         showToast('Saved Locally', `Timetable for ${section} saved locally (database sync returned an error).`, 'warning');
                     }
                 } catch (err) {
                     console.warn('Failed to save to Database:', err);
+                    localStorage.setItem(`sece_tt_built_${section}`, JSON.stringify(data));
+                    localStorage.removeItem('class_tt_' + section);
                     showToast('Saved Locally', `Timetable for ${section} saved locally.`, 'warning');
                 }
 
@@ -11035,7 +11108,13 @@ async function initSubstitutionModal() {
                         })
                     });
                     const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || 'Failed to assign timetable.');
+                    if (!res.ok) {
+                        if (res.status === 409) {
+                            showToast('Faculty Already Assigned', data.error || 'Selected faculty is already assigned to another class.', 'danger');
+                        }
+                        throw new Error(data.error || 'Failed to assign timetable.');
+                    }
+                    if (typeof window.invalidateTtSuggestionCatalog === 'function') window.invalidateTtSuggestionCatalog(true);
 
                     // Sync local storage & UI state so grid reflects assigned timetable immediately
                     const builtData = {
@@ -11771,9 +11850,152 @@ async function initSubstitutionModal() {
                     venues: Array.from(venueMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
                     departments: Array.from(deptMap.values()).sort((a, b) => a.code.localeCompare(b.code)),
                     sections: Array.from(secMap.values()).sort((a, b) => a.sectionName.localeCompare(b.sectionName)),
+                    assignments: (apiData && Array.isArray(apiData.assignments)) ? apiData.assignments : (window._ttSuggestionCatalog?.assignments || []),
                     loadedAt: Date.now(),
                     dirty: false
                 };
+            }
+
+            function _normFacTokens(str) {
+                if (!str) return [];
+                let cleaned = String(str).trim();
+                const commaIdx = cleaned.indexOf(',');
+                if (commaIdx > 0) cleaned = cleaned.substring(0, commaIdx).trim();
+                cleaned = cleaned.replace(/^(?:dr|mr|mrs|ms|miss|prof|smt|sri)\.?\s*/i, '').trim();
+                cleaned = cleaned.replace(/^(?:dr|mr|mrs|ms|miss|prof|smt|sri)\.?\s*/i, '').trim();
+                return cleaned.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+            }
+
+            function _phoneticFacCompact(tokens) {
+                return tokens.filter(t => t.length >= 2).join('').replace(/ck/g, 'k').replace(/ee/g, 'i').replace(/oo/g, 'u');
+            }
+
+            function _facultyNamesMatchClient(queryStr, assignment) {
+                if (!queryStr || !assignment) return false;
+                const qRaw = String(queryStr).trim().toLowerCase();
+                if (!qRaw || qRaw === '-' || qRaw === 'free' || qRaw === 'tba') return false;
+                if (assignment.teacherUsername && assignment.teacherUsername.toLowerCase() === qRaw) return true;
+                if (assignment.teacherEmployeeId && assignment.teacherEmployeeId.toLowerCase() === qRaw) return true;
+
+                const qTokens = _normFacTokens(queryStr);
+                if (qTokens.length === 0) return false;
+                const qInitials = qTokens.filter(t => t.length === 1);
+                const qLongJoined = _phoneticFacCompact(qTokens);
+
+                const cands = [assignment.teacherDisplayName, assignment.teacherName, assignment.facultyText].filter(Boolean);
+                for (const cand of cands) {
+                    const cTokens = _normFacTokens(cand);
+                    if (cTokens.length === 0) continue;
+                    if ([...qTokens].sort().join('|') === [...cTokens].sort().join('|')) return true;
+                    const cInitials = cTokens.filter(t => t.length === 1);
+                    if (qInitials.length > 0 && cInitials.length > 0 && !qInitials.some(i => cInitials.includes(i))) {
+                        continue;
+                    }
+                    const cLongJoined = _phoneticFacCompact(cTokens);
+                    if (qLongJoined.length >= 4 && qLongJoined === cLongJoined) return true;
+                    const qMain = qTokens.filter(t => t.length >= 3);
+                    if (qMain.length > 0 && qMain.every(tok => cTokens.includes(tok))) return true;
+                }
+                return false;
+            }
+
+            function _extractSlotContextFromInput(input) {
+                if (!input || !input.id) return { day: '', slotNumber: 0, targetSection: '', prefix: '' };
+                const ttbMatch = input.id.match(/^ttb_([A-Za-z]+)_P(\d+)$/);
+                if (ttbMatch) {
+                    return {
+                        prefix: 'ttb',
+                        day: ttbMatch[1],
+                        slotNumber: parseInt(ttbMatch[2], 10),
+                        targetSection: (window.currentTimetableSection || '').trim()
+                    };
+                }
+                const uatMatch = input.id.match(/^uat_([A-Za-z]+)_P(\d+)$/);
+                if (uatMatch) {
+                    const dept = (document.getElementById('uatDeptSelect')?.value || '').trim();
+                    const year = (document.getElementById('uatYearSelect')?.value || '').trim();
+                    const secCode = (document.getElementById('uatSecInput')?.value || '').trim().toUpperCase();
+                    return {
+                        prefix: 'uat',
+                        day: uatMatch[1],
+                        slotNumber: parseInt(uatMatch[2], 10),
+                        targetSection: (year && dept && secCode) ? `${year} ${dept} ${secCode}` : ''
+                    };
+                }
+                return { day: '', slotNumber: 0, targetSection: '', prefix: '' };
+            }
+
+            window.findFacultyClassConflict = function (facultyText, day, slotNumber, targetSectionName) {
+                if (!facultyText || !day || !slotNumber) return null;
+                const cat = window._ttSuggestionCatalog || {};
+                const list = Array.isArray(cat.assignments) ? cat.assignments : [];
+                if (list.length === 0) return null;
+
+                const cleanDay = String(day).trim().toLowerCase();
+                const slotInt = parseInt(slotNumber, 10);
+                const cleanSec = String(targetSectionName || '').trim().toLowerCase();
+
+                const facSegments = String(facultyText).split(/[/&+]/).map(s => s.trim()).filter(Boolean);
+                for (const a of list) {
+                    if (!a || String(a.day || '').trim().toLowerCase() !== cleanDay) continue;
+                    if (parseInt(a.slotNumber || 0, 10) !== slotInt) continue;
+                    const existingSec = String(a.sectionName || '').trim();
+                    if (cleanSec && existingSec.toLowerCase() === cleanSec) continue;
+                    if (facSegments.some(seg => _facultyNamesMatchClient(seg, a))) {
+                        const tLabel = a.teacherDisplayName || a.teacherName || facultyText;
+                        const detail = [a.subjectName, a.venue].filter(Boolean).join(', ');
+                        return {
+                            existingSection: existingSec,
+                            existingSubject: a.subjectName || '',
+                            existingVenue: a.venue || '',
+                            teacherDisplayName: tLabel,
+                            day: a.day,
+                            slotNumber: slotInt,
+                            message: `${tLabel} is already assigned to ${existingSec}${detail ? ` (${detail})` : ''} on ${a.day} Period ${slotInt}.`
+                        };
+                    }
+                }
+                return null;
+            };
+
+            window.findGridFacultyConflicts = function (gridData, targetSectionName) {
+                const conflicts = [];
+                if (!gridData || typeof gridData !== 'object') return conflicts;
+                for (const [day, periods] of Object.entries(gridData)) {
+                    if (!periods || typeof periods !== 'object') continue;
+                    for (let p = 1; p <= 7; p++) {
+                        const cellVal = periods['P' + p];
+                        if (!cellVal || !String(cellVal).trim()) continue;
+                        const parts = String(cellVal).split(',').map(s => s.trim());
+                        const sub = parts[0] || '';
+                        const fac = parts[1] || '';
+                        if (!sub || sub.toUpperCase() === 'FREE' || !fac) continue;
+                        const c = window.findFacultyClassConflict(fac, day, p, targetSectionName);
+                        if (c) conflicts.push(c);
+                    }
+                }
+                return conflicts;
+            };
+
+            function _notifyInputSlotConflict(input, conflict) {
+                const ctx = _extractSlotContextFromInput(input);
+                const alertEl = ctx.prefix === 'ttb'
+                    ? document.getElementById('ttBuilderConflictAlert')
+                    : (ctx.prefix === 'uat' ? document.getElementById('uatAssignAlert') : null);
+                if (alertEl) {
+                    if (conflict) {
+                        alertEl.className = ctx.prefix === 'ttb'
+                            ? 'alert alert-danger py-2 px-3 small mt-2 mb-0'
+                            : 'alert alert-warning py-2 mt-2 mb-0 small';
+                        alertEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i><strong>Faculty Already Assigned:</strong> ${conflict.message}`;
+                    } else if (ctx.prefix === 'ttb') {
+                        alertEl.className = 'alert alert-danger py-2 px-3 small d-none mt-2 mb-0';
+                        alertEl.textContent = '';
+                    }
+                }
+                if (conflict && typeof showToast === 'function') {
+                    showToast('Faculty Already Assigned', conflict.message, 'warning');
+                }
             }
 
             window.refreshTtSuggestionCatalog = async function (force = false) {
@@ -11840,7 +12062,12 @@ async function initSubstitutionModal() {
                     st.subject = segs[0] || st.subject;
                     st.staff = segs[1] || '';
                     st.venue = segs[2] || '';
-                    _commitSmartTtStateToInput(true);
+                    const ctx = _extractSlotContextFromInput(st.activeInput);
+                    const conflict = (st.mode === 'CLASS' && ctx.day && ctx.slotNumber)
+                        ? window.findFacultyClassConflict(st.staff, ctx.day, ctx.slotNumber, ctx.targetSection)
+                        : null;
+                    _notifyInputSlotConflict(st.activeInput, conflict);
+                    _commitSmartTtStateToInput(!conflict);
                     return;
                 }
                 const pickBtn = e.target.closest('[data-tt-pick]');
@@ -11853,8 +12080,15 @@ async function initSubstitutionModal() {
                         st.step = st.mode === 'CLASS' ? 'staff' : 'dept';
                         _commitSmartTtStateToInput(false);
                     } else if (kind === 'staff') {
+                        const ctx = _extractSlotContextFromInput(st.activeInput);
+                        const conflict = (st.mode === 'CLASS' && ctx.day && ctx.slotNumber)
+                            ? window.findFacultyClassConflict(val, ctx.day, ctx.slotNumber, ctx.targetSection)
+                            : null;
                         st.staff = val;
-                        st.step = 'venue';
+                        if (!conflict) {
+                            st.step = 'venue';
+                        }
+                        _notifyInputSlotConflict(st.activeInput, conflict);
                         _commitSmartTtStateToInput(false);
                     } else if (kind === 'dept') {
                         st.dept = val;
@@ -12071,12 +12305,24 @@ async function initSubstitutionModal() {
                 }).join('') : '<div class="text-muted small py-2">No matching subjects. Type any custom subject or add in Manage Resources.</div>';
             } else if (st.step === 'staff') {
                 hintText = 'Pick Staff / Faculty (auto-advances to Venue):';
+                const slotCtx = _extractSlotContextFromInput(input);
+                const selectedConflict = (slotCtx.day && slotCtx.slotNumber && st.staff)
+                    ? window.findFacultyClassConflict(st.staff, slotCtx.day, slotCtx.slotNumber, slotCtx.targetSection)
+                    : null;
+                if (selectedConflict) {
+                    quickHtml += `<div class="alert alert-danger py-1 px-2 mb-2" style="font-size:0.72rem;">
+                <i class="fa-solid fa-triangle-exclamation me-1"></i><strong>Already Assigned:</strong> ${esc(selectedConflict.message)}
+            </div>`;
+                }
                 const subMatch = (cat.subjects || []).find(s => s.label.toUpperCase() === st.subject.toUpperCase());
                 if (subMatch && subMatch.faculty) {
                     const defFull = [st.subject, subMatch.faculty, subMatch.venue || ''].filter(Boolean).join(', ');
-                    quickHtml = `<div class="mb-2">
-                <button type="button" class="btn btn-sm btn-success w-100 text-start py-1 px-2" style="font-size:0.74rem;" data-tt-quick="${esc(defFull)}">
-                    <i class="fa-solid fa-bolt me-1"></i>Use Stored Mapping: <strong>${esc(subMatch.faculty)}</strong>${subMatch.venue ? ` (${esc(subMatch.venue)})` : ''}
+                    const mappedConflict = (slotCtx.day && slotCtx.slotNumber)
+                        ? window.findFacultyClassConflict(subMatch.faculty, slotCtx.day, slotCtx.slotNumber, slotCtx.targetSection)
+                        : null;
+                    quickHtml += `<div class="mb-2">
+                <button type="button" class="btn btn-sm ${mappedConflict ? 'btn-warning text-dark' : 'btn-success'} w-100 text-start py-1 px-2" style="font-size:0.74rem;" data-tt-quick="${esc(defFull)}">
+                    <i class="fa-solid ${mappedConflict ? 'fa-triangle-exclamation' : 'fa-bolt'} me-1"></i>Use Stored Mapping: <strong>${esc(subMatch.faculty)}</strong>${subMatch.venue ? ` (${esc(subMatch.venue)})` : ''}${mappedConflict ? ` <span class="badge bg-danger text-white ms-1">Already in ${esc(mappedConflict.existingSection)}</span>` : ''}
                 </button>
             </div>`;
                 }
@@ -12084,10 +12330,13 @@ async function initSubstitutionModal() {
                     !q || t.label.toLowerCase().includes(q) || (t.dept || '').toLowerCase().includes(q) || (t.employeeId || '').toLowerCase().includes(q)
                 );
                 itemsHtml = list.length ? list.map(t => {
+                    const busy = (slotCtx.day && slotCtx.slotNumber)
+                        ? window.findFacultyClassConflict(t.label, slotCtx.day, slotCtx.slotNumber, slotCtx.targetSection)
+                        : null;
                     const meta = [t.dept, t.subjectHandling].filter(Boolean).join(' • ');
-                    return `<button type="button" class="btn btn-sm btn-outline-warning tt-pop-item text-start d-flex flex-column py-1 px-2" data-tt-pick="staff" data-val="${esc(t.label)}">
+                    return `<button type="button" class="btn btn-sm ${busy ? 'btn-outline-danger' : 'btn-outline-warning'} tt-pop-item text-start d-flex flex-column py-1 px-2" data-tt-pick="staff" data-val="${esc(t.label)}">
                 <span class="fw-semibold tt-pop-item-title" style="font-size:0.76rem;">${esc(t.label)}</span>
-                ${meta ? `<span class="tt-pop-item-meta text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : ''}
+                ${busy ? `<span class="badge bg-danger text-white mt-1" style="font-size:0.62rem;">Already in ${esc(busy.existingSection)} (${esc(busy.existingSubject)})</span>` : (meta ? `<span class="tt-pop-item-meta text-truncate" style="font-size:0.66rem; max-width:155px;">${esc(meta)}</span>` : '')}
             </button>`;
                 }).join('') : '<div class="text-muted small py-2">No matching staff found. Add faculty in Manage Faculty Details to see them here.</div>';
             } else if (st.step === 'venue') {
@@ -12217,6 +12466,11 @@ async function initSubstitutionModal() {
                     window._smartTtState.subject = (segs[0] || '').trim();
                     window._smartTtState.staff = (segs[1] || '').trim();
                     window._smartTtState.venue = (segs[2] || '').trim();
+                    const ctx = _extractSlotContextFromInput(el);
+                    if (ctx.day && ctx.slotNumber && window._smartTtState.staff) {
+                        const conflict = window.findFacultyClassConflict(window._smartTtState.staff, ctx.day, ctx.slotNumber, ctx.targetSection);
+                        _notifyInputSlotConflict(el, conflict);
+                    }
                 } else {
                     window._smartTtState.classStr = (segs[0] || '').trim();
                     window._smartTtState.venue = (segs[1] || '').trim();

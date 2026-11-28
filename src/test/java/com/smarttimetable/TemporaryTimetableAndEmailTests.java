@@ -1204,4 +1204,51 @@ class TemporaryTimetableAndEmailTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.dataJson").value(org.hamcrest.Matchers.containsString("\"P1\":\"DBMS, II ZZC A, SF 05\"")));
     }
+
+    @Test
+    void testAssigningAlreadyAssignedFacultyToAnotherClassReturnsConflictMessage() throws Exception {
+        String adminJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(adminUser.getUsername()), "ROLE_ADMIN");
+
+        // In setupFixtures(), Mr. Kumar (fac1) is already assigned to II ZZC A on Monday Period 3.
+        // Attempting to assign Mr. Kumar to II ZZC B on Monday Period 3 must return 409 with conflict message.
+        mockMvc.perform(post("/api/timetable/assign-class")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"department\":\"ZZC\",\"year\":\"II\",\"semester\":3,\"sectionCode\":\"B\",\"sectionName\":\"II ZZC B\",\"grid\":{\"Monday\":{\"P3\":\"JAVA, Mr. Kumar, ZZ-204\"}}}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("is already assigned to II ZZC A")))
+                .andExpect(jsonPath("$.conflicts[0].existingSection").value("II ZZC A"))
+                .andExpect(jsonPath("$.conflicts[0].day").value("Monday"))
+                .andExpect(jsonPath("$.conflicts[0].slotNumber").value(3));
+
+        mockMvc.perform(post("/api/timetable/save-manual")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"section\":\"II ZZC B\",\"semester\":3,\"grid\":{\"Monday\":{\"P3\":\"DBMS, Kumar R, ZZ-204\"}}}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("is already assigned to II ZZC A")));
+
+        // Pre-check endpoint reflects conflict for II ZZC B, but allows re-saving II ZZC A itself
+        mockMvc.perform(post("/api/timetable/check-faculty-conflicts")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"section\":\"II ZZC B\",\"semester\":3,\"grid\":{\"Monday\":{\"P3\":\"DBMS, Mr. Kumar, ZZ-204\"}}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasConflicts").value(true))
+                .andExpect(jsonPath("$.conflicts[0].message").value(org.hamcrest.Matchers.containsString("II ZZC A")));
+
+        mockMvc.perform(post("/api/timetable/check-faculty-conflicts")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"section\":\"II ZZC A\",\"semester\":3,\"grid\":{\"Monday\":{\"P3\":\"JAVA, Mr. Kumar, ZZ-101\"}}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasConflicts").value(false));
+
+        // Live suggestions endpoint includes active faculty assignments map for frontend conflict detection
+        mockMvc.perform(get("/api/operations/tt-suggestions")
+                        .header("Authorization", "Bearer " + adminJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignments").isArray())
+                .andExpect(jsonPath("$.assignments[0].sectionName").isNotEmpty());
+    }
 }

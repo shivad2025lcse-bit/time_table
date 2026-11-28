@@ -1002,7 +1002,7 @@ export default function DashboardLayout() {
                                                     <div className="row g-2 mb-3">
                                                         <div className="col-md-6">
                                                             <label className="form-label small text-muted">Faculty Incharge</label>
-                                                            <input type="text" id="editFaculty" list="savedStaffOptions" className="form-control form-control-sm bg-dark text-white border-secondary" defaultValue="Dr.S.K.Harikarthick, ASP/CSE" />
+                                                            <input type="text" id="editFaculty" list="savedStaffOptions" className="form-control form-control-sm bg-dark text-white border-secondary" defaultValue="Dr.S.K.Harikarthick, ASP/CSE" onInput={() => window.checkEditPeriodFacultyConflict && window.checkEditPeriodFacultyConflict()} onChange={() => window.checkEditPeriodFacultyConflict && window.checkEditPeriodFacultyConflict()} />
                                                             <datalist id="savedStaffOptions"></datalist>
                                                         </div>
                                                         <div className="col-md-6">
@@ -1010,6 +1010,7 @@ export default function DashboardLayout() {
                                                             <input type="text" id="editVenue" list="savedVenueOptions" className="form-control form-control-sm bg-dark text-white border-secondary" defaultValue="SF 04" />
                                                         </div>
                                                     </div>
+                                                    <div id="editPeriodConflictAlert" className="alert alert-warning py-2 px-3 small d-none mb-3" role="alert"></div>
 
                                                     <div className="row g-2 mb-3">
                                                         <div className="col-md-6">
@@ -2462,6 +2463,7 @@ export default function DashboardLayout() {
                                                         </table>
                                                     </div>
 
+                                                    <div id="ttBuilderConflictAlert" className="alert alert-danger py-2 px-3 small d-none mt-2 mb-0" role="alert"></div>
                                                     <div className="d-flex justify-content-end gap-2 mt-3">
                                                         <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                                         <button type="submit" className="btn btn-success"><i className="fa-solid fa-floppy-disk me-1"></i> Save Built Timetable</button>

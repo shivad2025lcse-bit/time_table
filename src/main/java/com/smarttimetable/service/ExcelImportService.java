@@ -479,6 +479,12 @@ public class ExcelImportService {
     }
 
     private int replaceSectionTimetableFromGrid(Section section, int semester, Map<String, Map<String, String>> gridData) {
+        List<Map<String, Object>> conflicts = facultyTimetableSyncService.findGridFacultyConflicts(
+                section != null ? section.getSectionName() : "", semester, gridData);
+        if (!conflicts.isEmpty()) {
+            throw new FacultyTimetableSyncService.FacultyConflictException(conflicts);
+        }
+
         List<TimetableEntry> existing = timetableRepository.findBySectionId(section.getId()).stream()
                 .filter(e -> e.getSemester() == null || Objects.equals(e.getSemester(), semester))
                 .collect(java.util.stream.Collectors.toList());
