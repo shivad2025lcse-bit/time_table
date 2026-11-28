@@ -6,6 +6,7 @@ import com.smarttimetable.repository.SubstitutionRepository;
 import com.smarttimetable.repository.TeacherRepository;
 import com.smarttimetable.repository.UserRepository;
 import com.smarttimetable.service.EmailNotificationService;
+import com.smarttimetable.service.FacultyTimetableSyncService;
 import com.smarttimetable.service.TimetableOperationsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,9 @@ public class TimetableOperationsController {
 
         @Autowired
         private TimetableOperationsService service;
+
+        @Autowired
+        private FacultyTimetableSyncService facultyTimetableSyncService;
 
         @Autowired
         private UserRepository userRepository;
@@ -280,6 +284,12 @@ public class TimetableOperationsController {
                                 "dataJson", saved.getDataJson(),
                                 "updatedBy", saved.getUpdatedBy() != null ? saved.getUpdatedBy() : "",
                                 "updatedAt", saved.getUpdatedAt() != null ? saved.getUpdatedAt().toString() : ""));
+        }
+
+        @PostMapping("/sync-faculty-timetables")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+        public ResponseEntity<Map<String, Object>> syncFacultyTimetablesFromStudentTimetables() {
+                return ResponseEntity.ok(facultyTimetableSyncService.syncAllFacultyTimetablesFromStudentTimetables());
         }
 
         @GetMapping("/tt-suggestions")

@@ -56,6 +56,9 @@ public class TimetableController {
     @Autowired
     private com.smarttimetable.service.ExcelImportService excelImportService;
 
+    @Autowired
+    private com.smarttimetable.service.FacultyTimetableSyncService facultyTimetableSyncService;
+
     @PostMapping("/upload-image")
     public ResponseEntity<?> parseTimetableImage(@RequestParam("file") MultipartFile file) {
         try {
@@ -150,6 +153,7 @@ public class TimetableController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     public ResponseEntity<TimetableResponse> generateTimetable(@RequestBody TimetableGenerateRequest request) {
         TimetableResponse response = timetableGeneratorService.generateTimetable(request);
+        facultyTimetableSyncService.syncAllFacultyTimetablesFromStudentTimetables();
         return ResponseEntity.ok(response);
     }
 
@@ -172,21 +176,27 @@ public class TimetableController {
         return timetableRepository.findById(id).map(entry -> {
             if (teacherId != null) {
                 Teacher t = teacherRepository.findById(teacherId).orElse(null);
-                if (t != null) entry.setTeacher(t);
+                if (t != null) {
+                    entry.setTeacher(t);
+                    entry.setAssignedFaculty(t.getDisplayName() != null && !t.getDisplayName().isBlank() ? t.getDisplayName() : t.getName());
+                }
             }
             if (classroomId != null) {
                 Classroom rm = classroomRepository.findById(classroomId).orElse(null);
                 entry.setClassroom(rm);
                 entry.setLaboratory(null);
+                if (rm != null) entry.setAssignedVenue(rm.getRoomNumber());
             } else if (laboratoryId != null) {
                 Laboratory lab = laboratoryRepository.findById(laboratoryId).orElse(null);
                 entry.setLaboratory(lab);
                 entry.setClassroom(null);
+                if (lab != null) entry.setAssignedVenue(lab.getLabName());
             }
             if (day != null && !day.isEmpty()) {
                 entry.setDay(day);
             }
             TimetableEntry updated = timetableRepository.save(entry);
+            facultyTimetableSyncService.syncAllFacultyTimetablesFromStudentTimetables();
             return ResponseEntity.ok(timetableGeneratorService.convertToDto(updated));
         }).orElse(ResponseEntity.notFound().build());
     }
@@ -262,6 +272,7 @@ public class TimetableController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     public ResponseEntity<Void> clearTimetable() {
         timetableRepository.deleteAll();
+        facultyTimetableSyncService.syncAllFacultyTimetablesFromStudentTimetables();
         return ResponseEntity.noContent().build();
     }
 

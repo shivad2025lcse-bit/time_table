@@ -708,31 +708,6 @@ export default function DashboardLayout() {
                                                     </div>
                                                 </div>
 
-                                                {!isFaculty && (
-                                                    <div className="glass-panel" id="referenceTableArea">
-                                                        <div className="panel-header">
-                                                            <h3 className="panel-title"><i className="fa-solid fa-book-bookmark text-warning"></i> Course & Faculty Incharge Reference Table</h3>
-                                                        </div>
-                                                        <div className="table-responsive p-2">
-                                                            <table className="ref-table">
-                                                                <thead>
-                                                                    <tr>
-                                                                        <th>Short Name</th>
-                                                                        <th>Course Code & Title</th>
-                                                                        <th>Faculty Incharge</th>
-                                                                        <th>Venue</th>
-                                                                        <th>Category</th>
-                                                                        <th>Credits</th>
-                                                                        <th>No. of Hrs</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody id="courseRefBody">
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    </div>
-                                                )}
-
                                                 <div className="glass-panel mt-3" id="studentFacultyAvailabilityArea">
                                                     <div className="panel-header">
                                                         <h3 className="panel-title"><i className="fa-solid fa-people-arrows text-warning"></i> Faculty Availability (Today)</h3>

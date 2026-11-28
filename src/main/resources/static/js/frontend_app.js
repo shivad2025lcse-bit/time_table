@@ -3129,6 +3129,10 @@ async function initSubstitutionModal() {
                     renderCoverageRequests();
                     renderStaffAvailability();
                     updateLeaveButtonState();
+                    if (role === 'FACULTY' && typeof window.syncFacultyPersonalTtFromBackend === 'function') {
+                        await window.syncFacultyPersonalTtFromBackend();
+                        if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+                    }
                     if (role === 'STUDENT' && typeof window.refreshStudentQuizVisibility === 'function') {
                         await window.refreshStudentQuizVisibility();
                     }
@@ -3285,6 +3289,42 @@ async function initSubstitutionModal() {
             document.getElementById('editCategory').value = 'cat-alt';
         }
 
+        function _syncSectionTimetableAndRefreshFaculty(sectionName, explicitGrid) {
+            if (!sectionName || !localStorage.getItem('jwt_token')) return;
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            let grid = explicitGrid;
+            if (!grid && timetableData && timetableData[sectionName]) {
+                grid = {};
+                days.forEach(d => {
+                    grid[d] = {};
+                    const dayArr = Array.isArray(timetableData[sectionName][d]) ? timetableData[sectionName][d] : [];
+                    for (let i = 0; i < 7; i++) {
+                        const slot = dayArr[i] || {};
+                        const sub = (slot.sub || '').trim();
+                        if (!sub || sub === 'FREE' || sub === '-') {
+                            grid[d]['P' + (i + 1)] = '';
+                        } else {
+                            const fac = (slot.faculty || '').trim();
+                            const ven = (slot.venue || '').trim();
+                            grid[d]['P' + (i + 1)] = [sub, fac === '-' ? '' : fac, ven === '-' ? '' : ven].filter(Boolean).join(', ');
+                        }
+                    }
+                });
+            }
+            if (!grid) return;
+            const secObj = (window.dbSectionsCache || []).find(s => String(s.sectionName || '').toLowerCase() === String(sectionName).toLowerCase());
+            const sem = (secObj && secObj.semester) ? parseInt(secObj.semester, 10) : (parseInt(window.currentTimetableSemester || '3', 10) || 3);
+            apiFetch('/api/timetable/save-manual', {
+                method: 'POST',
+                body: JSON.stringify({ section: sectionName, semester: sem, grid })
+            }).then(async res => {
+                if (res && res.ok && typeof window.syncFacultyPersonalTtFromBackend === 'function') {
+                    await window.syncFacultyPersonalTtFromBackend();
+                    if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+                }
+            }).catch(err => console.warn('Could not sync section edit to backend:', err));
+        }
+
         // Save Period Changes
         function savePeriodChanges() {
             const day = document.getElementById('editDay').value;
@@ -3328,6 +3368,7 @@ async function initSubstitutionModal() {
                 timetableData[currentSection][day][pIdx] = updatedSlot;
 
                 saveTimetableEdit(currentSection, day, pIdx, updatedSlot);
+                _syncSectionTimetableAndRefreshFaculty(currentSection);
                 createFacultyChangeNotification(day, pIdx, originalSlot, updatedSlot, currentSection);
                 showToast('Period Permanently Updated!', `Updated base schedule for ${day} Period ${pIdx + 1}. SMS sent to students.`);
             }
@@ -8393,6 +8434,10 @@ async function initSubstitutionModal() {
 
                 timetableData = loadSavedTimetable();
                 if (typeof window.loadTimetableData === 'function') await window.loadTimetableData();
+                if (typeof window.syncFacultyPersonalTtFromBackend === 'function') {
+                    await window.syncFacultyPersonalTtFromBackend();
+                    if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+                }
                 if (currentSection === section || !currentSection) {
                     currentSection = section;
                     renderTimetableGrid();
@@ -9417,6 +9462,16 @@ async function initSubstitutionModal() {
                 });
 
                 localStorage.setItem('class_tt_' + sectionKey, JSON.stringify(data));
+                const syncGrid = {};
+                days.forEach(d => {
+                    syncGrid[d] = {};
+                    for (let p = 1; p <= 7; p++) {
+                        const cell = data[d] ? data[d]['P' + p] : null;
+                        const val = cell && typeof cell === 'object' ? (cell.value || '') : (cell || '');
+                        syncGrid[d]['P' + p] = (val && val.toUpperCase() !== 'FREE') ? val : '';
+                    }
+                });
+                _syncSectionTimetableAndRefreshFaculty(sectionKey, syncGrid);
                 showToast('Success', 'Class timetable saved successfully!', 'success');
                 bootstrap.Modal.getInstance(document.getElementById('manageClassTtModal')).hide();
 
@@ -11013,6 +11068,10 @@ async function initSubstitutionModal() {
                     currentSection = fullSectionName;
                     if (typeof populateSectionSelects === 'function') populateSectionSelects();
                     if (typeof loadTimetableData === 'function') await loadTimetableData();
+                    if (typeof window.syncFacultyPersonalTtFromBackend === 'function') {
+                        await window.syncFacultyPersonalTtFromBackend();
+                        if (typeof window.renderFacultyPersonalTT === 'function') window.renderFacultyPersonalTT();
+                    }
                     if (typeof renderTimetableGrid === 'function') renderTimetableGrid();
                     if (typeof renderCourseRefTable === 'function') renderCourseRefTable();
 

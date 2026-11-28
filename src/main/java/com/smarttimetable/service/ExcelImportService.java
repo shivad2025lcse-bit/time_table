@@ -31,6 +31,8 @@ public class ExcelImportService {
     private ClassroomRepository classroomRepository;
     @Autowired
     private LaboratoryRepository laboratoryRepository;
+    @Autowired
+    private FacultyTimetableSyncService facultyTimetableSyncService;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> importTimetableExcel(MultipartFile file, String sectionName) throws Exception {
@@ -547,14 +549,12 @@ public class ExcelImportService {
                 }
             }
         }
+        facultyTimetableSyncService.syncAllFacultyTimetablesFromStudentTimetables();
         return savedCount;
     }
 
     private List<TimeSlot> ensureTimeSlots() {
-        List<TimeSlot> slots = timeSlotRepository.findAll();
-        if (!slots.isEmpty()) {
-            return slots;
-        }
+        List<TimeSlot> slots = new ArrayList<>(timeSlotRepository.findAll());
         String[][] defaults = {
                 {"08:40", "09:40"},
                 {"09:40", "10:40"},
@@ -564,11 +564,14 @@ public class ExcelImportService {
                 {"14:30", "15:20"},
                 {"15:20", "16:10"}
         };
-        List<TimeSlot> created = new ArrayList<>();
         for (int i = 0; i < defaults.length; i++) {
-            created.add(timeSlotRepository.save(new TimeSlot(i + 1, defaults[i][0], defaults[i][1])));
+            final int num = i + 1;
+            boolean exists = slots.stream().anyMatch(s -> s.getSlotNumber() != null && s.getSlotNumber() == num);
+            if (!exists) {
+                slots.add(timeSlotRepository.save(new TimeSlot(num, defaults[i][0], defaults[i][1])));
+            }
         }
-        return created;
+        return slots;
     }
 
     private int parseYearToInt(String y) {
@@ -608,17 +611,7 @@ public class ExcelImportService {
     }
 
     private Teacher matchTeacher(String facText, List<Teacher> allTeachers) {
-        if (facText == null || facText.trim().isEmpty()) return null;
-        String q = facText.trim().toLowerCase();
-        for (Teacher t : allTeachers) {
-            if ((t.getDisplayName() != null && t.getDisplayName().toLowerCase().contains(q))
-                    || t.getName().toLowerCase().contains(q)
-                    || (t.getFirstName() != null && q.contains(t.getFirstName().toLowerCase()))
-                    || (t.getUser() != null && t.getUser().getUsername().equalsIgnoreCase(q))) {
-                return t;
-            }
-        }
-        return null;
+        return facultyTimetableSyncService.matchBestTeacher(facText, allTeachers);
     }
 
     private Classroom matchClassroom(String venueText, List<Classroom> allRooms) {

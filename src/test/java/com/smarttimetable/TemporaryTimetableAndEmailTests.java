@@ -62,6 +62,7 @@ class TemporaryTimetableAndEmailTests {
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private CustomUserDetailsService userDetailsService;
+    @Autowired private FacultyTimetableRepository facultyTimetableRepo;
 
     private User adminUser, fac1User, fac2User, stu1User, stu2User;
     private Section secA, secB;
@@ -1117,5 +1118,90 @@ class TemporaryTimetableAndEmailTests {
                         .header("Authorization", "Bearer " + facultyJwt))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.downloadTtEnabled").value(true));
+    }
+
+    @Test
+    void testBackfillExistingFacultyTimetableFromPreExistingStudentEntries() throws Exception {
+        String adminJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(adminUser.getUsername()), "ROLE_ADMIN");
+
+        // Pre-existing manual Faculty TT for fac1 (missing Monday.P3 from entryA)
+        FacultyTimetable existingFt = new FacultyTimetable();
+        existingFt.setUsername(fac1User.getUsername());
+        existingFt.setDataJson("{\"Monday\":{\"ACT\":\"Mentoring\"}}");
+        facultyTimetableRepo.save(existingFt);
+
+        // Pre-existing Student TT entry on secB assigned via title/no-space variant while fallback teacher is fac1
+        TimeSlot p4 = slotRepo.findAll().stream().filter(s -> Objects.equals(s.getSlotNumber(), 4)).findFirst()
+                .orElseGet(() -> slotRepo.save(new TimeSlot(4, "12:15", "01:15")));
+        TimetableEntry fallbackEntry = new TimetableEntry();
+        fallbackEntry.setSection(secB);
+        fallbackEntry.setDay("Tuesday");
+        fallbackEntry.setTimeSlot(p4);
+        fallbackEntry.setSubject(subjJava);
+        fallbackEntry.setTeacher(fac1); // simulates old fallback teacher #0
+        fallbackEntry.setAssignedFaculty("Ms.PriyaS"); // compact variant without space
+        fallbackEntry.setAssignedVenue("SF-09");
+        fallbackEntry.setSemester(3);
+        timetableRepo.save(fallbackEntry);
+
+        mockMvc.perform(post("/api/operations/sync-faculty-timetables")
+                        .header("Authorization", "Bearer " + adminJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.syncedSlots").isNumber());
+
+        // Existing fac1 Faculty TT gets Monday.P3 backfilled while preserving manual ACT slot
+        String fac1Json = facultyTimetableRepo.findByUsernameIgnoreCase(fac1User.getUsername()).orElseThrow().getDataJson();
+        assertThat(fac1Json).contains("\"ACT\":\"Mentoring\"");
+        assertThat(fac1Json).contains("\"P3\":\"Java Programming, II ZZC A, ZZ-101\"");
+
+        // fac2 gets both Monday.P3 (from setup) and Tuesday.P4 (from compact "Ms.PriyaS", not leaked to fac1)
+        String fac2Json = facultyTimetableRepo.findByUsernameIgnoreCase(fac2User.getUsername()).orElseThrow().getDataJson();
+        assertThat(fac2Json).contains("\"P3\":\"Database Management Systems, II ZZC B, ZZ-204\"");
+        assertThat(fac2Json).contains("\"P4\":\"Java Programming, II ZZC B, SF-09\"");
+        assertThat(fac1Json).doesNotContain("SF-09");
+    }
+
+    @Test
+    void testAssignAndReassignStudentTimetableUpdatesFacultyTimetableAutomatically() throws Exception {
+        String adminJwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(adminUser.getUsername()), "ROLE_ADMIN");
+        String fac1Jwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(fac1User.getUsername()), "ROLE_FACULTY");
+        String fac2Jwt = jwtUtil.generateToken(userDetailsService.loadUserByUsername(fac2User.getUsername()), "ROLE_FACULTY");
+
+        // 1. Faculty 1 has a manual slot in their timetable
+        mockMvc.perform(post("/api/operations/faculty-timetables/" + fac1User.getUsername())
+                        .header("Authorization", "Bearer " + fac1Jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dataJson\":\"{\\\"Monday\\\":{\\\"ACT\\\":\\\"Club Activity\\\"}}\"}"))
+                .andExpect(status().isOk());
+
+        // 2. Admin assigns Student TT for II ZZC A placing Mr. Kumar on Monday P1
+        mockMvc.perform(post("/api/timetable/assign-class")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"department\":\"ZZC\",\"year\":\"II\",\"semester\":3,\"sectionCode\":\"A\",\"sectionName\":\"II ZZC A\",\"grid\":{\"Monday\":{\"P1\":\"JAVA, Mr. Kumar, SF 04\"}}}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/operations/faculty-timetables/" + fac1User.getUsername())
+                        .header("Authorization", "Bearer " + fac1Jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dataJson").value(org.hamcrest.Matchers.containsString("\"P1\":\"JAVA, II ZZC A, SF 04\"")))
+                .andExpect(jsonPath("$.dataJson").value(org.hamcrest.Matchers.containsString("\"ACT\":\"Club Activity\"")));
+
+        // 3. Reassign Monday P1 on II ZZC A from Mr. Kumar to Priya S via save-manual
+        mockMvc.perform(post("/api/timetable/save-manual")
+                        .header("Authorization", "Bearer " + adminJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"section\":\"II ZZC A\",\"semester\":3,\"grid\":{\"Monday\":{\"P1\":\"DBMS, Priya S, SF 05\"}}}"))
+                .andExpect(status().isOk());
+
+        // Old faculty Monday P1 auto-synced slot is cleared while manual ACT slot stays; new faculty gets DBMS
+        String fac1After = facultyTimetableRepo.findByUsernameIgnoreCase(fac1User.getUsername()).orElseThrow().getDataJson();
+        assertThat(fac1After).contains("\"ACT\":\"Club Activity\"");
+        assertThat(fac1After).doesNotContain("JAVA, II ZZC A, SF 04");
+
+        mockMvc.perform(get("/api/operations/faculty-timetables/" + fac2User.getUsername())
+                        .header("Authorization", "Bearer " + fac2Jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dataJson").value(org.hamcrest.Matchers.containsString("\"P1\":\"DBMS, II ZZC A, SF 05\"")));
     }
 }
